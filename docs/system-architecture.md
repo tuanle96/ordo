@@ -50,13 +50,26 @@ Handoff 4 currently hardens the shipped surface instead of widening it:
 - focused unit coverage for Odoo 19 group field fallback, session TTL behavior, condition parsing, and schema mapping
 - repo/docs alignment with the live-validated backend state
 
+## iOS architecture scope (Handoff 5)
+
+iOS client is now implemented with:
+
+- `AppState` manager for app lifecycle, session restore, login, and user context
+- `APIClient` async/await wrapper for backend routes (auth, schema, records, search)
+- `KeychainSessionStore` for secure token and session persistence
+- **File-based offline cache** via `FileCacheStore` actor storing JSON-encoded cache envelopes with timestamps for schema, record details, and paginated lists under `~/Library/Application Support/OrdoCache/`
+- **Cache-first list pagination** for res.partner with default 30 items per page; load-more appends subsequent pages from API or fallback to cache
+- **Relative timestamp display** on cached data showing age (e.g., "Showing saved data from 2 hours ago")
+- Feature screens: auth (login), browse (list/search with pagination), record-detail, home, settings
+- Settings screen with cache clear action (destructive)
+- Environment-driven AppConfig for backend URL resolution
+
 ## Deferred architecture
 
-The following remain deferred beyond the current Handoff 4 scope:
+The following remain deferred beyond the current scope:
 
 - sync engine
 - notifications
 - file proxying
 - refresh token rotation
-- persistent session storage
 - dashboard aggregation beyond a tiny future slice

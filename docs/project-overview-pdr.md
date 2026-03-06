@@ -31,10 +31,14 @@ Handoff 3 (complete and live-validated):
 - Record reads via `GET /records/:model`, `GET /records/:model/:id`, and `GET /search/:model`
 - Opaque upstream Odoo session bridge for protected reads
 
-Handoff 4 (in progress):
+Handoff 4 (complete):
 - Comprehensive backend automated test coverage and hardening
-- Docs and status alignment with the verified backend surface
-- Optional tiny dashboard slice remains deferred unless explicitly requested
+- Docs and status alignment with backend implementations
+
+Handoff 5 (in progress):
+- iOS SwiftUI native client with file-based offline cache and pagination
+- Feature set: login, session restore, schema/record browsing, detail view, search, reload-cache management
+- Unit test coverage for cache store (FileCacheStore) and pagination logic
 
 ## Explicit correction
 

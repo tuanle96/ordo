@@ -7,8 +7,9 @@ The repository currently contains:
 - `prd.md` as the main product specification
 - `.claude/` workflow and skill configuration
 - `odoo-src/` with vendored Odoo source for versions 17, 18, and 19
-- `backend/`
-- `shared/`
+- `backend/` NestJS API with Odoo adapter seams
+- `shared/` TypeScript transport contracts
+- `ios/` SwiftUI app with Xcode project
 - root `README.md`
 - root `docs/`
 - `odoo-instances/` for local Odoo 17/18/19 Docker validation
@@ -23,9 +24,24 @@ The backend now ships and verifies:
 - automated backend regression tests with Jest + Supertest
 - live local validation through the Dockerized `odoo-instances/` stack
 
+## iOS surface
+
+The iOS app now ships with:
+
+- `app/app-state.swift` for lifecycle, session restore, login state machine
+- `app/app-config.swift` for backend URL resolution and configuration
+- `networking/api-client.swift` async/await wrapper for all backend routes
+- `persistence/keychain-session-store.swift` for secure token storage
+- `features/auth/` login screen and session restore flow
+- `features/browse/` list and search for res.partner
+- `features/record-detail/` detail view for individual records
+- `features/home/` tab navigation shell
+- `features/settings/` user profile and settings
+
 ## Package ownership
 
 - `shared/` owns transport-level contracts
 - `backend/` owns API runtime and Odoo integration logic
+- `ios/` owns SwiftUI app with AppState, APIClient, and feature screens
 - `odoo-instances/` owns local integration infrastructure for Postgres + Odoo 17/18/19
 - `odoo-src/` is reference material only

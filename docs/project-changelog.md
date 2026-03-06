@@ -1,6 +1,63 @@
 # Project Changelog
 
-## 2026-03-06
+## 2026-03-06 (iOS Foundation — Offline Cache & Pagination)
+
+### Added
+
+- **FileCacheStore** actor for file-based offline persistence under `~/Library/Application Support/OrdoCache/`
+  - JSON-encoded cache envelopes with absolute timestamps for schema, record details, and paginated lists
+  - `loadSchema()`, `saveSchema()` for model metadata
+  - `loadRecord()`, `saveRecord()` for record details
+  - `loadListPage()`, `saveListPage()` for paginated record lists
+  - `clear()` to remove all cached data
+- **CachedValue** wrapper providing `relativeTimestamp` string (e.g., "2 hours ago") via `RelativeDateTimeFormatter`
+- **List pagination for res.partner** with default 30 items per page
+  - `loadMoreIfNeeded()` triggers next-page fetch when list scrolls to last visible item
+  - Cache fallback when network unavailable; displays timestamp badge
+  - `canLoadMore` flag reflects whether additional pages exist (determined by full-page return count)
+- **Clear offline cache action** in Settings screen with destructive button variant
+- **Cache status messages** on list/load-more views (e.g., "Showing saved data from 2 hours ago.")
+- **Unit tests** for cache store (schema save/load, list pagination, encoding/decoding)
+
+### Changed
+
+- Record list view-model now integrates cache-first loading for initial page and load-more
+- Settings screen expanded with Storage section for cache management
+- AppState exposes `clearCache()` method scoped to cache store
+
+### Verified
+
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — build succeeds
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — unit test target passes
+
+## 2026-03-06 (iOS Foundation)
+
+### Added
+
+- iOS native SwiftUI app scaffold with folder-first architecture under `ios/Ordo/` (App, Features, Shared, Networking, Persistence)
+- Auth/login UI with Keychain-backed session persistence and `/auth/me` session restore at launch
+- `APIClient` with async/await methods for auth, schema, records, and search routes; typed envelope decoding and error mapping
+- Curated model registry with `res.partner` as first supported model
+- Record list view with pagination and inline quick-search using `/search/:model`
+- Schema-backed read-only record detail rendering with support for MVP field types (char, text, integer, float, boolean, selection, date, datetime, many2one, statusbar)
+- Settings UI with server info, user profile display, and session management (sign out, cache clear)
+- Home tab shell with connection status and recent items scaffolding
+- iOS deployment target normalized to 17.0 across app, unit tests, and UI tests
+- Removed Xcode template-only code (Item.swift)
+
+### Changed
+
+- iOS project structure reorganized from template defaults to feature-based organization
+
+### Notes
+
+- verified with `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — build succeeds
+- `xcodebuild test` incomplete due to terminal interruption; full test suite run needed for final validation
+- AppState restores previous authenticated session on app launch; routes to login if session invalid or expired
+- APIClient integrates with shared TypeScript contracts from backend all six current endpoints
+- Offline caching layer (read-through repositories, SwiftData cache entities, stale/offline UI states) deferred beyond this iteration
+
+## 2026-03-06 (Backend completion)
 
 ### Added
 
