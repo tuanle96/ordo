@@ -4,6 +4,20 @@
 
 ### Added
 
+- `odoo-instances/` local Docker Compose stack with shared PostgreSQL and live Odoo 17/18/19 instances on ports `38420`-`38423`
+- per-version Odoo Dockerfiles and Postgres init SQL for repeatable local integration validation
+
+### Changed
+
+- Handoff 3 is now live-validated end-to-end against reachable Odoo 17/18/19 instances
+- authenticated user profile loading now falls back from `groups_id` to `group_ids` for Odoo 19 compatibility
+
+### Notes
+
+- verified with `docker compose config`, `docker compose up -d --build`, database initialization for Odoo 17/18/19, `npm run build`, and live backend calls for `POST /auth/login`, `GET /auth/me`, `GET /schema/:model`, `GET /records/:model`, `GET /records/:model/:id`, and `GET /search/:model`
+
+### Added
+
 - in-memory upstream Odoo session-handle store with TTL
 - session-aware Odoo dataset calls for protected reads
 - `SchemaModule` with `GET /schema/:model`
@@ -18,8 +32,7 @@
 
 ### Notes
 
-- verified with `npm install`, `npm run build`, backend runtime smoke tests, and protected-route checks for missing upstream session behavior
-- live successful schema/record/search validation against a reachable Odoo instance is still pending
+- verified with `npm install`, `npm run build`, backend runtime smoke tests, protected-route checks for missing upstream session behavior, and live successful schema/record/search validation against reachable Odoo 17/18/19 instances
 
 ## 2026-03-06
 

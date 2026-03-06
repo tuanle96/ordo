@@ -5,8 +5,8 @@
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Handoff 1 — Foundation | Complete | Docs baseline, npm workspace, shared contracts, Nest bootstrap, health smoke test |
-| Handoff 2 — Odoo auth and RPC | In Progress | Auth module, JWT, version detection, JSON-RPC client, protected `/auth/me` with offline smoke tests; live Odoo integration pending |
-| Handoff 3 — Schema and records | In Progress | Session bridge, `GET /schema/:model`, `GET /records/:model`, `GET /records/:model/:id`, `GET /search/:model`; live Odoo happy-path validation pending |
+| Handoff 2 — Odoo auth and RPC | Complete | Auth module, JWT, version detection, JSON-RPC client, protected `/auth/me`, and live login validation against Odoo 17/18/19 |
+| Handoff 3 — Schema and records | Complete | Session bridge, `GET /schema/:model`, `GET /records/:model`, `GET /records/:model/:id`, `GET /search/:model`, plus live happy-path validation against Odoo 17/18/19 |
 | Handoff 4 — Dashboard and hardening | Planned | Dashboard read APIs, tests, docs cleanup |
 
 ## Scope reminders

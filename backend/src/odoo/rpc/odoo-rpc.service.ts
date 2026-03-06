@@ -86,7 +86,7 @@ export class OdooRpcService {
     }
 
     async readCurrentUser(input: OdooCurrentUserRequest) {
-        const users = await this.executeKw<OdooCurrentUserProfile[]>(input.odooUrl, {
+        const users = await this.readCurrentUserRecords(() => this.executeKw<OdooCurrentUserProfile[]>(input.odooUrl, {
             db: input.db,
             uid: input.uid,
             password: input.password,
@@ -96,28 +96,26 @@ export class OdooRpcService {
             kwargs: {
                 fields: ['id', 'name', 'email', 'lang', 'tz', 'groups_id'],
             },
-        });
+        }), () => this.executeKw<OdooCurrentUserProfile[]>(input.odooUrl, {
+            db: input.db,
+            uid: input.uid,
+            password: input.password,
+            model: 'res.users',
+            method: 'read',
+            args: [[input.uid]],
+            kwargs: {
+                fields: ['id', 'name', 'email', 'lang', 'tz', 'group_ids'],
+            },
+        }));
 
-        const [user] = users;
-        if (!user) {
-            throw new BadGatewayException('Unable to load authenticated user profile from Odoo');
-        }
-
-        return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            lang: user.lang ?? 'en_US',
-            tz: user.tz,
-            groups: user.groups_id ?? [],
-        };
+        return this.mapCurrentUser(users);
     }
 
     async readCurrentUserWithSession(
         session: Pick<OdooCallKwRequest['session'], 'odooUrl' | 'cookieHeader'>,
         uid: number,
     ) {
-        const users = await this.callKwWithSession<OdooCurrentUserProfile[]>({
+        const users = await this.readCurrentUserRecords(() => this.callKwWithSession<OdooCurrentUserProfile[]>({
             session,
             model: 'res.users',
             method: 'read',
@@ -125,21 +123,17 @@ export class OdooRpcService {
             kwargs: {
                 fields: ['id', 'name', 'email', 'lang', 'tz', 'groups_id'],
             },
-        });
+        }), () => this.callKwWithSession<OdooCurrentUserProfile[]>({
+            session,
+            model: 'res.users',
+            method: 'read',
+            args: [[uid]],
+            kwargs: {
+                fields: ['id', 'name', 'email', 'lang', 'tz', 'group_ids'],
+            },
+        }));
 
-        const [user] = users;
-        if (!user) {
-            throw new BadGatewayException('Unable to load authenticated user profile from Odoo');
-        }
-
-        return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            lang: user.lang ?? 'en_US',
-            tz: user.tz,
-            groups: user.groups_id ?? [],
-        };
+        return this.mapCurrentUser(users);
     }
 
     async executeKw<T>(odooUrl: string, request: OdooExecuteKwRequest): Promise<T> {
@@ -268,6 +262,37 @@ export class OdooRpcService {
 
         const match = rawCookie.match(/session_id=([^;]+)/);
         return match ? `session_id=${match[1]}` : null;
+    }
+
+    private async readCurrentUserRecords(
+        primary: () => Promise<OdooCurrentUserProfile[]>,
+        fallback: () => Promise<OdooCurrentUserProfile[]>,
+    ): Promise<OdooCurrentUserProfile[]> {
+        try {
+            return await primary();
+        } catch (error) {
+            if (!(error instanceof BadGatewayException)) {
+                throw error;
+            }
+
+            return fallback();
+        }
+    }
+
+    private mapCurrentUser(users: OdooCurrentUserProfile[]) {
+        const [user] = users;
+        if (!user) {
+            throw new BadGatewayException('Unable to load authenticated user profile from Odoo');
+        }
+
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            lang: user.lang ?? 'en_US',
+            tz: user.tz,
+            groups: user.groups_id ?? user.group_ids ?? [],
+        };
     }
 }
 

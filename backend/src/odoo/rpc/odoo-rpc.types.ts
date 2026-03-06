@@ -48,4 +48,5 @@ export interface OdooCurrentUserProfile {
     lang?: string;
     tz?: string;
     groups_id?: number[];
+    group_ids?: number[];
 }
