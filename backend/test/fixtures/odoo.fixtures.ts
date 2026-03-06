@@ -1,0 +1,72 @@
+export const odooFixtures = {
+    tokenPayload: {
+        uid: 2,
+        db: 'odoo17',
+        odooUrl: 'http://127.0.0.1:38421',
+        version: '17',
+        lang: 'en_US',
+        groups: [2, 8, 3, 9, 1, 4, 7],
+        name: 'Administrator',
+        email: 'admin@example.com',
+        tz: 'UTC',
+        sessionHandle: 'session-handle-123',
+    },
+    authenticatedPrincipal: {
+        uid: 2,
+        db: 'odoo17',
+        odooUrl: 'http://127.0.0.1:38421',
+        version: '17',
+        lang: 'en_US',
+        groups: [2, 8, 3, 9, 1, 4, 7],
+        name: 'Administrator',
+        email: 'admin@example.com',
+        tz: 'UTC',
+    },
+    authUser: {
+        id: 2,
+        name: 'Administrator',
+        email: 'admin@example.com',
+        lang: 'en_US',
+        tz: 'UTC',
+        groups: [2, 8, 3, 9, 1, 4, 7],
+    },
+    tokenResponse: {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresIn: 900,
+        user: {
+            id: 2,
+            name: 'Administrator',
+            email: 'admin@example.com',
+            lang: 'en_US',
+            tz: 'UTC',
+        },
+    },
+    schema: {
+        model: 'res.partner',
+        title: 'Partners',
+        header: { actions: [] },
+        sections: [
+            {
+                label: null,
+                fields: [
+                    {
+                        name: 'name',
+                        type: 'char',
+                        label: 'Name',
+                        required: true,
+                        readonly: false,
+                        searchable: false,
+                    },
+                ],
+            },
+        ],
+        tabs: [],
+        hasChatter: false,
+    },
+    records: [
+        { id: 3, name: 'Administrator', email: 'admin@example.com' },
+        { id: 1, name: 'My Company', email: false },
+    ],
+    nameSearch: [{ id: 3, name: 'Administrator' }],
+};

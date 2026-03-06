@@ -4,6 +4,20 @@
 
 ### Added
 
+- Jest + Supertest backend test foundation under `backend/test/`
+- automated regression coverage for health, auth, schema, records, search, and the Odoo 19 `group_ids` fallback path
+
+### Changed
+
+- `backend` `npm test` now runs real automated tests instead of only TypeScript linting
+- backend bootstrap configuration is shared between runtime and test app setup through `src/app.factory.ts`
+
+### Notes
+
+- verified with `npm run lint`, `npm run build`, and `npm run test` with 7 passing suites / 14 passing tests
+
+### Added
+
 - `odoo-instances/` local Docker Compose stack with shared PostgreSQL and live Odoo 17/18/19 instances on ports `38420`-`38423`
 - per-version Odoo Dockerfiles and Postgres init SQL for repeatable local integration validation
 

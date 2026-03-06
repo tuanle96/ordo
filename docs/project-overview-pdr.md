@@ -21,15 +21,20 @@ Handoff 1 (complete):
 - shared contracts
 - NestJS bootstrap
 
-Handoff 2 (implemented, pending live validation):
+Handoff 2 (complete and live-validated):
 - Auth module with Odoo login and token issuance
 - JSON-RPC transport for version-aware Odoo integration
 - First protected endpoint (`GET /auth/me`)
 
-Handoff 3+ planned:
-- Schema parsing and record CRUD
-- Dashboard and search APIs
-- Comprehensive test coverage and hardening
+Handoff 3 (complete and live-validated):
+- Schema parsing via `GET /schema/:model`
+- Record reads via `GET /records/:model`, `GET /records/:model/:id`, and `GET /search/:model`
+- Opaque upstream Odoo session bridge for protected reads
+
+Handoff 4 (in progress):
+- Comprehensive backend automated test coverage and hardening
+- Docs and status alignment with the verified backend surface
+- Optional tiny dashboard slice remains deferred unless explicitly requested
 
 ## Explicit correction
 

@@ -31,14 +31,32 @@ Handoff 2 implements the first real Odoo-backed feature:
 - Full HTTP exception mapping and error envelope consistency
 - Environment validation for JWT secrets and timeouts
 
+## Handoff 3 architecture scope
+
+Handoff 3 adds the first real Odoo-backed read surface:
+
+- opaque backend-managed upstream Odoo session handles
+- `SchemaModule` for `GET /schema/:model`
+- `RecordModule` for `GET /records/:model`, `GET /records/:model/:id`, and `GET /search/:model`
+- XML form parsing through `MobileSchemaBuilderService` and `ConditionParserService`
+- version reuse where v18/v19 inherit the v17 adapter path unless proven otherwise
+
+## Handoff 4 hardening scope
+
+Handoff 4 currently hardens the shipped surface instead of widening it:
+
+- shared runtime/test bootstrap via `src/app.factory.ts`
+- Jest + Supertest automated regression tests
+- focused unit coverage for Odoo 19 group field fallback, session TTL behavior, condition parsing, and schema mapping
+- repo/docs alignment with the live-validated backend state
+
 ## Deferred architecture
 
-The following remain deferred beyond Handoff 2:
+The following remain deferred beyond the current Handoff 4 scope:
 
-- schema XML parsing
-- record CRUD operations
 - sync engine
 - notifications
 - file proxying
 - refresh token rotation
 - persistent session storage
+- dashboard aggregation beyond a tiny future slice

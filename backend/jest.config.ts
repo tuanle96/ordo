@@ -1,0 +1,19 @@
+import type { Config } from 'jest';
+
+const config: Config = {
+    rootDir: '.',
+    moduleFileExtensions: ['js', 'json', 'ts'],
+    testEnvironment: 'node',
+    testRegex: '.*\\.spec\\.ts$',
+    transform: {
+        '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+    },
+    moduleNameMapper: {
+        '^@ordo/shared$': '<rootDir>/../shared/src',
+    },
+    roots: ['<rootDir>/src', '<rootDir>/test'],
+    collectCoverageFrom: ['src/**/*.ts', '!src/main.ts'],
+    clearMocks: true,
+};
+
+export default config;

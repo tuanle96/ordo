@@ -4,11 +4,13 @@
         "baseUrl": "./",
         "outDir": "./dist",
         "types": [
-            "node"
+            "node",
+            "jest"
         ]
     },
     "include": [
-        "src/**/*.ts"
+        "src/**/*.ts",
+        "test/**/*.ts"
     ],
     "exclude": [
         "node_modules",
