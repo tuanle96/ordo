@@ -145,7 +145,11 @@ private enum UITestFixtures {
             FieldSchema(name: "city", type: .char, label: "City", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
         ])],
-        tabs: [],
+        tabs: [FormTab(label: "Notes", content: ["sections": encodedSections([
+            FormSection(label: "Notes", fields: [
+                FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ]),
+        ])])],
         hasChatter: false
     )
 
@@ -175,7 +179,17 @@ private enum UITestFixtures {
             "phone": .string(phones[index]),
             "city": .string(cities[index]),
             "country_id": .array([.number(233), .string("United States")]),
+            "comment": .string("Preferred customer"),
         ]
+    }
+
+    private static func encodedSections(_ sections: [FormSection]) -> JSONValue {
+        do {
+            let data = try JSONEncoder().encode(sections)
+            return try JSONDecoder().decode(JSONValue.self, from: data)
+        } catch {
+            return .array([])
+        }
     }
 }
 

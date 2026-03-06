@@ -9,7 +9,7 @@ struct CacheStoreTests {
     func schemaRoundTrip() async throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let store = FileCacheStore(baseDirectoryURL: directoryURL)
+        let store = await FileCacheStore(baseDirectoryURL: directoryURL)
         let schema = MobileFormSchema(
             model: "res.partner",
             title: "Contact",
@@ -29,7 +29,7 @@ struct CacheStoreTests {
     func listPageRoundTripAndClear() async throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let store = FileCacheStore(baseDirectoryURL: directoryURL)
+        let store = await FileCacheStore(baseDirectoryURL: directoryURL)
         let list = RecordListResult(
             items: [["id": .number(1), "name": .string("Azure Interior")]],
             limit: 30,
@@ -51,7 +51,7 @@ struct CacheStoreTests {
         let directoryURL = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let oldDate = Date(timeIntervalSinceNow: -(8 * 24 * 60 * 60))
-        let store = FileCacheStore(baseDirectoryURL: directoryURL, dateProvider: { oldDate })
+        let store = await FileCacheStore(baseDirectoryURL: directoryURL, dateProvider: { oldDate })
         let schema = MobileFormSchema(
             model: "res.partner",
             title: "Contact",
@@ -63,7 +63,7 @@ struct CacheStoreTests {
 
         try await store.saveSchema(schema, for: schema.model, scope: scope)
 
-        let freshStore = FileCacheStore(baseDirectoryURL: directoryURL, dateProvider: Date.init)
+        let freshStore = await FileCacheStore(baseDirectoryURL: directoryURL, dateProvider: Date.init)
         let cached = await freshStore.loadSchema(for: schema.model, scope: scope)
 
         #expect(cached == nil)

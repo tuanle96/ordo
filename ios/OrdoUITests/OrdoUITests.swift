@@ -31,6 +31,7 @@ final class OrdoUITests: XCTestCase {
 
         app.cells["record-row-1"].tap()
         XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["field-value-comment"].waitForExistence(timeout: 5))
     }
 
     @MainActor

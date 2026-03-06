@@ -75,6 +75,10 @@ struct FormTab: Codable, Hashable, Identifiable {
     let content: [String: JSONValue]
 
     var id: String { label }
+
+    var sections: [FormSection] {
+        content.decodedValue(forKey: "sections", as: [FormSection].self) ?? []
+    }
 }
 
 struct MobileFormSchema: Codable, Hashable {
@@ -87,11 +91,25 @@ struct MobileFormSchema: Codable, Hashable {
 
     var requestedFieldNames: [String] {
         var fields = sections.flatMap(\.fields).map(\.name)
+        fields.append(contentsOf: tabs.flatMap(\.sections).flatMap(\.fields).map(\.name))
 
         if let statusField = header.statusbar?.field {
             fields.append(statusField)
         }
 
         return Array(Set(fields + ["id", "display_name", "name"]))
+    }
+}
+
+private extension Dictionary where Key == String, Value == JSONValue {
+    func decodedValue<T: Decodable>(forKey key: String, as type: T.Type) -> T? {
+        guard let value = self[key] else { return nil }
+
+        do {
+            let data = try JSONEncoder().encode(value)
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            return nil
+        }
     }
 }

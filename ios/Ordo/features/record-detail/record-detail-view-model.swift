@@ -74,17 +74,4 @@ final class RecordDetailViewModel: ObservableObject {
 
         isLoading = false
     }
-
-    func value(for field: FieldSchema) -> String? {
-        guard let rawValue = record?[field.name], !rawValue.isVisuallyEmpty else { return nil }
-
-        if field.type == .selection,
-           let key = rawValue.stringValue,
-           let option = field.selection?.first(where: { $0.first == key }),
-           option.count > 1 {
-            return option[1]
-        }
-
-        return rawValue.displayText
-    }
 }

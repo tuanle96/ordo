@@ -288,11 +288,17 @@ export class OdooRpcService {
         return {
             id: user.id,
             name: user.name,
-            email: user.email,
+            email: this.normalizeOptionalString(user.email),
             lang: user.lang ?? 'en_US',
-            tz: user.tz,
+            tz: this.normalizeOptionalString(user.tz),
             groups: user.groups_id ?? user.group_ids ?? [],
         };
+    }
+
+    private normalizeOptionalString(
+        value: string | false | null | undefined,
+    ): string | undefined {
+        return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
     }
 }
 

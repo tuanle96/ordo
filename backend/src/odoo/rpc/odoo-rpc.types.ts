@@ -44,9 +44,9 @@ export interface OdooCallKwRequest {
 export interface OdooCurrentUserProfile {
     id: number;
     name: string;
-    email?: string;
+    email?: string | false | null;
     lang?: string;
-    tz?: string;
+    tz?: string | false | null;
     groups_id?: number[];
     group_ids?: number[];
 }

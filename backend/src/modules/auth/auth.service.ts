@@ -56,8 +56,8 @@ export class AuthService {
             lang: user.lang,
             groups: user.groups,
             name: user.name,
-            email: user.email,
-            tz: user.tz,
+            email: this.normalizeOptionalString(user.email),
+            tz: this.normalizeOptionalString(user.tz),
             sessionHandle: storedSession.handle,
         };
 
@@ -100,18 +100,24 @@ export class AuthService {
         return {
             id: user.id,
             name: user.name,
-            email: user.email,
+            email: this.normalizeOptionalString(user.email),
             lang: user.lang,
-            tz: user.tz,
+            tz: this.normalizeOptionalString(user.tz),
         };
+    }
+
+    private normalizeOptionalString(
+        value: string | false | null | undefined,
+    ): string | undefined {
+        return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
     }
 }
 
 interface OdooUserProfile {
     id: number;
     name: string;
-    email?: string;
+    email?: string | false | null;
     lang: string;
-    tz?: string;
+    tz?: string | false | null;
     groups: number[];
 }

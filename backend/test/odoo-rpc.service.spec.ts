@@ -45,9 +45,9 @@ describe('OdooRpcService', () => {
         expect(user).toEqual({
             id: 2,
             name: 'Administrator',
-            email: false,
+            email: undefined,
             lang: 'en_US',
-            tz: false,
+            tz: undefined,
             groups: [4],
         });
     });

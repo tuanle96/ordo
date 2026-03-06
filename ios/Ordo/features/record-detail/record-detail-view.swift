@@ -45,31 +45,7 @@ struct RecordDetailView: View {
                         .padding(.vertical, 4)
                     }
 
-                    ForEach(Array(schema.sections.enumerated()), id: \.offset) { _, section in
-                        let visibleFields = section.fields.compactMap { field in
-                            viewModel.value(for: field).map { value in (field, value) }
-                        }
-
-                        if !visibleFields.isEmpty {
-                            Section(section.label ?? "Details") {
-                                ForEach(visibleFields, id: \.0.name) { field, value in
-                                    LabeledContent(field.label) {
-                                        Text(value)
-                                            .multilineTextAlignment(.trailing)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if !schema.tabs.isEmpty {
-                        Section("Additional Sections") {
-                            ForEach(schema.tabs) { tab in
-                                Text(tab.label)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
+                    SchemaRendererView(schema: schema, record: record)
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {

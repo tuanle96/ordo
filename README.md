@@ -1,12 +1,5 @@
 <p align="center">
-  <img src="docs/assets/ordo-logo.png" alt="Ordo Logo" width="120" />
-</p>
-
-<h1 align="center">Ordo</h1>
-
-<p align="center">
-  <strong>Mobile-first client for Odoo Community Edition</strong><br />
-  Native iOS app powered by a NestJS middleware layer
+  <img src="docs/assets/ordo-banner.png" alt="Ordo — Mobile-first client for Odoo Community Edition" width="800" />
 </p>
 
 <p align="center">

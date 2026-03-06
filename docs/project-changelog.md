@@ -1,5 +1,31 @@
 # Project Changelog
 
+## 2026-03-06 (iOS Dynamic Form Engine — Read-only Foundation)
+
+### Added
+
+- **Typed tab-section decoding** for schema-driven detail rendering; `FormTab.content.sections` now decodes into real `[FormSection]` values instead of remaining opaque JSON
+- **Reusable read-only schema renderer** for record detail screens, covering both top-level sections and tab-backed sections from the backend schema contract
+- **Field row factory + fallback rendering** for the first supported dynamic-form subset (`char`, `text`, `integer`, `float`, `boolean`, `selection`, `date`, `datetime`, `many2one`, `statusbar`) with graceful unsupported-type rows
+- **Focused unit coverage** for schema tab decoding and read-only field row behavior
+- **Smoke assertion for tab-backed content** in UI tests; the detail flow now verifies a rendered `comment` field coming from a schema tab section
+
+### Changed
+
+- `RecordDetailView` no longer hand-renders schema rows inline; it now delegates read-only composition to extracted renderer views
+- `MobileFormSchema.requestedFieldNames` now includes field names from decoded tab sections so record fetches request the full visible detail payload
+- UI-test schema fixtures now include a `Notes` tab with a `comment` field to exercise the new renderer path end-to-end
+
+### Fixed
+
+- **HIGH (2026-03-06 live iOS verification)**: notebook/tab fields were effectively stranded in opaque tab content and did not render on the detail screen
+- **MEDIUM (2026-03-06 dynamic-form verification)**: auth envelope decoding regressed when optional string fields arrived as boolean `false`; defensive lossy decoding keeps login/session restore stable during renderer verification
+
+### Verified
+
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — unit tests pass, including schema tab decoding, field-row factory, cache TTL, and auth decoding regression coverage
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/testSmokeLoginBrowseAndDetail -only-testing:OrdoUITests/testSmokeRestoresSessionAfterRelaunch test` — targeted smoke tests pass end to end
+
 ## 2026-03-06 (iOS Hardening — Cache & Pagination & Deterministic Tests)
 
 ### Added
@@ -14,6 +40,7 @@
   - Fixture endpoints return hardcoded auth tokens, principals, schemas, records, and search results
   - Pagination offset query param parsed deterministically (e.g., `offset=0` returns full fixture list, non-zero offsets return empty for stateless testing)
   - All cache/session storage scoped to UI test suite via UserDefaults and ephemeral cache directories
+- **Auth response decode hardening** via lossy optional-string decoding for `AuthUser` and `AuthenticatedPrincipal`; falsy upstream values like `false`, `null`, or blank strings now normalize to `nil` instead of failing login/session restore decoding
 - **xcodebuild + test suite verification**: full build succeeds (0 errors); OrdoTests unit target passes; OrdoUITests smoke suite validates login → browse → detail and session restore flows
 
 ### Changed
@@ -29,6 +56,7 @@
 - **HIGH (2026-03-06 code review)**: Silent cache write failures — resolved via OSLog error capture
 - **HIGH (2026-03-06 code review)**: Pagination offset tracking edge cases — resolved via deduplication on merge
 - **HIGH (2026-03-06 code review)**: No cache expiration policy — resolved via tiered TTL with auto-cleanup
+- **HIGH (2026-03-06 live auth validation)**: iOS login/session restore decode failures when Odoo-backed auth payloads leaked boolean `false` for optional string fields such as `email` and `tz`
 
 ### Verified
 
