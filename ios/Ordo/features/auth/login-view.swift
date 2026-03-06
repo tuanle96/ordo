@@ -46,6 +46,7 @@ struct LoginView: View {
 
                 Section {
                     TextField("Backend API URL", text: $draft.backendBaseURL)
+                        .accessibilityIdentifier("login-backend-url-field")
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
                         .autocorrectionDisabled()
@@ -59,6 +60,7 @@ struct LoginView: View {
 
                 Section {
                     TextField("Odoo URL", text: $draft.odooURL)
+                        .accessibilityIdentifier("login-odoo-url-field")
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
                         .autocorrectionDisabled()
@@ -66,6 +68,7 @@ struct LoginView: View {
                         .submitLabel(.next)
 
                     TextField("Database", text: $draft.database)
+                        .accessibilityIdentifier("login-database-field")
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .database)
@@ -76,12 +79,14 @@ struct LoginView: View {
 
                 Section {
                     TextField("Username", text: $draft.username)
+                        .accessibilityIdentifier("login-username-field")
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .username)
                         .submitLabel(.next)
 
                     SecureField("Password", text: $draft.password)
+                        .accessibilityIdentifier("login-password-field")
                         .focused($focusedField, equals: .password)
                         .submitLabel(.go)
                 } header: {
@@ -117,6 +122,7 @@ struct LoginView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("login-submit-button")
                 .controlSize(.large)
                 .disabled(!canSubmit)
                 .padding(.horizontal)

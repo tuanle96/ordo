@@ -32,6 +32,7 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Home")
+        .accessibilityIdentifier("home-screen")
     }
 }
 

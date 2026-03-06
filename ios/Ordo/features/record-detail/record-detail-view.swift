@@ -32,6 +32,7 @@ struct RecordDetailView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(record["display_name"]?.displayText ?? record["name"]?.displayText ?? schema.title)
                                 .font(.title3.weight(.semibold))
+                                .accessibilityIdentifier("record-detail-title")
 
                             if let statusField = schema.header.statusbar?.field,
                                let status = record[statusField]?.displayText,
@@ -70,6 +71,7 @@ struct RecordDetailView: View {
                         }
                     }
                 }
+                .accessibilityIdentifier("record-detail-screen")
                 .refreshable {
                     await viewModel.load(using: appState)
                 }

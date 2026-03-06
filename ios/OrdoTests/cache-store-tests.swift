@@ -44,5 +44,28 @@ struct CacheStoreTests {
         let cleared = await store.loadListPage(for: "res.partner", limit: 30, offset: 0, scope: scope)
 
         #expect(cleared == nil)
-        }
+    }
+
+    @Test
+    func expiredEntriesAreEvictedByTTL() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let oldDate = Date(timeIntervalSinceNow: -(8 * 24 * 60 * 60))
+        let store = FileCacheStore(baseDirectoryURL: directoryURL, dateProvider: { oldDate })
+        let schema = MobileFormSchema(
+            model: "res.partner",
+            title: "Contact",
+            header: FormHeader(statusbar: nil, actions: []),
+            sections: [FormSection(label: "Main", fields: [FieldSchema(name: "name", type: .char, label: "Name", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)])],
+            tabs: [],
+            hasChatter: false
+        )
+
+        try await store.saveSchema(schema, for: schema.model, scope: scope)
+
+        let freshStore = FileCacheStore(baseDirectoryURL: directoryURL, dateProvider: Date.init)
+        let cached = await freshStore.loadSchema(for: schema.model, scope: scope)
+
+        #expect(cached == nil)
+    }
     }

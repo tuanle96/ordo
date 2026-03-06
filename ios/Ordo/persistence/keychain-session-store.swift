@@ -7,6 +7,30 @@ protocol SessionStoring {
     func clear() throws
 }
 
+final class UserDefaultsSessionStore: SessionStoring {
+    private let defaults: UserDefaults
+    private let key: String
+
+    init(defaults: UserDefaults, key: String = "ordo.session") {
+        self.defaults = defaults
+        self.key = key
+    }
+
+    func load() throws -> StoredSession? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try JSONDecoder().decode(StoredSession.self, from: data)
+    }
+
+    func save(_ session: StoredSession) throws {
+        let data = try JSONEncoder().encode(session)
+        defaults.set(data, forKey: key)
+    }
+
+    func clear() throws {
+        defaults.removeObject(forKey: key)
+    }
+}
+
 final class KeychainSessionStore: SessionStoring {
     private let service = "com.ordo.app.session"
     private let account = "default"

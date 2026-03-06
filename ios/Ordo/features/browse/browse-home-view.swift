@@ -19,8 +19,10 @@ struct BrowseHomeView: View {
                         .foregroundStyle(.tint)
                 }
             }
+            .accessibilityIdentifier("browse-model-\(descriptor.model.replacingOccurrences(of: ".", with: "-"))")
         }
         .navigationTitle("Browse")
+        .accessibilityIdentifier("browse-home-screen")
     }
 }
 

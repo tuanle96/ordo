@@ -24,14 +24,14 @@ struct AuthUser: Codable, Hashable {
     let avatarUrl: String?
 }
 
-struct TokenResponse: Decodable {
+struct TokenResponse: Codable {
     let accessToken: String
     let refreshToken: String
     let expiresIn: Int
     let user: AuthUser
 }
 
-struct AuthenticatedPrincipal: Decodable, Hashable {
+struct AuthenticatedPrincipal: Codable, Hashable {
     let uid: Int
     let db: String
     let odooUrl: String

@@ -52,17 +52,23 @@ Handoff 4 currently hardens the shipped surface instead of widening it:
 
 ## iOS architecture scope (Handoff 5)
 
-iOS client is now implemented with:
+iOS client is now implemented and hardened with:
 
 - `AppState` manager for app lifecycle, session restore, login, and user context
 - `APIClient` async/await wrapper for backend routes (auth, schema, records, search)
 - `KeychainSessionStore` for secure token and session persistence
 - **File-based offline cache** via `FileCacheStore` actor storing JSON-encoded cache envelopes with timestamps for schema, record details, and paginated lists under `~/Library/Application Support/OrdoCache/`
+  - **TTL-based eviction**: 7-day expiration for schemas, 24-hour expiration for record details and list pages
+  - **Error resilience**: cache write failures logged via OSLog but do not block UI rendering; stale cache preferentially used on load-more network failures
+  - **Safe file I/O**: atomic writes, directory creation on demand, expired entries pruned on load
 - **Cache-first list pagination** for res.partner with default 30 items per page; load-more appends subsequent pages from API or fallback to cache
+  - **Offset hardening**: `loadedOffsets` Set prevents duplicate page fetches; `nextOffset` computed from previous page size to detect boundaries
+  - **Deduplication**: incoming records checked against existing `seenIDs` before merge to prevent ID collisions across stateless API calls
 - **Relative timestamp display** on cached data showing age (e.g., "Showing saved data from 2 hours ago")
 - Feature screens: auth (login), browse (list/search with pagination), record-detail, home, settings
 - Settings screen with cache clear action (destructive)
 - Environment-driven AppConfig for backend URL resolution
+- **Deterministic UI testing** via `UITestURLProtocol` intercepting URLSession requests and `UITestAppStateFactory` providing in-process fixtures; mocked responses deterministic across test runs
 
 ## Deferred architecture
 

@@ -20,6 +20,8 @@ final class OrdoUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["ORDO_UI_TEST_MODE"] = "smoke"
+        app.launchEnvironment["ORDO_UI_TEST_RESET_STORAGE"] = "1"
         app.launch()
 
         // Insert steps here to perform after app launch but before taking a screenshot,

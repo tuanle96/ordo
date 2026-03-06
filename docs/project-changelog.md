@@ -1,5 +1,41 @@
 # Project Changelog
 
+## 2026-03-06 (iOS Hardening — Cache & Pagination & Deterministic Tests)
+
+### Added
+
+- **Cache write failure logging** with OSLog when FileCacheStore fails to persist schema/record/list pages; errors logged but non-blocking
+- **Session-scoped cache isolation** via `CacheScope` struct; each session (odooUrl + db + uid) maintains isolated cache namespace preventing data leakage between users on same device
+- **Cache key collision prevention** using SHA256 hashing of model names instead of character sanitization
+- **Pagination offset hardening** via `loadedOffsets` Set to prevent duplicate page fetches and `nextOffset` tracking for next-page boundary detection
+- **Deduplication on merge** in record list view-model; incoming records checked against existing `seenIDs` before appending to prevent ID collisions across paginated fetches
+- **Cache TTL eviction** with fine-grained lifetimes: 7-day TTL for schema, 24-hour TTL for record details and list pages; expired entries logged and removed on load attempt
+- **Deterministic UI smoke tests** with `UITestURLProtocol` intercepting all network requests and `UITestAppStateFactory` providing in-process fixtures when `ORDO_UI_TEST_MODE=smoke`
+  - Fixture endpoints return hardcoded auth tokens, principals, schemas, records, and search results
+  - Pagination offset query param parsed deterministically (e.g., `offset=0` returns full fixture list, non-zero offsets return empty for stateless testing)
+  - All cache/session storage scoped to UI test suite via UserDefaults and ephemeral cache directories
+- **xcodebuild + test suite verification**: full build succeeds (0 errors); OrdoTests unit target passes; OrdoUITests smoke suite validates login → browse → detail and session restore flows
+
+### Changed
+
+- FileCacheStore now wraps all file I/O with try/catch; save failures logged via OSLog but do not propagate or block list rendering
+- Record list pagination now deduplicates incoming records before merging, protecting against server-side pagination anomalies or offset edge cases
+- Cache store methods now require `scope: CacheScope` parameter for session-aware isolation
+
+### Fixed
+
+- **CRITICAL (2026-03-06 code review)**: Cache data leakage between users — resolved via session-scoped namespace isolation
+- **CRITICAL (2026-03-06 code review)**: Cache key collision potential — resolved via SHA256 hashing
+- **HIGH (2026-03-06 code review)**: Silent cache write failures — resolved via OSLog error capture
+- **HIGH (2026-03-06 code review)**: Pagination offset tracking edge cases — resolved via deduplication on merge
+- **HIGH (2026-03-06 code review)**: No cache expiration policy — resolved via tiered TTL with auto-cleanup
+
+### Verified
+
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — build succeeds (0 errors)
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — unit tests pass (all cache/TTL tests)
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests test` — smoke tests pass (2/2: login→browse→detail, session restore)
+
 ## 2026-03-06 (iOS Foundation — Offline Cache & Pagination)
 
 ### Added

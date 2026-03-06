@@ -12,7 +12,7 @@ struct OrdoApp: App {
     @StateObject private var appState: AppState
 
     init() {
-        _appState = StateObject(wrappedValue: AppState.live())
+        _appState = StateObject(wrappedValue: UITestAppStateFactory.make() ?? AppState.live())
     }
 
     var body: some Scene {

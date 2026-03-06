@@ -66,6 +66,7 @@ struct RecordListView: View {
                                 }
                                 .padding(.vertical, 2)
                             }
+                            .accessibilityIdentifier("record-row-\(summary.id)")
                             .task {
                                 await viewModel.loadMoreIfNeeded(currentID: summary.id, using: appState)
                             }
@@ -80,6 +81,7 @@ struct RecordListView: View {
                         }
                     }
                 }
+                .accessibilityIdentifier("record-list-screen")
                 .refreshable {
                     await viewModel.load(using: appState)
                 }

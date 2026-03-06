@@ -1,5 +1,6 @@
-import Foundation
 import CryptoKit
+import Foundation
+import OSLog
 
 protocol CacheStoring {
     func loadSchema(for model: String, scope: CacheScope) async -> CachedValue<MobileFormSchema>?
@@ -34,18 +35,22 @@ actor FileCacheStore: CacheStoring {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let fileManager: FileManager
+    private let dateProvider: @Sendable () -> Date
+    private let logger = Logger(subsystem: "com.ordo.app", category: "cache-store")
 
     init(
         baseDirectoryURL: URL? = nil,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        dateProvider: @escaping @Sendable () -> Date = Date.init
     ) {
         self.fileManager = fileManager
+        self.dateProvider = dateProvider
         self.baseDirectoryURL = baseDirectoryURL ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appending(path: "OrdoCache", directoryHint: .isDirectory)
     }
 
     func loadSchema(for model: String, scope: CacheScope) async -> CachedValue<MobileFormSchema>? {
-        await loadValue(at: fileURL(for: .schema(model), scope: scope))
+        await loadValue(at: fileURL(for: .schema(model), scope: scope), lifetime: .schema)
     }
 
     func saveSchema(_ schema: MobileFormSchema, for model: String, scope: CacheScope) async throws {
@@ -53,7 +58,7 @@ actor FileCacheStore: CacheStoring {
     }
 
     func loadRecord(for model: String, id: Int, scope: CacheScope) async -> CachedValue<RecordData>? {
-        await loadValue(at: fileURL(for: .record(model: model, id: id), scope: scope))
+        await loadValue(at: fileURL(for: .record(model: model, id: id), scope: scope), lifetime: .record)
     }
 
     func saveRecord(_ record: RecordData, for model: String, id: Int, scope: CacheScope) async throws {
@@ -61,7 +66,7 @@ actor FileCacheStore: CacheStoring {
     }
 
     func loadListPage(for model: String, limit: Int, offset: Int, scope: CacheScope) async -> CachedValue<RecordListResult>? {
-        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset), scope: scope))
+        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset), scope: scope), lifetime: .list)
     }
 
     func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, scope: CacheScope) async throws {
@@ -76,19 +81,28 @@ actor FileCacheStore: CacheStoring {
 
     private func saveValue<Value: Codable>(_ value: Value, at url: URL) async throws {
         try ensureDirectoryExists(for: url.deletingLastPathComponent())
-        let envelope = CacheEnvelope(cachedAt: .now, value: value)
+        let envelope = CacheEnvelope(cachedAt: dateProvider(), value: value)
         let data = try encoder.encode(envelope)
         try data.write(to: url, options: .atomic)
     }
 
-    private func loadValue<Value: Codable>(at url: URL) async -> CachedValue<Value>? {
+    private func loadValue<Value: Codable>(at url: URL, lifetime: CacheLifetime) async -> CachedValue<Value>? {
         guard fileManager.fileExists(atPath: url.path()) else { return nil }
 
         do {
             let data = try Data(contentsOf: url)
             let envelope = try decoder.decode(CacheEnvelope<Value>.self, from: data)
+
+            if envelope.cachedAt.addingTimeInterval(lifetime.ttl) <= dateProvider() {
+                logger.debug("Removing expired cache entry at \(url.lastPathComponent, privacy: .public)")
+                try? fileManager.removeItem(at: url)
+                return nil
+            }
+
             return CachedValue(value: envelope.value, cachedAt: envelope.cachedAt)
         } catch {
+            logger.error("Failed to load cache entry \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            try? fileManager.removeItem(at: url)
             return nil
         }
     }
@@ -104,6 +118,21 @@ actor FileCacheStore: CacheStoring {
 
     private func scopedDirectoryURL(for scope: CacheScope) -> URL {
         baseDirectoryURL.appending(path: scope.namespace, directoryHint: .isDirectory)
+    }
+}
+
+private enum CacheLifetime {
+    case schema
+    case record
+    case list
+
+    var ttl: TimeInterval {
+        switch self {
+        case .schema:
+            7 * 24 * 60 * 60
+        case .record, .list:
+            24 * 60 * 60
+        }
     }
 }
 

@@ -1,8 +1,11 @@
 import Combine
 import Foundation
+import OSLog
 
 @MainActor
 final class RecordDetailViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "com.ordo.app", category: "record-detail")
+
     @Published private(set) var schema: MobileFormSchema?
     @Published private(set) var record: RecordData?
     @Published private(set) var errorMessage: String?
@@ -51,8 +54,16 @@ final class RecordDetailViewModel: ObservableObject {
             self.schema = schema
             self.record = record
             cacheMessage = nil
-            try? await appState.cacheStore.saveSchema(schema, for: descriptor.model, scope: cacheScope)
-            try? await appState.cacheStore.saveRecord(record, for: descriptor.model, id: recordID, scope: cacheScope)
+            do {
+                try await appState.cacheStore.saveSchema(schema, for: descriptor.model, scope: cacheScope)
+            } catch {
+                Self.logger.error("Failed to save schema cache for \(self.descriptor.model, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+            do {
+                try await appState.cacheStore.saveRecord(record, for: descriptor.model, id: recordID, scope: cacheScope)
+            } catch {
+                Self.logger.error("Failed to save record cache for \(self.descriptor.model, privacy: .public)#\(self.recordID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
         } catch {
             if case APIClientError.unauthorized = error {
                 appState.signOut()
