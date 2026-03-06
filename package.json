@@ -1,0 +1,18 @@
+{
+    "name": "ordo",
+    "private": true,
+    "version": "0.1.0",
+    "workspaces": [
+        "backend",
+        "shared"
+    ],
+    "engines": {
+        "node": ">=22.0.0"
+    },
+    "scripts": {
+        "build": "npm run build --workspace shared && npm run build --workspace backend",
+        "test": "npm run test --workspace shared && npm run test --workspace backend",
+        "lint": "npm run lint --workspace shared && npm run lint --workspace backend",
+        "dev:backend": "npm run start:dev --workspace backend"
+    }
+}
