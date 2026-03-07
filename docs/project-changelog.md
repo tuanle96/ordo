@@ -1,5 +1,58 @@
 # Project Changelog
 
+## 2026-03-07 (Testing Hardening & Docs — Handoff 6 Phase 05)
+
+### Added
+
+- **iOS unit regression coverage** for explicit `many2one` clears and same-ID/different-label relation normalization behavior
+- **iOS UI regression coverage** for discard confirmation (`Keep Editing` vs `Discard Changes`) and save-failure draft preservation
+
+### Changed
+
+- `RecordDetailView` now renders save failures inline on the detail screen when a record is already loaded, preserving edit state and unsaved draft data
+- `FormDraft.setValue()` now persists explicit clears as `.null` so write payloads can actually remove existing scalar/relation values instead of falling back to baseline data
+- Active Handoff 6 plan/docs and the legacy Handoff 4 plan status now reflect the completed write-capable Phase 1 slice
+
+### Verified
+
+- `npm run build` — root workspace build passes
+- `npm test` — root workspace test suite passes (8 backend suites / 20 tests)
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — full iOS unit target passes
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/testDetailCancelFlowSupportsKeepEditingAndDiscard test` — discard confirmation path passes
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/testDetailSaveFailurePreservesEditStateAndDraft test` — save-failure path passes
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS build passes
+
+### Notes
+
+- Full `OrdoUITests` remains susceptible to simulator launch flakiness in this environment, so Phase 05 validation focused on the critical write/discard/failure paths added in-session.
+
+## 2026-03-07 (Relation Editors & Model Expansion — Handoff 6 Phase 04)
+
+### Added
+
+- **`many2one` editor flow** on iOS with search, select, and clear behavior backed by the existing `/search/:model` endpoint
+- **Relation-aware JSON helpers** for display-friendly local values (`[id, label]`) and stable mutation payload normalization to scalar relation IDs
+- **Expanded browse model support** for `crm.lead` and a narrow, header-only `sale.order` slice after the existing `res.partner` proof
+- **Fixture-backed regression coverage** for relation search, relation persistence, model browse smoke coverage, and editable-field expectations
+
+### Changed
+
+- `FormDraft` now normalizes `many2one` values before diffing/saving and validates required relation fields locally
+- `EditableFieldFactory` now treats supported `many2one` fields as first-class editable controls rather than read-only fallbacks
+- UI test fixtures now serve schema/list/detail/PATCH flows for `res.partner`, `crm.lead`, and `sale.order`
+- `ModelRegistry` now uses per-model title/subtitle/footnote field sets instead of a single hard-coded `res.partner` summary rule
+
+### Verified
+
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — unit tests pass
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/testSmokeLoginBrowseAndDetail -only-testing:OrdoUITests/testDetailMany2OneSaveFlowPersistsSelectedRelation test` — targeted UI tests pass
+- Full `OrdoUITests` attempted in-session but one run hit a simulator launch denial from `SBMainWorkspace`; no app assertion/build failure was observed in that run
+
+### Notes
+
+- Phase 04 intentionally stops at `many2one`; `one2many` and `many2many` editors remain explicitly deferred
+- `sale.order` support remains narrow by design: header-level fields plus reused relation-display/edit paths only
+
 ## 2026-03-07 (iOS Save Flow & Form Validation — Handoff 6 Phase 03)
 
 ### Added

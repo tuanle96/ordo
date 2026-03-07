@@ -57,7 +57,14 @@ struct FieldRowFactoryTests {
         let many2one = FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let html = FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
 
-        #expect(EditableFieldFactory.model(for: many2one) == nil)
+        let many2oneModel = EditableFieldFactory.model(for: many2one)
+
+        if case .many2one(let comodel)? = many2oneModel?.style {
+            #expect(comodel == "res.country")
+        } else {
+            Issue.record("Expected many2one field to stay editable.")
+        }
+
         #expect(EditableFieldFactory.model(for: html) == nil)
     }
 }

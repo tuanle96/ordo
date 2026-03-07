@@ -25,7 +25,8 @@ struct RecordDetailView: View {
                     .padding(.vertical, OrdoSpacing.sm)
                 }
                 .background(OrdoColors.surfaceGrouped)
-            } else if let errorMessage = viewModel.errorMessage {
+            } else if let errorMessage = viewModel.errorMessage,
+                      viewModel.schema == nil || viewModel.record == nil {
                 ContentUnavailableView(
                     "Couldn’t Load Record",
                     systemImage: "exclamationmark.triangle",
@@ -45,6 +46,15 @@ struct RecordDetailView: View {
                             Text(saveMessage)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(.green)
+                        }
+                    }
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Section {
+                            Text(errorMessage)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.red)
+                                .accessibilityIdentifier("detail-error-message")
                         }
                     }
 

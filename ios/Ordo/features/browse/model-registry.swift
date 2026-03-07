@@ -6,27 +6,18 @@ struct ModelDescriptor: Identifiable, Hashable {
     let subtitle: String
     let systemImage: String
     let listFields: [String]
+    let titleFields: [String]
+    let subtitleFields: [String]
+    let footnoteFields: [String]
 
     var id: String { model }
 
     func summary(from record: RecordData) -> RecordRowSummary? {
         guard let id = record["id"]?.intValue else { return nil }
 
-        let title = record["display_name"]?.displayText
-            ?? record["name"]?.displayText
-            ?? "Record #\(id)"
-        let subtitle = [record["email"]?.displayText, record["phone"]?.displayText]
-            .compactMap { value -> String? in
-                guard let value, value != "—", !value.isEmpty else { return nil }
-                return value
-            }
-            .joined(separator: " · ")
-        let footnote = [record["city"]?.displayText, record["country_id"]?.displayText]
-            .compactMap { value -> String? in
-                guard let value, value != "—", !value.isEmpty else { return nil }
-                return value
-            }
-            .joined(separator: " · ")
+        let title = firstDisplayValue(in: record, fields: titleFields) ?? "Record #\(id)"
+        let subtitle = joinedDisplayValues(in: record, fields: subtitleFields)
+        let footnote = joinedDisplayValues(in: record, fields: footnoteFields)
 
         return RecordRowSummary(
             id: id,
@@ -34,6 +25,22 @@ struct ModelDescriptor: Identifiable, Hashable {
             subtitle: subtitle.isEmpty ? nil : subtitle,
             footnote: footnote.isEmpty ? nil : footnote
         )
+    }
+
+    private func firstDisplayValue(in record: RecordData, fields: [String]) -> String? {
+        fields.lazy
+            .compactMap { displayValue(for: $0, in: record) }
+            .first
+    }
+
+    private func joinedDisplayValues(in record: RecordData, fields: [String]) -> String {
+        fields.compactMap { displayValue(for: $0, in: record) }
+            .joined(separator: " · ")
+    }
+
+    private func displayValue(for field: String, in record: RecordData) -> String? {
+        guard let value = record[field]?.displayText, value != "—", !value.isEmpty else { return nil }
+        return value
     }
 }
 
@@ -44,7 +51,30 @@ enum ModelRegistry {
             title: "Customers",
             subtitle: "Contacts and companies",
             systemImage: "person.2",
-            listFields: ["id", "display_name", "name", "email", "phone", "city", "country_id"]
+            listFields: ["id", "display_name", "name", "email", "phone", "city", "country_id"],
+            titleFields: ["display_name", "name"],
+            subtitleFields: ["email", "phone"],
+            footnoteFields: ["city", "country_id"]
+        ),
+        ModelDescriptor(
+            model: "crm.lead",
+            title: "Leads",
+            subtitle: "Pipeline opportunities",
+            systemImage: "target",
+            listFields: ["id", "display_name", "name", "partner_name", "email_from", "phone", "stage_id", "user_id"],
+            titleFields: ["name", "display_name"],
+            subtitleFields: ["partner_name", "email_from", "phone"],
+            footnoteFields: ["stage_id", "user_id"]
+        ),
+        ModelDescriptor(
+            model: "sale.order",
+            title: "Sales Orders",
+            subtitle: "Quotes and confirmed orders",
+            systemImage: "cart",
+            listFields: ["id", "display_name", "name", "partner_id", "user_id", "state", "amount_total"],
+            titleFields: ["name", "display_name"],
+            subtitleFields: ["partner_id", "user_id"],
+            footnoteFields: ["state", "amount_total"]
         ),
     ]
 }

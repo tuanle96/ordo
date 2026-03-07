@@ -57,6 +57,34 @@ enum JSONValue: Codable, Hashable {
         return value
     }
 
+    var relationID: Int? {
+        switch self {
+        case .array(let values):
+            guard let first = values.first else { return nil }
+            return first.intValue
+        case .number(let value):
+            return Int(value)
+        default:
+            return nil
+        }
+    }
+
+    var relationLabel: String? {
+        switch self {
+        case .array(let values):
+            guard values.count >= 2 else { return nil }
+            return values[1].stringValue
+        case .string(let value):
+            return value
+        default:
+            return nil
+        }
+    }
+
+    static func relation(id: Int, label: String) -> JSONValue {
+        .array([.number(Double(id)), .string(label)])
+    }
+
     var displayText: String {
         switch self {
         case .string(let value):

@@ -92,6 +92,25 @@ Handoff 6 Phase 03 adds iOS form save and validation:
 - **Canonical record sync** after mutation response: record replaced, draft rebuilt from canonical response, cache updated, edit mode exited
 - **iOS unit + UI test coverage** (16/16 tests passing) for dirty state, validation, save success/failure, cancel/discard, and edit mode visibility rules
 
+## Handoff 6 architecture scope (Phase 04)
+
+Handoff 6 Phase 04 adds relation editing and disciplined model expansion:
+
+- **`many2one` editor path** with modal search/select/clear UI powered by the existing backend `/search/:model` contract
+- **Local relation value representation** kept display-friendly in the draft layer while mutation payloads normalize to scalar relation IDs for PATCH semantics
+- **ModelRegistry expansion** from `res.partner` to `crm.lead` and a narrow `sale.order` slice using model-specific row-summary field sets
+- **Fixture-backed UI transport coverage** for schema/list/detail/update flows across all three supported browse models
+- **Scope discipline** preserved by explicitly deferring `one2many` and `many2many` editors, order-line editing, and wizard-heavy flows
+
+## Handoff 6 architecture scope (Phase 05)
+
+Handoff 6 Phase 05 hardens the shipped write slice instead of widening it:
+
+- **Explicit clear semantics** in `FormDraft` so cleared scalar/relation fields serialize to `.null` mutations instead of silently reusing baseline values
+- **Inline save-failure handling** in the detail screen so mutation errors preserve edit mode, draft state, and loaded record context
+- **Targeted regression coverage** for discard confirmation, save failure, and relation normalization edge cases
+- **Repository status cleanup** so roadmap, changelog, README, and legacy plan files align with the completed write-capable Phase 1 state
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:

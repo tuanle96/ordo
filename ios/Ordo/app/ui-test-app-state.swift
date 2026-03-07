@@ -66,6 +66,69 @@ private final class UITestURLProtocol: URLProtocol {
         let encoder = JSONEncoder()
         let path = request.url?.path ?? ""
 
+        if path.hasPrefix("/api/v1/mobile/schema/") {
+            let model = String(path.dropFirst("/api/v1/mobile/schema/".count))
+            guard let schema = UITestFixtures.schema(for: model) else {
+                return notFound(encoder: encoder)
+            }
+            return (200, try encoder.encode(UITestEnvelope(data: schema, meta: nil)))
+        }
+
+        if path.hasPrefix("/api/v1/mobile/records/") {
+            let suffix = String(path.dropFirst("/api/v1/mobile/records/".count))
+            let components = suffix.split(separator: "/").map(String.init)
+
+            if components.count == 1, request.httpMethod == "GET" {
+                let model = components[0]
+                let offset = request.url.flatMap(Self.queryItems(from:))?["offset"].flatMap(Int.init) ?? 0
+                guard let result = UITestFixtures.listPage(for: model, offset: offset) else {
+                    return notFound(encoder: encoder)
+                }
+                let meta = UITestMeta(total: result.items.count, offset: result.offset, limit: result.limit, timestamp: nil)
+                return (200, try encoder.encode(UITestEnvelope(data: result, meta: meta)))
+            }
+
+            if components.count == 2 {
+                let model = components[0]
+                let recordID = Int(components[1]) ?? 1
+
+                if request.httpMethod == "PATCH" {
+                    if ProcessInfo.processInfo.environment["ORDO_UI_TEST_FAIL_SAVE"] == "1" {
+                        let data = try encoder.encode(
+                            UITestEnvelope<JSONValue>(
+                                success: false,
+                                data: .null,
+                                meta: nil,
+                                errors: [UITestError(code: "save_failed", message: "Save failed for test.", field: nil)]
+                            )
+                        )
+                        return (500, data)
+                    }
+
+                    let body = request.httpBody ?? Data()
+                    let mutationRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: body)
+                    guard let updatedRecord = UITestFixtures.updatedRecord(model: model, id: recordID, values: mutationRequest.values) else {
+                        return notFound(encoder: encoder)
+                    }
+                    let result = RecordMutationResult(id: recordID, record: updatedRecord)
+                    return (200, try encoder.encode(UITestEnvelope(data: result, meta: nil)))
+                }
+
+                guard let record = UITestFixtures.record(model: model, id: recordID) else {
+                    return notFound(encoder: encoder)
+                }
+                return (200, try encoder.encode(UITestEnvelope(data: record, meta: nil)))
+            }
+        }
+
+        if path.hasPrefix("/api/v1/mobile/search/") {
+            let model = String(path.dropFirst("/api/v1/mobile/search/".count))
+            guard let results = UITestFixtures.searchResults(for: model) else {
+                return notFound(encoder: encoder)
+            }
+            return (200, try encoder.encode(UITestEnvelope(data: results, meta: nil)))
+        }
+
         if path.hasSuffix("/auth/login") {
             return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.tokenResponse, meta: nil)))
         }
@@ -78,46 +141,19 @@ private final class UITestURLProtocol: URLProtocol {
             return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.principal, meta: nil)))
         }
 
-        if path.hasSuffix("/schema/res.partner") {
-            return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.schema, meta: nil)))
-        }
+        return notFound(encoder: encoder)
+    }
 
-        if path.hasSuffix("/records/res.partner") {
-            let offset = request.url.flatMap(Self.queryItems(from:))?["offset"].flatMap(Int.init) ?? 0
-            let result = UITestFixtures.listPage(offset: offset)
-            let meta = UITestMeta(total: result.items.count, offset: result.offset, limit: result.limit, timestamp: nil)
-            return (200, try encoder.encode(UITestEnvelope(data: result, meta: meta)))
-        }
-
-        if path.contains("/records/res.partner/") && request.httpMethod == "PATCH" {
-            let body = request.httpBody ?? Data()
-            let mutationRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: body)
-            let recordID = Int(request.url?.lastPathComponent ?? "") ?? 1
-            let updatedRecord = UITestFixtures.updatedRecord(id: recordID, values: mutationRequest.values)
-            let result = RecordMutationResult(id: recordID, record: updatedRecord)
-            return (200, try encoder.encode(UITestEnvelope(data: result, meta: nil)))
-        }
-
-        if path.contains("/records/res.partner/") {
-            let recordID = Int(request.url?.lastPathComponent ?? "") ?? 1
-            return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.record(id: recordID), meta: nil)))
-        }
-
-        if path.hasSuffix("/search/res.partner") {
-            return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.searchResults, meta: nil)))
-        }
-
-        return (
-            404,
-            try encoder.encode(
-                UITestEnvelope<JSONValue>(
-                    success: false,
-                    data: .null,
-                    meta: nil,
-                    errors: [UITestError(code: "not_found", message: "Fixture route not found.", field: nil)]
-                )
+    private static func notFound(encoder: JSONEncoder) -> (Int, Data) {
+        let data = (try? encoder.encode(
+            UITestEnvelope<JSONValue>(
+                success: false,
+                data: .null,
+                meta: nil,
+                errors: [UITestError(code: "not_found", message: "Fixture route not found.", field: nil)]
             )
-        )
+        )) ?? Data()
+        return (404, data)
     }
 
     private nonisolated static func queryItems(from url: URL) -> [String: String]? {
@@ -147,7 +183,108 @@ private enum UITestFixtures {
         tz: "UTC"
     )
 
-    static let schema = MobileFormSchema(
+    static let partnerSearchResults = [
+        NameSearchResult(id: 1, name: "Azure Interior"),
+        NameSearchResult(id: 2, name: "Deco Addict"),
+    ]
+
+    static let countrySearchResults = [
+        NameSearchResult(id: 124, name: "Canada"),
+        NameSearchResult(id: 233, name: "United States"),
+    ]
+
+    static let userSearchResults = [
+        NameSearchResult(id: 7, name: "Mitchell Admin"),
+        NameSearchResult(id: 9, name: "Marc Demo"),
+    ]
+
+    static let stageSearchResults = [
+        NameSearchResult(id: 10, name: "Qualified"),
+        NameSearchResult(id: 12, name: "Proposition"),
+    ]
+
+    static func schema(for model: String) -> MobileFormSchema? {
+        switch model {
+        case "res.partner":
+            return partnerSchema
+        case "crm.lead":
+            return leadSchema
+        case "sale.order":
+            return saleOrderSchema
+        default:
+            return nil
+        }
+    }
+
+    static func searchResults(for model: String) -> [NameSearchResult]? {
+        switch model {
+        case "res.partner":
+            return partnerSearchResults
+        case "res.country":
+            return countrySearchResults
+        case "res.users":
+            return userSearchResults
+        case "crm.stage":
+            return stageSearchResults
+        default:
+            return nil
+        }
+    }
+
+    static func listPage(for model: String, offset: Int) -> RecordListResult? {
+        let items: [RecordData]
+
+        switch model {
+        case "res.partner":
+            items = [partnerRecord(id: 1), partnerRecord(id: 2), partnerRecord(id: 3)]
+        case "crm.lead":
+            items = [leadRecord(id: 1), leadRecord(id: 2)]
+        case "sale.order":
+            items = [saleOrderRecord(id: 1), saleOrderRecord(id: 2)]
+        default:
+            return nil
+        }
+
+        let pagedItems = offset == 0 ? items : []
+        return RecordListResult(items: pagedItems, limit: 30, offset: offset)
+    }
+
+    static func record(model: String, id: Int) -> RecordData? {
+        switch model {
+        case "res.partner":
+            return partnerRecord(id: id)
+        case "crm.lead":
+            return leadRecord(id: id)
+        case "sale.order":
+            return saleOrderRecord(id: id)
+        default:
+            return nil
+        }
+    }
+
+    static func updatedRecord(model: String, id: Int, values: RecordData) -> RecordData? {
+        guard var record = record(model: model, id: id) else { return nil }
+
+        for (key, value) in values {
+            if key == "name", let name = value.stringValue {
+                record[key] = value
+                record["display_name"] = .string(name)
+            } else if let relationID = value.relationID,
+                      let relation = relationValue(for: key, id: relationID) {
+                record[key] = relation
+            } else if relationFieldNames.contains(key), value == .null {
+                record[key] = .null
+            } else {
+                record[key] = value
+            }
+        }
+
+        return record
+    }
+
+    private static let relationFieldNames: Set<String> = ["country_id", "stage_id", "user_id", "partner_id"]
+
+    private static let partnerSchema = MobileFormSchema(
         model: "res.partner",
         title: "Customer",
         header: FormHeader(statusbar: nil, actions: []),
@@ -172,18 +309,38 @@ private enum UITestFixtures {
         hasChatter: false
     )
 
-    static let searchResults = [
-        NameSearchResult(id: 1, name: "Azure Interior"),
-        NameSearchResult(id: 2, name: "Deco Addict"),
-    ]
+    private static let leadSchema = MobileFormSchema(
+        model: "crm.lead",
+        title: "Lead",
+        header: FormHeader(statusbar: .init(field: "stage_id", visibleStates: nil), actions: []),
+        sections: [FormSection(label: "Opportunity", fields: [
+            FieldSchema(name: "name", type: .char, label: "Opportunity", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "partner_name", type: .char, label: "Customer", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "email_from", type: .char, label: "Email", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "phone", type: .char, label: "Phone", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "stage_id", type: .many2one, label: "Stage", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "crm.stage", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "user_id", type: .many2one, label: "Salesperson", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.users", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ])],
+        tabs: [],
+        hasChatter: true
+    )
 
-    static func listPage(offset: Int) -> RecordListResult {
-        let items = [record(id: 1), record(id: 2), record(id: 3)]
-        let pagedItems = offset == 0 ? items : []
-        return RecordListResult(items: pagedItems, limit: 30, offset: offset)
-    }
+    private static let saleOrderSchema = MobileFormSchema(
+        model: "sale.order",
+        title: "Sales Order",
+        header: FormHeader(statusbar: .init(field: "state", visibleStates: nil), actions: []),
+        sections: [FormSection(label: "Order", fields: [
+            FieldSchema(name: "name", type: .char, label: "Order", required: true, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "partner_id", type: .many2one, label: "Customer", required: true, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "user_id", type: .many2one, label: "Salesperson", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.users", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "state", type: .selection, label: "Status", required: nil, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: [["draft", "Quotation"], ["sale", "Sales Order"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: "statusbar"),
+            FieldSchema(name: "amount_total", type: .monetary, label: "Total", required: nil, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+        ])],
+        tabs: [],
+        hasChatter: false
+    )
 
-    static func record(id: Int) -> RecordData {
+    private static func partnerRecord(id: Int) -> RecordData {
         let names = ["Azure Interior", "Deco Addict", "Gemini Furniture"]
         let emails = ["azure@example.com", "deco@example.com", "gemini@example.com"]
         let phones = ["+1 555-0101", "+1 555-0102", "+1 555-0103"]
@@ -209,15 +366,88 @@ private enum UITestFixtures {
         ]
     }
 
-    static func updatedRecord(id: Int, values: RecordData) -> RecordData {
-        var record = record(id: id)
-        for (key, value) in values {
-            record[key] = value
-            if key == "name", let name = value.stringValue {
-                record["display_name"] = .string(name)
+    private static func leadRecord(id: Int) -> RecordData {
+        let names = ["Website redesign", "Warehouse expansion"]
+        let customers = ["Azure Interior", "Gemini Furniture"]
+        let emails = ["buyer@azure.example.com", "ops@gemini.example.com"]
+        let phones = ["+1 555-0201", "+1 555-0202"]
+        let index = max(0, min(id - 1, 1))
+
+        return [
+            "id": .number(Double(id)),
+            "display_name": .string(names[index]),
+            "name": .string(names[index]),
+            "partner_name": .string(customers[index]),
+            "email_from": .string(emails[index]),
+            "phone": .string(phones[index]),
+            "stage_id": .relation(id: 10, label: "Qualified"),
+            "user_id": .relation(id: 7, label: "Mitchell Admin"),
+        ]
+    }
+
+    private static func saleOrderRecord(id: Int) -> RecordData {
+        let names = ["S00045", "S00046"]
+        let partners: [JSONValue] = [.relation(id: 1, label: "Azure Interior"), .relation(id: 3, label: "Gemini Furniture")]
+        let users: [JSONValue] = [.relation(id: 7, label: "Mitchell Admin"), .relation(id: 9, label: "Marc Demo")]
+        let amounts = [1250.0, 3200.75]
+        let states = ["draft", "sale"]
+        let index = max(0, min(id - 1, 1))
+
+        return [
+            "id": .number(Double(id)),
+            "display_name": .string(names[index]),
+            "name": .string(names[index]),
+            "partner_id": partners[index],
+            "user_id": users[index],
+            "state": .string(states[index]),
+            "amount_total": .number(amounts[index]),
+            "currency_id": .relation(id: 1, label: "USD"),
+        ]
+    }
+
+    private static func relationValue(for field: String, id: Int) -> JSONValue? {
+        switch field {
+        case "country_id":
+            switch id {
+            case 124:
+                return .relation(id: 124, label: "Canada")
+            case 233:
+                return .relation(id: 233, label: "United States")
+            default:
+                return nil
             }
+        case "stage_id":
+            switch id {
+            case 10:
+                return .relation(id: 10, label: "Qualified")
+            case 12:
+                return .relation(id: 12, label: "Proposition")
+            default:
+                return nil
+            }
+        case "user_id":
+            switch id {
+            case 7:
+                return .relation(id: 7, label: "Mitchell Admin")
+            case 9:
+                return .relation(id: 9, label: "Marc Demo")
+            default:
+                return nil
+            }
+        case "partner_id":
+            switch id {
+            case 1:
+                return .relation(id: 1, label: "Azure Interior")
+            case 2:
+                return .relation(id: 2, label: "Deco Addict")
+            case 3:
+                return .relation(id: 3, label: "Gemini Furniture")
+            default:
+                return nil
+            }
+        default:
+            return nil
         }
-        return record
     }
 
     private static func encodedSections(_ sections: [FormSection]) -> JSONValue {

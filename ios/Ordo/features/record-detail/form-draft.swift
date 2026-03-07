@@ -18,13 +18,13 @@ final class FormDraft: ObservableObject {
     }
 
     func setValue(_ value: JSONValue?, for fieldName: String) {
-        storage[fieldName] = value
+        storage[fieldName] = value ?? .null
     }
 
     func changedValues(comparedTo baseline: RecordData, fields: [FieldSchema]) -> RecordData {
         fields.reduce(into: RecordData()) { result, field in
-            let current = value(for: field.name, fallback: baseline[field.name])
-            let original = baseline[field.name]
+            let current = normalizedValue(for: field, value: value(for: field.name, fallback: baseline[field.name]))
+            let original = normalizedValue(for: field, value: baseline[field.name])
 
             guard current != original else { return }
             result[field.name] = current ?? .null
@@ -46,11 +46,27 @@ final class FormDraft: ObservableObject {
                 if trimmed?.isEmpty != false {
                     errors[field.name] = "\(field.label) is required."
                 }
+            case .many2one:
+                if normalizedValue(for: field, value: value(for: field.name, fallback: nil)) == nil {
+                    errors[field.name] = "\(field.label) is required."
+                }
             case .boolean:
                 break
             default:
                 break
             }
+        }
+    }
+
+    private func normalizedValue(for field: FieldSchema, value: JSONValue?) -> JSONValue? {
+        guard let value else { return nil }
+
+        switch field.type {
+        case .many2one:
+            guard let relationID = value.relationID else { return nil }
+            return .number(Double(relationID))
+        default:
+            return value
         }
     }
 }

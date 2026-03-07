@@ -39,15 +39,15 @@ The middleware handles version differences, authentication, and schema introspec
 | **Authentication**       | `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me`, JWT with session bridge | Login screen, Keychain persistence, session restore       |
 | **Version Detection**    | Auto-detect Odoo 17/18/19 via `/web/webclient/version_info` | —                                                         |
 | **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema        | —                                                         |
-| **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list, detail view, pull-to-refresh              |
-| **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay                         |
-| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | Edit mode for `char`, `text`, `boolean`, `selection`; save/discard UX; dirty tracking; required-field validation; refresh-aware auth retry |
+| **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list, detail view, pull-to-refresh for `res.partner`, `crm.lead`, and narrow `sale.order` |
+| **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay, plus relation search for supported `many2one` editors |
+| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | Edit mode for `char`, `text`, `boolean`, `selection`, `many2one`; save/discard UX; dirty tracking; required-field validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` |
 | **Offline Cache**        | —                                                           | File-based cache with actor isolation, stale-data banners |
 | **Health Check**         | `GET /health` (unprefixed)                                  | —                                                         |
 
 ### 🚧 Planned
 
-Broader relation editors (`many2one`, `one2many`), dynamic relation search, expanded field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
+Broader nested relation editors (`one2many`, `many2many`), deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
 
 ---
 
@@ -240,10 +240,15 @@ All endpoints are prefixed with `/api/v1/mobile` (configurable via `API_PREFIX` 
 | ------ | --------------------- | ------ | ---------------------------------- |
 | `GET`  | `/health`             | No     | Health check (unprefixed)          |
 | `POST` | `/auth/login`         | No     | Authenticate via Odoo, returns JWT |
+| `POST` | `/auth/refresh`       | No     | Exchange refresh token for a fresh access token |
 | `GET`  | `/auth/me`            | Bearer | Get current user principal         |
 | `GET`  | `/schema/:model`      | Bearer | Get mobile form schema for model   |
 | `GET`  | `/records/:model`     | Bearer | List records with pagination       |
 | `GET`  | `/records/:model/:id` | Bearer | Get single record by ID            |
+| `POST` | `/records/:model`     | Bearer | Create a record and read it back canonically |
+| `PATCH`| `/records/:model/:id` | Bearer | Update a record and read it back canonically |
+| `DELETE`| `/records/:model/:id`| Bearer | Delete a record |
+| `POST` | `/records/:model/:id/actions/:name` | Bearer | Execute a record-level action |
 | `GET`  | `/search/:model`      | Bearer | Name search (autocomplete)         |
 
 ### Response Envelope
@@ -287,18 +292,24 @@ The **Version Adapter** pattern normalizes API differences. Adding support for a
 - [x] **Handoff 4 — Hardening** — Backend test suite, regression tests, docs cleanup
 - [x] **Handoff 5 — iOS MVP** — SwiftUI app shell, login, session restore, API client, offline cache, res.partner browsing
 
-### Phase 1 — Core Forms *(Next)*
+### Phase 1 — Core Forms *(Complete through Phase 04)*
 
 - [x] Token refresh backend (`POST /auth/refresh`)
 - [x] Dynamic form foundation — render forms from schema JSON
 - [x] Backend record create / edit / delete endpoints
 - [x] Backend workflow action endpoints
-- [ ] iOS auto-refresh
-- [ ] iOS form save/write integration
-- [ ] `many2one` editor flow
-- [ ] Additional models: `crm.lead`, `sale.order`
+- [x] iOS auto-refresh
+- [x] iOS form save/write integration
+- [x] `many2one` editor flow
+- [x] Additional models: `crm.lead`, `sale.order`
 
-### Phase 2 — Production Hardening
+### Phase 1.5 — Hardening & Docs *(Complete)*
+
+- [x] Full regression confirmation across backend + iOS write flows
+- [x] Broaden iOS test coverage around save failures and relation edge cases
+- [x] Final docs cleanup for the completed write slice
+
+### Phase 2 — Production Hardening *(Next)*
 
 - [ ] Redis session store (replace in-memory `Map`)
 - [ ] Schema caching with Redis (1h TTL)
