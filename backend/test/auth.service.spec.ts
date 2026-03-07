@@ -86,4 +86,68 @@ describe('AuthService', () => {
             expect.objectContaining({ secret: 'test-secret', expiresIn: 604800 }),
         );
     });
+
+    it('refreshes tokens when the refresh token is valid and the session is still active', async () => {
+        const configService = {
+            get: jest.fn((key: string, fallback?: number) => fallback),
+            getOrThrow: jest.fn(() => 'test-secret'),
+        } as unknown as ConfigService;
+        const jwtService = {
+            verifyAsync: jest.fn().mockResolvedValue({
+                uid: 2,
+                db: 'odoo17',
+                odooUrl: 'http://127.0.0.1:38421',
+                version: '17',
+                lang: 'en_US',
+                groups: [1, 2],
+                name: 'Administrator',
+                email: false,
+                tz: false,
+                sessionHandle: 'session-handle-123',
+            }),
+            signAsync: jest
+                .fn()
+                .mockResolvedValueOnce('new-access-token')
+                .mockResolvedValueOnce('new-refresh-token'),
+        } as unknown as JwtService;
+        const sessionStore = {
+            touchOrThrow: jest.fn().mockReturnValue({
+                handle: 'session-handle-123',
+                odooUrl: 'http://127.0.0.1:38421',
+                db: 'odoo17',
+                uid: 2,
+                version: '17',
+                lang: 'en_US',
+                cookieHeader: 'session_id=abc123',
+                expiresAt: 123456,
+            }),
+        };
+
+        const service = new AuthService(
+            configService,
+            jwtService,
+            {} as never,
+            {} as never,
+            sessionStore as never,
+        );
+
+        const response = await service.refresh({ refreshToken: 'refresh-token' });
+
+        expect(jwtService.verifyAsync).toHaveBeenCalledWith('refresh-token', {
+            secret: 'test-secret',
+        });
+        expect(sessionStore.touchOrThrow).toHaveBeenCalledWith('session-handle-123');
+        expect(response).toEqual({
+            accessToken: 'new-access-token',
+            refreshToken: 'new-refresh-token',
+            expiresIn: 900,
+            user: {
+                id: 2,
+                name: 'Administrator',
+                email: undefined,
+                lang: 'en_US',
+                tz: undefined,
+            },
+        });
+    });
 });

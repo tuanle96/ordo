@@ -12,12 +12,10 @@ export class OdooSessionStoreService {
 
     create(session: Omit<OdooSessionContext, 'handle' | 'expiresAt'>): OdooSessionContext {
         this.cleanupExpired();
-
-        const ttlSeconds = this.configService.get<number>('ODOO_SESSION_TTL_SECONDS', 1800);
         const created: OdooSessionContext = {
             ...session,
             handle: randomUUID(),
-            expiresAt: Date.now() + ttlSeconds * 1000,
+            expiresAt: this.computeExpiry(),
         };
 
         this.sessions.set(created.handle, created);
@@ -45,6 +43,34 @@ export class OdooSessionStoreService {
         }
 
         return session;
+    }
+
+    touch(handle: string): OdooSessionContext | null {
+        const session = this.get(handle);
+        if (!session) {
+            return null;
+        }
+
+        const refreshed: OdooSessionContext = {
+            ...session,
+            expiresAt: this.computeExpiry(),
+        };
+        this.sessions.set(handle, refreshed);
+        return refreshed;
+    }
+
+    touchOrThrow(handle: string): OdooSessionContext {
+        const session = this.touch(handle);
+        if (!session) {
+            throw new UnauthorizedException('Upstream Odoo session expired. Please log in again.');
+        }
+
+        return session;
+    }
+
+    private computeExpiry(): number {
+        const ttlSeconds = this.configService.get<number>('ODOO_SESSION_TTL_SECONDS', 1800);
+        return Date.now() + ttlSeconds * 1000;
     }
 
     private cleanupExpired(): void {

@@ -13,6 +13,7 @@ describe('Auth endpoints', () => {
 
     const authServiceMock = {
         login: jest.fn().mockResolvedValue(odooFixtures.tokenResponse),
+        refresh: jest.fn().mockResolvedValue(odooFixtures.tokenResponse),
         getAuthenticatedPrincipal: jest.fn().mockReturnValue(odooFixtures.authenticatedPrincipal),
     };
 
@@ -48,6 +49,20 @@ describe('Auth endpoints', () => {
             .expect(201);
 
         expect(authServiceMock.login).toHaveBeenCalledWith(expect.objectContaining(payload));
+        expect(response.body.data).toEqual(odooFixtures.tokenResponse);
+    });
+
+    it('returns token response from /auth/refresh', async () => {
+        const refreshToken = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOjF9.c2ln';
+
+        const response = await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/auth/refresh')
+            .send({ refreshToken })
+            .expect(201);
+
+        expect(authServiceMock.refresh).toHaveBeenCalledWith(
+            expect.objectContaining({ refreshToken }),
+        );
         expect(response.body.data).toEqual(odooFixtures.tokenResponse);
     });
 

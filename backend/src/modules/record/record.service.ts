@@ -1,14 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import type {
+    DeleteRecordResult,
     NameSearchResult,
+    RecordActionResult,
     RecordData,
     RecordListResult,
+    RecordMutationResult,
     TokenPayload,
 } from '@ordo/shared';
 
 import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
+import type { OdooAdapter } from '../../odoo/adapters/odoo-adapter.interface';
+import type { OdooSessionContext } from '../../odoo/session/odoo-session.types';
 import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';
+import { RecordActionDto } from './dto/record-action.dto';
+import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
 import { SearchQueryDto } from './dto/search-query.dto';
 
@@ -26,8 +33,7 @@ export class RecordService {
         model: string,
         query: RecordQueryDto,
     ): Promise<RecordListResult> {
-        const session = this.sessionStore.getOrThrow(currentUser.sessionHandle);
-        const adapter = this.adapterFactory.getAdapter(currentUser.version);
+        const { session, adapter } = this.resolveContext(currentUser);
         return adapter.searchRecords(session, model, query);
     }
 
@@ -38,8 +44,7 @@ export class RecordService {
         query: RecordQueryDto,
     ): Promise<RecordData> {
         this.logger.debug(`⏳ getRecord ${model}#${id} fields=${query.fields?.join(',') ?? 'ALL'}`);
-        const session = this.sessionStore.getOrThrow(currentUser.sessionHandle);
-        const adapter = this.adapterFactory.getAdapter(currentUser.version);
+        const { session, adapter } = this.resolveContext(currentUser);
         const record = await adapter.getRecord(session, model, id, query.fields);
 
         // Log field types to diagnose iOS decoding issues
@@ -58,8 +63,73 @@ export class RecordService {
         model: string,
         query: SearchQueryDto,
     ): Promise<NameSearchResult[]> {
-        const session = this.sessionStore.getOrThrow(currentUser.sessionHandle);
-        const adapter = this.adapterFactory.getAdapter(currentUser.version);
+        const { session, adapter } = this.resolveContext(currentUser);
         return adapter.nameSearch(session, model, query.query ?? '', query.domain, query.limit);
+    }
+
+    async createRecord(
+        currentUser: TokenPayload,
+        model: string,
+        body: RecordMutationDto,
+    ): Promise<RecordMutationResult> {
+        const { session, adapter } = this.resolveContext(currentUser);
+        const id = await adapter.createRecord(session, model, body.values);
+        const record = await adapter.getRecord(session, model, id, body.fields);
+
+        return { id, record };
+    }
+
+    async updateRecord(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+        body: RecordMutationDto,
+    ): Promise<RecordMutationResult> {
+        const { session, adapter } = this.resolveContext(currentUser);
+        await adapter.updateRecord(session, model, id, body.values);
+        const record = await adapter.getRecord(session, model, id, body.fields);
+
+        return { id, record };
+    }
+
+    async deleteRecord(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+    ): Promise<DeleteRecordResult> {
+        const { session, adapter } = this.resolveContext(currentUser);
+        await adapter.deleteRecord(session, model, id);
+
+        return { id, deleted: true };
+    }
+
+    async runRecordAction(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+        actionName: string,
+        body: RecordActionDto,
+    ): Promise<RecordActionResult> {
+        const { session, adapter } = this.resolveContext(currentUser);
+        const rawResult = await adapter.runRecordAction(session, model, id, actionName);
+        const changed = rawResult !== false;
+
+        return {
+            id,
+            changed,
+            record: body.fields?.length
+                ? await adapter.getRecord(session, model, id, body.fields)
+                : undefined,
+        };
+    }
+
+    private resolveContext(currentUser: TokenPayload): {
+        session: OdooSessionContext;
+        adapter: OdooAdapter;
+    } {
+        return {
+            session: this.sessionStore.getOrThrow(currentUser.sessionHandle),
+            adapter: this.adapterFactory.getAdapter(currentUser.version),
+        };
     }
 }

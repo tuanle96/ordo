@@ -6,7 +6,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
-import type { AuthUser, AuthenticatedPrincipal, TokenPayload, TokenResponse } from '@ordo/shared';
+import type {
+    AuthUser,
+    AuthenticatedPrincipal,
+    RefreshTokenRequest,
+    TokenPayload,
+    TokenResponse,
+} from '@ordo/shared';
 
 import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
 import { OdooRpcService } from '../../odoo/rpc/odoo-rpc.service';
@@ -48,7 +54,7 @@ export class AuthService {
             cookieHeader: upstreamSession.cookieHeader,
         });
 
-        const payload: TokenPayload = {
+        const payload = this.buildTokenPayload({
             uid: upstreamSession.uid,
             db: input.db,
             odooUrl: this.odooRpcService.normalizeBaseUrl(input.odooUrl),
@@ -59,8 +65,81 @@ export class AuthService {
             email: this.normalizeOptionalString(user.email),
             tz: this.normalizeOptionalString(user.tz),
             sessionHandle: storedSession.handle,
-        };
+        });
 
+        return this.issueTokens(payload, this.toAuthUser(user));
+    }
+
+    async refresh(input: RefreshTokenRequest): Promise<TokenResponse> {
+        let payload: TokenPayload;
+
+        try {
+            payload = await this.jwtService.verifyAsync<TokenPayload>(input.refreshToken, {
+                secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+            });
+        } catch {
+            throw new UnauthorizedException('Refresh token is invalid or expired');
+        }
+
+        const session = this.sessionStore.touchOrThrow(payload.sessionHandle);
+        const refreshedPayload = this.buildTokenPayload({
+            ...payload,
+            sessionHandle: session.handle,
+            odooUrl: session.odooUrl,
+            db: session.db,
+            uid: session.uid,
+            version: session.version,
+            lang: session.lang,
+        });
+
+        return this.issueTokens(refreshedPayload, this.toAuthUserFromPayload(refreshedPayload));
+    }
+
+    getAuthenticatedPrincipal(payload: TokenPayload): AuthenticatedPrincipal {
+        const { sessionHandle: _sessionHandle, ...principal } = payload;
+        return principal;
+    }
+
+    private toAuthUser(user: OdooUserProfile): AuthUser {
+        if (!user.id || !user.name) {
+            throw new BadGatewayException('Authenticated Odoo user profile is incomplete');
+        }
+
+        return {
+            id: user.id,
+            name: user.name,
+            email: this.normalizeOptionalString(user.email),
+            lang: user.lang,
+            tz: this.normalizeOptionalString(user.tz),
+        };
+    }
+
+    private toAuthUserFromPayload(payload: TokenPayload): AuthUser {
+        return {
+            id: payload.uid,
+            name: payload.name,
+            email: payload.email,
+            lang: payload.lang,
+            tz: payload.tz,
+        };
+    }
+
+    private buildTokenPayload(payload: TokenPayload): TokenPayload {
+        return {
+            uid: payload.uid,
+            db: payload.db,
+            odooUrl: payload.odooUrl,
+            version: payload.version,
+            lang: payload.lang,
+            groups: payload.groups,
+            name: payload.name,
+            email: this.normalizeOptionalString(payload.email),
+            tz: this.normalizeOptionalString(payload.tz),
+            sessionHandle: payload.sessionHandle,
+        };
+    }
+
+    private async issueTokens(payload: TokenPayload, user: AuthUser): Promise<TokenResponse> {
         const accessExpiresIn = this.configService.get<number>(
             'JWT_ACCESS_EXPIRES_IN_SECONDS',
             900,
@@ -83,26 +162,7 @@ export class AuthService {
             accessToken,
             refreshToken,
             expiresIn: accessExpiresIn,
-            user: this.toAuthUser(user),
-        };
-    }
-
-    getAuthenticatedPrincipal(payload: TokenPayload): AuthenticatedPrincipal {
-        const { sessionHandle: _sessionHandle, ...principal } = payload;
-        return principal;
-    }
-
-    private toAuthUser(user: OdooUserProfile): AuthUser {
-        if (!user.id || !user.name) {
-            throw new BadGatewayException('Authenticated Odoo user profile is incomplete');
-        }
-
-        return {
-            id: user.id,
-            name: user.name,
-            email: this.normalizeOptionalString(user.email),
-            lang: user.lang,
-            tz: this.normalizeOptionalString(user.tz),
+            user,
         };
     }
 

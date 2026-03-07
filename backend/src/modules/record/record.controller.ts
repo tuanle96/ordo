@@ -1,9 +1,29 @@
-import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    ParseIntPipe,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
+} from '@nestjs/common';
 
-import type { RecordData, RecordListResult, TokenPayload } from '@ordo/shared';
+import type {
+    DeleteRecordResult,
+    RecordActionResult,
+    RecordData,
+    RecordListResult,
+    RecordMutationResult,
+    TokenPayload,
+} from '@ordo/shared';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { RecordActionDto } from './dto/record-action.dto';
+import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
 import { RecordService } from './record.service';
 
@@ -29,5 +49,44 @@ export class RecordController {
         @Query() query: RecordQueryDto,
     ): Promise<RecordData> {
         return this.recordService.getRecord(currentUser, model, id, query);
+    }
+
+    @Post(':model')
+    createRecord(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Body() body: RecordMutationDto,
+    ): Promise<RecordMutationResult> {
+        return this.recordService.createRecord(currentUser, model, body);
+    }
+
+    @Patch(':model/:id')
+    updateRecord(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: RecordMutationDto,
+    ): Promise<RecordMutationResult> {
+        return this.recordService.updateRecord(currentUser, model, id, body);
+    }
+
+    @Delete(':model/:id')
+    deleteRecord(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+    ): Promise<DeleteRecordResult> {
+        return this.recordService.deleteRecord(currentUser, model, id);
+    }
+
+    @Post(':model/:id/actions/:actionName')
+    runRecordAction(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+        @Param('actionName') actionName: string,
+        @Body() body: RecordActionDto = new RecordActionDto(),
+    ): Promise<RecordActionResult> {
+        return this.recordService.runRecordAction(currentUser, model, id, actionName, body);
     }
 }

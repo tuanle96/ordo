@@ -23,6 +23,14 @@ describe('Schema, record, and search endpoints', () => {
             offset: 0,
         }),
         getRecord: jest.fn().mockResolvedValue(odooFixtures.records[0]),
+        createRecord: jest.fn().mockResolvedValue({ id: 3, record: odooFixtures.records[0] }),
+        updateRecord: jest.fn().mockResolvedValue({ id: 3, record: odooFixtures.records[0] }),
+        deleteRecord: jest.fn().mockResolvedValue({ id: 3, deleted: true }),
+        runRecordAction: jest.fn().mockResolvedValue({
+            id: 3,
+            changed: true,
+            record: odooFixtures.records[0],
+        }),
         search: jest.fn().mockResolvedValue(odooFixtures.nameSearch),
     };
 
@@ -83,6 +91,66 @@ describe('Schema, record, and search endpoints', () => {
             expect.objectContaining({ fields: ['id', 'name', 'email'] }),
         );
         expect(detailResponse.body.data).toEqual(odooFixtures.records[0]);
+    });
+
+    it('returns envelopes for create, update, delete, and action endpoints', async () => {
+        const createResponse = await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/records/res.partner')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({ values: { name: 'Administrator' }, fields: ['id', 'name', 'email'] })
+            .expect(201);
+
+        expect(recordServiceMock.createRecord).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            expect.objectContaining({ values: { name: 'Administrator' }, fields: ['id', 'name', 'email'] }),
+        );
+        expect(createResponse.body.data).toEqual({ id: 3, record: odooFixtures.records[0] });
+
+        const updateResponse = await request(protectedApp.getHttpServer())
+            .patch('/api/v1/mobile/records/res.partner/3')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({ values: { name: 'Updated Administrator' }, fields: ['id', 'name', 'email'] })
+            .expect(200);
+
+        expect(recordServiceMock.updateRecord).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            3,
+            expect.objectContaining({ values: { name: 'Updated Administrator' }, fields: ['id', 'name', 'email'] }),
+        );
+        expect(updateResponse.body.data).toEqual({ id: 3, record: odooFixtures.records[0] });
+
+        const deleteResponse = await request(protectedApp.getHttpServer())
+            .delete('/api/v1/mobile/records/res.partner/3')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+
+        expect(recordServiceMock.deleteRecord).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            3,
+        );
+        expect(deleteResponse.body.data).toEqual({ id: 3, deleted: true });
+
+        const actionResponse = await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/records/res.partner/3/actions/action_archive')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({ fields: ['id', 'name', 'email'] })
+            .expect(201);
+
+        expect(recordServiceMock.runRecordAction).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            3,
+            'action_archive',
+            expect.objectContaining({ fields: ['id', 'name', 'email'] }),
+        );
+        expect(actionResponse.body.data).toEqual({
+            id: 3,
+            changed: true,
+            record: odooFixtures.records[0],
+        });
     });
 
     it('returns relation search envelope for /search/:model', async () => {

@@ -43,6 +43,60 @@ export class OdooV17Adapter implements OdooAdapter {
         return this.schemaBuilder.build(model, view.arch, fieldsMeta);
     }
 
+    async createRecord(
+        session: OdooSessionContext,
+        model: string,
+        values: RecordData,
+    ): Promise<number> {
+        return this.odooRpcService.callKwWithSession<number>({
+            session,
+            model,
+            method: 'create',
+            args: [values],
+        });
+    }
+
+    async updateRecord(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        values: RecordData,
+    ): Promise<boolean> {
+        return this.odooRpcService.callKwWithSession<boolean>({
+            session,
+            model,
+            method: 'write',
+            args: [[id], values],
+        });
+    }
+
+    async deleteRecord(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<boolean> {
+        return this.odooRpcService.callKwWithSession<boolean>({
+            session,
+            model,
+            method: 'unlink',
+            args: [[id]],
+        });
+    }
+
+    async runRecordAction(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        actionName: string,
+    ): Promise<unknown> {
+        return this.odooRpcService.callKwWithSession<unknown>({
+            session,
+            model,
+            method: actionName,
+            args: [[id]],
+        });
+    }
+
     async getRecord(
         session: OdooSessionContext,
         model: string,

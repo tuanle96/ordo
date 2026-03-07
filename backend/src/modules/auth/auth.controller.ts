@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal, TokenPayload, TokenResponse } from '@ordo/
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './auth.guard';
 
 @Controller('auth')
@@ -14,6 +15,11 @@ export class AuthController {
     @Post('login')
     login(@Body() loginDto: LoginDto): Promise<TokenResponse> {
         return this.authService.login(loginDto);
+    }
+
+    @Post('refresh')
+    refresh(@Body() refreshTokenDto: RefreshTokenDto): Promise<TokenResponse> {
+        return this.authService.refresh(refreshTokenDto);
     }
 
     @UseGuards(JwtAuthGuard)

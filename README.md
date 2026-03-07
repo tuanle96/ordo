@@ -36,17 +36,18 @@ The middleware handles version differences, authentication, and schema introspec
 
 | Area                     | Backend                                                     | iOS                                                       |
 | ------------------------ | ----------------------------------------------------------- | --------------------------------------------------------- |
-| **Authentication**       | `POST /auth/login`, `GET /auth/me`, JWT with session bridge | Login screen, Keychain persistence, session restore       |
+| **Authentication**       | `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me`, JWT with session bridge | Login screen, Keychain persistence, session restore       |
 | **Version Detection**    | Auto-detect Odoo 17/18/19 via `/web/webclient/version_info` | —                                                         |
 | **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema        | —                                                         |
 | **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list, detail view, pull-to-refresh              |
 | **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay                         |
+| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | —                                                         |
 | **Offline Cache**        | —                                                           | File-based cache with actor isolation, stale-data banners |
 | **Health Check**         | `GET /health` (unprefixed)                                  | —                                                         |
 
 ### 🚧 Planned
 
-Record write (create/update/delete), dynamic form rendering, token refresh, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
+iOS form save/write integration on top of the existing dynamic form foundation, broader relation editors, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
 
 ---
 
@@ -288,10 +289,13 @@ The **Version Adapter** pattern normalizes API differences. Adding support for a
 
 ### Phase 1 — Core Forms *(Next)*
 
-- [ ] Token refresh flow (`POST /auth/refresh`) + iOS auto-refresh
-- [ ] Dynamic Form Engine — render forms from schema JSON
-- [ ] Record create / edit / delete endpoints
-- [ ] Workflow actions (confirm, cancel, state transitions)
+- [x] Token refresh backend (`POST /auth/refresh`)
+- [x] Dynamic form foundation — render forms from schema JSON
+- [x] Backend record create / edit / delete endpoints
+- [x] Backend workflow action endpoints
+- [ ] iOS auto-refresh
+- [ ] iOS form save/write integration
+- [ ] `many2one` editor flow
 - [ ] Additional models: `crm.lead`, `sale.order`
 
 ### Phase 2 — Production Hardening

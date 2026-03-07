@@ -1,5 +1,38 @@
 # Project Changelog
 
+## 2026-03-07 (Backend Record Mutations & Auth Refresh — Handoff 6 Phase 01/02)
+
+### Added
+
+- **`POST /auth/refresh` endpoint** with `RefreshTokenDto` for access token rotation; validates both JWT and upstream session handle (fail-closed if expired)
+- **Session touch lifecycle** via `OdooSessionStoreService.touch()` and `touchOrThrow()` for sliding-window TTL extension on refresh
+- **Record mutation endpoints** for all core write operations:
+  - `POST /records/:model` → create with canonical read-back of new record
+  - `PATCH /records/:model/:id` → update with canonical read-back of modified record
+  - `DELETE /records/:model/:id` → delete with `{ id, deleted: true }` confirmation
+  - `POST /records/:model/:id/actions/:actionName` → action execution with optional record refresh
+- **Shared mutation contracts** (`RecordMutationRequest`, `RecordMutationResult`, `DeleteRecordResult`, `RecordActionResult`) with strict DTO validation
+- **Comprehensive E2E + unit test coverage** for all mutation endpoints and session refresh logic
+
+### Architecture
+
+- Dual JWT validation (separate access + refresh secrets) with session handle verification
+- Adapter interface for mutations ensures consistent v17/v18/v19 support
+- Canonical post-write reads guarantee client-server state synchronization essential for offline-first architecture
+- Session store maintains in-memory context with TTL-based expiry and cleanup
+
+### Verified
+
+- TypeScript compiles without errors (shared + backend)
+- All 20 tests pass (8 suites, 1.8s runtime)
+- Security audit: JWT dual-secret strategy, input validation, error handling, session management
+- API design: RESTful conventions, consistent response envelopes, idempotency semantics
+
+### Notes
+
+- iOS refresh helper + 401 retry logic deferred to Phase 03
+- Session cleanup runs on create (sufficient for MVP); consider periodic cleanup if login rate exceeds 100/sec in production
+
 ## 2026-03-06 (iOS Dynamic Form Engine — Local Edit + Schema Rules Slice)
 
 ### Added

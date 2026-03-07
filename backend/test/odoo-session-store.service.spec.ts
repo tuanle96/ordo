@@ -34,4 +34,33 @@ describe('OdooSessionStoreService', () => {
         expect(service.get(session.handle)).toBeNull();
         expect(() => service.getOrThrow(session.handle)).toThrow(UnauthorizedException);
     });
+
+    it('touches active sessions and extends their TTL', () => {
+        const configService = {
+            get: jest.fn().mockReturnValue(10),
+        } as unknown as ConfigService;
+        const service = new OdooSessionStoreService(configService);
+
+        jest.spyOn(Date, 'now').mockReturnValue(1_000);
+        const session = service.create({
+            odooUrl: 'http://127.0.0.1:38421',
+            db: 'odoo17',
+            uid: 2,
+            version: '17',
+            lang: 'en_US',
+            cookieHeader: 'session_id=abc',
+        });
+
+        jest.spyOn(Date, 'now').mockReturnValue(5_000);
+        const touched = service.touch(session.handle);
+
+        expect(touched).toEqual({
+            ...session,
+            expiresAt: 15_000,
+        });
+        expect(service.get(session.handle)).toEqual({
+            ...session,
+            expiresAt: 15_000,
+        });
+    });
 });

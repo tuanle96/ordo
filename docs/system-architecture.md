@@ -70,12 +70,23 @@ iOS client is now implemented and hardened with:
 - Environment-driven AppConfig for backend URL resolution
 - **Deterministic UI testing** via `UITestURLProtocol` intercepting URLSession requests and `UITestAppStateFactory` providing in-process fixtures; mocked responses deterministic across test runs
 
+## Handoff 6 architecture scope (Phase 01/02)
+
+Handoff 6 Phase 01/02 adds auth refresh and backend record mutations:
+
+- **Auth refresh** with dual JWT validation (separate access + refresh secrets) and session handle verification
+- **Session touch lifecycle** via sliding-window TTL extension; expired sessions fail-closed requiring re-login
+- **Record mutation surface** (POST/PATCH/DELETE + action) with shared DTOs and validation
+- **Canonical post-write reads** after create/update ensuring client receives server-assigned defaults and computed fields
+- **Action execution** with Odoo convention interpretation (`false` = no-op, truthy/record-dict = mutation occurred)
+- **Adapter layer** for mutations with v17/v18/v19 version support
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:
 
+- iOS refresh helper + 401 retry logic (Phase 03)
 - sync engine
 - notifications
 - file proxying
-- refresh token rotation
 - dashboard aggregation beyond a tiny future slice

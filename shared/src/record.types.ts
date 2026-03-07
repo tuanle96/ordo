@@ -1,5 +1,30 @@
 export type RecordData = Record<string, unknown>;
 
+export interface RecordMutationRequest {
+    values: RecordData;
+    fields?: string[];
+}
+
+export interface RecordActionRequest {
+    fields?: string[];
+}
+
+export interface RecordMutationResult {
+    id: number;
+    record: RecordData;
+}
+
+export interface DeleteRecordResult {
+    id: number;
+    deleted: true;
+}
+
+export interface RecordActionResult {
+    id: number;
+    changed: boolean;
+    record?: RecordData;
+}
+
 export interface SyncOperation {
     id: string;
     model: string;
