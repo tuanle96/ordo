@@ -81,12 +81,25 @@ Handoff 6 Phase 01/02 adds auth refresh and backend record mutations:
 - **Action execution** with Odoo convention interpretation (`false` = no-op, truthy/record-dict = mutation occurred)
 - **Adapter layer** for mutations with v17/v18/v19 version support
 
+## Handoff 6 architecture scope (Phase 03)
+
+Handoff 6 Phase 03 adds iOS form save and validation:
+
+- **Refresh-aware auth retry** before authenticated record writes; `AppState.withAuthenticatedToken()` transparently refreshes expired tokens via `POST /auth/refresh`
+- **Dirty state tracking** via `FormDraft.isDirty()` comparing current field values to baseline; `FormDraft.changedValues()` extracts only modified fields for efficient PATCH payloads
+- **Required-field validation** for `char`, `text`, and `selection` types (required `boolean` always valid); validation errors collected before API call and displayed inline
+- **Save/discard UX** with edit mode entering on button tap; `Save` and `Cancel` buttons visible only when form is in edit mode; discard confirmation dialog prevents accidental data loss
+- **Canonical record sync** after mutation response: record replaced, draft rebuilt from canonical response, cache updated, edit mode exited
+- **iOS unit + UI test coverage** (16/16 tests passing) for dirty state, validation, save success/failure, cancel/discard, and edit mode visibility rules
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:
 
-- iOS refresh helper + 401 retry logic (Phase 03)
 - sync engine
 - notifications
 - file proxying
 - dashboard aggregation beyond a tiny future slice
+- autosave and offline queued writes
+- draft recovery after app relaunch
+- expanded field type editors beyond `char`/`text`/`boolean`/`selection`

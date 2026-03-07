@@ -6,6 +6,7 @@ struct RecordDetailView: View {
     @StateObject private var viewModel: RecordDetailViewModel
     @State private var isEditing = false
     @State private var draft: FormDraft?
+    @State private var showDiscardConfirmation = false
 
     init(descriptor: ModelDescriptor, recordID: Int) {
         _viewModel = StateObject(wrappedValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
@@ -39,6 +40,14 @@ struct RecordDetailView: View {
                         }
                     }
 
+                    if let saveMessage = viewModel.saveMessage, !isEditing {
+                        Section {
+                            Text(saveMessage)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.green)
+                        }
+                    }
+
                     Section {
                         RecordHeaderCard(
                             displayName: record["display_name"]?.displayText ?? record["name"]?.displayText ?? schema.title,
@@ -53,7 +62,13 @@ struct RecordDetailView: View {
                         )
                     }
 
-                    SchemaRendererView(schema: schema, record: record, draft: draft, isEditing: isEditing)
+                    SchemaRendererView(
+                        schema: schema,
+                        record: record,
+                        draft: draft,
+                        isEditing: isEditing,
+                        validationErrors: viewModel.validationErrors
+                    )
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {
@@ -70,21 +85,46 @@ struct RecordDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if viewModel.schema != nil, viewModel.record != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(isEditing ? "Cancel" : "Edit") {
-                        if isEditing {
-                            isEditing = false
-                            if let record = viewModel.record {
-                                draft = FormDraft(record: record)
+                if isEditing {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            handleCancelTap()
+                        }
+                        .disabled(viewModel.isSaving)
+                        .accessibilityIdentifier("detail-cancel-button")
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if viewModel.isSaving {
+                            ProgressView()
+                                .accessibilityIdentifier("detail-save-progress")
+                        } else if viewModel.canSave(draft: draft) {
+                            Button("Save") {
+                                Task {
+                                    await handleSaveTap()
+                                }
                             }
-                        } else if let record = viewModel.record {
-                            draft = FormDraft(record: record)
-                            isEditing = true
+                            .accessibilityIdentifier("detail-save-button")
                         }
                     }
-                    .accessibilityIdentifier("detail-edit-button")
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Edit") {
+                            draft = viewModel.startEditing()
+                            isEditing = draft != nil
+                        }
+                        .accessibilityIdentifier("detail-edit-button")
+                    }
                 }
             }
+        }
+        .alert("Discard changes?", isPresented: $showDiscardConfirmation) {
+            Button("Keep Editing", role: .cancel) {}
+            Button("Discard Changes", role: .destructive) {
+                finishDiscardingChanges()
+            }
+        } message: {
+            Text("Your unsaved changes will be lost.")
         }
         .task {
             await viewModel.load(using: appState)
@@ -94,6 +134,35 @@ struct RecordDetailView: View {
                 recentItems.add(model: viewModel.descriptor.model, recordID: viewModel.recordID, displayName: displayName)
             }
         }
+    }
+
+    private func handleCancelTap() {
+        guard viewModel.hasUnsavedChanges(draft: draft) else {
+            finishDiscardingChanges()
+            return
+        }
+
+        showDiscardConfirmation = true
+    }
+
+    private func finishDiscardingChanges() {
+        isEditing = false
+        viewModel.discardEditing()
+        if let record = viewModel.record {
+            draft = FormDraft(record: record)
+        }
+    }
+
+    private func handleSaveTap() async {
+        guard let draft else { return }
+        let didSave = await viewModel.save(draft: draft, using: appState)
+
+        guard didSave, let savedRecord = viewModel.record else { return }
+
+        self.draft = FormDraft(record: savedRecord)
+        isEditing = false
+        let displayName = savedRecord["display_name"]?.displayText ?? savedRecord["name"]?.displayText ?? "Record"
+        recentItems.add(model: viewModel.descriptor.model, recordID: viewModel.recordID, displayName: displayName)
     }
 }
 

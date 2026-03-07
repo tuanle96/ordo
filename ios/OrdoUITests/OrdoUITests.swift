@@ -70,6 +70,32 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testDetailSaveFlowPersistsUpdatedValueLocally() throws {
+        let app = makeApp(resetStorage: true)
+        app.launch()
+
+        signIn(app)
+        app.tabBars.buttons["Browse"].tap()
+        app.cells["browse-model-res-partner"].tap()
+        app.cells["record-row-1"].tap()
+
+        let editButton = app.buttons["detail-edit-button"]
+        XCTAssertTrue(editButton.waitForExistence(timeout: 5))
+        editButton.tap()
+
+        let nicknameField = app.textFields["field-editor-nickname"]
+        XCTAssertTrue(nicknameField.waitForExistence(timeout: 5))
+        nicknameField.clearAndTypeText("Priority Client")
+
+        let saveButton = app.buttons["detail-save-button"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        saveButton.tap()
+
+        XCTAssertTrue(app.staticTexts["field-value-nickname"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["field-value-nickname"].label, "Priority Client")
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             let app = makeApp(resetStorage: true)

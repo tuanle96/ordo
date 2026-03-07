@@ -41,13 +41,13 @@ The middleware handles version differences, authentication, and schema introspec
 | **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema        | —                                                         |
 | **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list, detail view, pull-to-refresh              |
 | **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay                         |
-| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | —                                                         |
+| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | Edit mode for `char`, `text`, `boolean`, `selection`; save/discard UX; dirty tracking; required-field validation; refresh-aware auth retry |
 | **Offline Cache**        | —                                                           | File-based cache with actor isolation, stale-data banners |
 | **Health Check**         | `GET /health` (unprefixed)                                  | —                                                         |
 
 ### 🚧 Planned
 
-iOS form save/write integration on top of the existing dynamic form foundation, broader relation editors, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
+Broader relation editors (`many2one`, `one2many`), dynamic relation search, expanded field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
 
 ---
 

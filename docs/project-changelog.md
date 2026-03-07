@@ -1,5 +1,36 @@
 # Project Changelog
 
+## 2026-03-07 (iOS Save Flow & Form Validation — Handoff 6 Phase 03)
+
+### Added
+
+- **Refresh-aware auth retry** before authenticated record writes; `AppState.withAuthenticatedToken()` ensures non-expired access token
+- **Save/discard UX** on detail screen with `Save` and `Cancel` buttons visible only in edit mode; discard confirmation dialog prevents accidental loss
+- **Dirty state tracking** via `FormDraft.isDirty()` and `FormDraft.changedValues()` for efficient PATCH payload generation
+- **Required-field validation** for `char`, `text`, and `selection` (required `boolean` fields always valid); validation errors displayed inline before API call
+- **Fixture-backed PATCH flow** via `APIClient.updateRecord()` calling backend canonical read after mutation; response syncs record/draft/cache
+- **Unit + UI test coverage** (16/16 tests passing): FormDraftTests, validation, save success/failure, cancel/discard, edit mode visibility rules
+
+### Architecture
+
+- Save flow validates locally (required fields) → calls PATCH → receives canonical record response → rebuilds draft → exits edit mode → updates cache
+- `RecordDetailViewModel` centralized save/error state management; UI remains pure observer
+- Editable field types limited to supported subset (`char`, `text`, `boolean`, `selection`); unsupported types remain read-only
+- Token refresh happens transparently; 401 triggers sign-out with clear messaging
+
+### Verified
+
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — app builds without errors
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' -only-testing:OrdoTests test` — 16 unit tests pass
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' -only-testing:OrdoUITests test` — critical UI tests pass (edit mode visibility, save persistence)
+- Dirty tracking accurate; validation gates API calls; 401 refresh + retry prevents token expiry race conditions
+
+### Notes
+
+- Autosave, offline queued writes, and draft recovery deferred to future phases
+- Backend remains authority for complex business validation; client-side validation is defensive only
+- Delete CTA optional if kept simple; can be added in Phase 04 relation expansion
+
 ## 2026-03-07 (Backend Record Mutations & Auth Refresh — Handoff 6 Phase 01/02)
 
 ### Added

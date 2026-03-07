@@ -20,6 +20,8 @@ final class AppState: ObservableObject {
     let cacheStore: CacheStoring
 
     private var hasAttemptedRestore = false
+    private var refreshTask: Task<Void, Error>?
+    private let sessionRefreshLeadTime: TimeInterval = 60
 
     init(config: AppConfig, sessionStore: SessionStoring, apiClient: APIClient, cacheStore: CacheStoring) {
         self.config = config
@@ -84,7 +86,9 @@ final class AppState: ObservableObject {
 
             session = storedSession
             apiClient.updateBaseURL(storedSession.backendBaseURL)
-            currentPrincipal = try await apiClient.me(token: storedSession.accessToken)
+            currentPrincipal = try await withAuthenticatedToken { [self] token in
+                try await self.apiClient.me(token: token)
+            }
             phase = .authenticated
             statusMessage = nil
         } catch {
@@ -128,16 +132,118 @@ final class AppState: ObservableObject {
         phase = .authenticated
     }
 
+    func withAuthenticatedToken<T>(_ operation: @escaping (String) async throws -> T) async throws -> T {
+        guard session != nil else {
+            throw APIClientError.unauthorized
+        }
+
+        do {
+            try await ensureFreshSession()
+        } catch {
+            signOut()
+            throw APIClientError.unauthorized
+        }
+
+        guard let accessToken = session?.accessToken else {
+            throw APIClientError.unauthorized
+        }
+
+        do {
+            return try await operation(accessToken)
+        } catch {
+            guard case APIClientError.unauthorized = error else {
+                throw error
+            }
+
+            do {
+                try await refreshSession(force: true)
+            } catch {
+                signOut()
+                throw APIClientError.unauthorized
+            }
+
+            guard let refreshedAccessToken = session?.accessToken else {
+                signOut()
+                throw APIClientError.unauthorized
+            }
+
+            do {
+                return try await operation(refreshedAccessToken)
+            } catch {
+                if case APIClientError.unauthorized = error {
+                    signOut()
+                }
+                throw error
+            }
+        }
+    }
+
     func signOut() {
         try? sessionStore.clear()
         session = nil
         currentPrincipal = nil
         phase = .login
         statusMessage = nil
+        refreshTask = nil
     }
 
     func clearCache() async throws {
         try await cacheStore.clear(scope: cacheScope)
+    }
+
+    private func ensureFreshSession() async throws {
+        guard let session else {
+            throw APIClientError.unauthorized
+        }
+
+        guard session.expiresAt.timeIntervalSinceNow <= sessionRefreshLeadTime else {
+            return
+        }
+
+        try await refreshSession(force: true)
+    }
+
+    private func refreshSession(force: Bool) async throws {
+        guard session != nil else {
+            throw APIClientError.unauthorized
+        }
+
+        if !force, let session, session.expiresAt.timeIntervalSinceNow > sessionRefreshLeadTime {
+            return
+        }
+
+        if let refreshTask {
+            return try await refreshTask.value
+        }
+
+        let task = Task { @MainActor in
+            guard let currentSession = self.session else {
+                throw APIClientError.unauthorized
+            }
+
+            let tokenResponse = try await self.apiClient.refresh(
+                request: RefreshTokenRequest(refreshToken: currentSession.refreshToken)
+            )
+
+            let updatedSession = StoredSession(
+                backendBaseURL: currentSession.backendBaseURL,
+                odooURL: currentSession.odooURL,
+                database: currentSession.database,
+                login: currentSession.login,
+                accessToken: tokenResponse.accessToken,
+                refreshToken: tokenResponse.refreshToken,
+                expiresAt: Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn)),
+                user: tokenResponse.user
+            )
+
+            try self.sessionStore.save(updatedSession)
+            self.session = updatedSession
+            self.statusMessage = nil
+        }
+
+        refreshTask = task
+        defer { refreshTask = nil }
+        try await task.value
     }
 }
 

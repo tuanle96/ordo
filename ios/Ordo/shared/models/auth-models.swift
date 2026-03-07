@@ -7,6 +7,10 @@ struct LoginRequest: Encodable {
     let password: String
 }
 
+struct RefreshTokenRequest: Encodable {
+    let refreshToken: String
+}
+
 struct LoginDraft: Equatable {
     var backendBaseURL: String
     var odooURL: String

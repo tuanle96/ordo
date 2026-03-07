@@ -20,6 +20,11 @@ final class APIClient {
         return try await perform(route: "auth/login", method: "POST", body: body)
     }
 
+    func refresh(request: RefreshTokenRequest) async throws -> TokenResponse {
+        let body = try JSONEncoder().encode(request)
+        return try await perform(route: "auth/refresh", method: "POST", body: body)
+    }
+
     func me(token: String) async throws -> AuthenticatedPrincipal {
         try await perform(route: "auth/me", token: token)
     }
@@ -50,6 +55,17 @@ final class APIClient {
     func record(model: String, id: Int, fields: [String], token: String) async throws -> RecordData {
         let queryItems = [URLQueryItem(name: "fields", value: fields.joined(separator: ","))]
         return try await perform(route: "records/\(model)/\(id)", queryItems: queryItems, token: token)
+    }
+
+    func updateRecord(
+        model: String,
+        id: Int,
+        values: RecordData,
+        fields: [String],
+        token: String
+    ) async throws -> RecordMutationResult {
+        let body = try JSONEncoder().encode(RecordMutationRequest(values: values, fields: fields))
+        return try await perform(route: "records/\(model)/\(id)", method: "PATCH", token: token, body: body)
     }
 
     private func perform<T: Decodable>(

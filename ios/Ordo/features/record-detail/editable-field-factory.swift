@@ -33,15 +33,19 @@ struct EditableFieldRow: View {
     let model: EditableFieldRowModel
     @ObservedObject var draft: FormDraft
     let fallbackValue: JSONValue?
+    let validationMessage: String?
 
     var body: some View {
         switch model.style {
         case .text:
-            LabeledContent(field.label) {
-                TextField(field.placeholder ?? field.label, text: stringBinding)
-                    .multilineTextAlignment(.trailing)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("field-editor-\(field.name)")
+            VStack(alignment: .leading, spacing: 6) {
+                LabeledContent(field.label) {
+                    TextField(field.placeholder ?? field.label, text: stringBinding)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("field-editor-\(field.name)")
+                }
+                validationText
             }
             .accessibilityIdentifier("field-row-\(field.name)")
         case .multiline:
@@ -52,20 +56,39 @@ struct EditableFieldRow: View {
                     .lineLimit(3...6)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("field-editor-\(field.name)")
+                validationText
             }
             .accessibilityIdentifier("field-row-\(field.name)")
         case .toggle:
-            Toggle(field.label, isOn: boolBinding)
-                .accessibilityIdentifier("field-editor-\(field.name)")
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(field.label, isOn: boolBinding)
+                    .accessibilityIdentifier("field-editor-\(field.name)")
+                validationText
+            }
+            .accessibilityIdentifier("field-row-\(field.name)")
         case .selection(let options):
-            Picker(field.label, selection: selectionBinding(options: options)) {
-                ForEach(options, id: \.self) { option in
-                    if option.count > 1 {
-                        Text(option[1]).tag(option[0])
+            VStack(alignment: .leading, spacing: 6) {
+                Picker(field.label, selection: selectionBinding(options: options)) {
+                    ForEach(options, id: \.self) { option in
+                        if option.count > 1 {
+                            Text(option[1]).tag(option[0])
+                        }
                     }
                 }
+                .accessibilityIdentifier("field-editor-\(field.name)")
+                validationText
             }
-            .accessibilityIdentifier("field-editor-\(field.name)")
+            .accessibilityIdentifier("field-row-\(field.name)")
+        }
+    }
+
+    @ViewBuilder
+    private var validationText: some View {
+        if let validationMessage {
+            Text(validationMessage)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("field-error-\(field.name)")
         }
     }
 

@@ -45,10 +45,6 @@ final class RecordListViewModel: ObservableObject {
     }
 
     private func loadPage(offset: Int, using appState: AppState, replacing: Bool) async {
-        guard let token = appState.session?.accessToken else {
-            errorMessage = "Sign in again to load records."
-            return
-        }
         guard let cacheScope = appState.cacheScope else {
             errorMessage = "Sign in again to load records."
             return
@@ -76,13 +72,15 @@ final class RecordListViewModel: ObservableObject {
         Self.logger.info("📋 Loading page for \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public) replacing=\(replacing, privacy: .public)")
 
         do {
-            let result = try await appState.apiClient.listRecords(
-                model: descriptor.model,
-                fields: descriptor.listFields,
-                limit: pageSize,
-                offset: offset,
-                token: token
-            )
+            let result = try await appState.withAuthenticatedToken { [self] token in
+                try await appState.apiClient.listRecords(
+                    model: self.descriptor.model,
+                    fields: self.descriptor.listFields,
+                    limit: self.pageSize,
+                    offset: offset,
+                    token: token
+                )
+            }
             Self.logger.debug("📋 Page loaded: \(result.items.count, privacy: .public) items for \(self.descriptor.model, privacy: .public)")
             applyPage(result, offset: offset, replacing: replacing)
             cacheMessage = nil
@@ -125,24 +123,26 @@ final class RecordListViewModel: ObservableObject {
             return
         }
 
-        guard let token = appState.session?.accessToken else { return }
-
         searchTask = Task { [weak self] in
             do {
                 try await Task.sleep(for: self?.searchDebounce ?? .milliseconds(300))
                 guard !Task.isCancelled else { return }
 
-                let results = try await appState.apiClient.search(
-                    model: descriptor.model,
-                    query: trimmedQuery,
-                    limit: 15,
-                    token: token
-                )
+                guard let self else { return }
+
+                let results = try await appState.withAuthenticatedToken { token in
+                    try await appState.apiClient.search(
+                        model: self.descriptor.model,
+                        query: trimmedQuery,
+                        limit: 15,
+                        token: token
+                    )
+                }
 
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    self?.searchResults = results
+                    self.searchResults = results
                 }
             } catch {
                 guard !(error is CancellationError) else { return }

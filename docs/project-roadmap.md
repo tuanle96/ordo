@@ -10,6 +10,8 @@
 | Handoff 4 — Dashboard and hardening | Complete | Real backend test harness and regression suite; docs/status cleanup; live multi-Odoo version validation |
 | Handoff 5 — iOS native MVP | Complete | Native SwiftUI foundation, auth/login, session restore, API client, file-based offline cache with TTL eviction, res.partner pagination/load-more with offset hardening and deduplication, settings with cache clear, deterministic UI smoke tests with mocked transport; xcodebuild build verified; OrdoTests + OrdoUITests passing |
 | Handoff 6 — Backend forms & mutations (Phase 01/02) | Complete | Auth refresh with session touch lifecycle; backend record mutations (create/update/delete/action) with canonical post-write reads; shared contracts + comprehensive test coverage |
+| Handoff 6 — iOS save flow & validation (Phase 03) | Complete | Refresh-aware auth retry; save/discard UX with confirmation; dirty tracking and required-field validation; fixture-backed PATCH flow; new unit/UI tests (16/16 passing, xcodebuild verified) |
+| Handoff 6 — Relation editors & model expansion (Phase 04) | In Progress | Deep editing for many2one/one2many; dynamic relation search; expanded field type coverage; optional delete UX |
 
 ## Scope reminders
 

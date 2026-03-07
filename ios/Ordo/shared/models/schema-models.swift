@@ -101,9 +101,12 @@ struct MobileFormSchema: Codable, Hashable {
     let tabs: [FormTab]
     let hasChatter: Bool
 
+    var allFields: [FieldSchema] {
+        sections.flatMap(\.fields) + tabs.flatMap(\.sections).flatMap(\.fields)
+    }
+
     var requestedFieldNames: [String] {
-        var fields = sections.flatMap(\.fields).map(\.name)
-        fields.append(contentsOf: tabs.flatMap(\.sections).flatMap(\.fields).map(\.name))
+        var fields = allFields.map(\.name)
 
         if let statusField = header.statusbar?.field {
             fields.append(statusField)

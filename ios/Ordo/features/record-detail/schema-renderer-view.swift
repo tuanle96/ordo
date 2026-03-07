@@ -5,6 +5,7 @@ struct SchemaRendererView: View {
     let record: RecordData
     var draft: FormDraft? = nil
     var isEditing = false
+    var validationErrors: [String: String] = [:]
 
     var body: some View {
         ForEach(Array(schema.sections.enumerated()), id: \.offset) { index, section in
@@ -13,6 +14,7 @@ struct SchemaRendererView: View {
                 record: record,
                 draft: draft,
                 isEditing: isEditing,
+                validationErrors: validationErrors,
                 title: section.label ?? "Details",
                 identifierPrefix: "primary-\(index)"
             )
@@ -25,6 +27,7 @@ struct SchemaRendererView: View {
                     record: record,
                     draft: draft,
                     isEditing: isEditing,
+                    validationErrors: validationErrors,
                     title: section.label ?? tab.label,
                     identifierPrefix: "tab-\(tabIndex)-\(sectionIndex)"
                 )
@@ -38,6 +41,7 @@ private struct SchemaSectionView: View {
     let record: RecordData
     let draft: FormDraft?
     let isEditing: Bool
+    let validationErrors: [String: String]
     let title: String
     let identifierPrefix: String
 
@@ -67,7 +71,13 @@ private struct SchemaSectionView: View {
            let draft,
            !field.isStaticallyReadOnly,
            let editor = EditableFieldFactory.model(for: field) {
-            EditableFieldRow(field: field, model: editor, draft: draft, fallbackValue: record[field.name])
+            EditableFieldRow(
+                field: field,
+                model: editor,
+                draft: draft,
+                fallbackValue: record[field.name],
+                validationMessage: validationErrors[field.name]
+            )
         } else if let row = FieldRowFactory.model(for: field, rawValue: rawValue) {
             ReadOnlyFieldRow(model: row)
         }

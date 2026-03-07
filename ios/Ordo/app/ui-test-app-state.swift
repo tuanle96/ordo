@@ -70,6 +70,10 @@ private final class UITestURLProtocol: URLProtocol {
             return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.tokenResponse, meta: nil)))
         }
 
+        if path.hasSuffix("/auth/refresh") {
+            return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.tokenResponse, meta: nil)))
+        }
+
         if path.hasSuffix("/auth/me") {
             return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.principal, meta: nil)))
         }
@@ -83,6 +87,15 @@ private final class UITestURLProtocol: URLProtocol {
             let result = UITestFixtures.listPage(offset: offset)
             let meta = UITestMeta(total: result.items.count, offset: result.offset, limit: result.limit, timestamp: nil)
             return (200, try encoder.encode(UITestEnvelope(data: result, meta: meta)))
+        }
+
+        if path.contains("/records/res.partner/") && request.httpMethod == "PATCH" {
+            let body = request.httpBody ?? Data()
+            let mutationRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: body)
+            let recordID = Int(request.url?.lastPathComponent ?? "") ?? 1
+            let updatedRecord = UITestFixtures.updatedRecord(id: recordID, values: mutationRequest.values)
+            let result = RecordMutationResult(id: recordID, record: updatedRecord)
+            return (200, try encoder.encode(UITestEnvelope(data: result, meta: nil)))
         }
 
         if path.contains("/records/res.partner/") {
@@ -194,6 +207,17 @@ private enum UITestFixtures {
             "comment": .string("Preferred customer"),
             "internal_note": .string("Backoffice only"),
         ]
+    }
+
+    static func updatedRecord(id: Int, values: RecordData) -> RecordData {
+        var record = record(id: id)
+        for (key, value) in values {
+            record[key] = value
+            if key == "name", let name = value.stringValue {
+                record["display_name"] = .string(name)
+            }
+        }
+        return record
     }
 
     private static func encodedSections(_ sections: [FormSection]) -> JSONValue {
