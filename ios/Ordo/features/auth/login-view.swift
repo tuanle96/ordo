@@ -20,6 +20,7 @@ struct LoginView: View {
     )
     @State private var errorMessage: String?
     @State private var isSubmitting = false
+    @State private var showAdvanced = false
 
     private var canSubmit: Bool {
         !draft.backendBaseURL.isEmpty
@@ -33,31 +34,29 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: - Branding Header
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Welcome back")
-                            .font(.title2.weight(.semibold))
-                        Text("Sign in with your middleware URL and Odoo credentials.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    VStack(spacing: OrdoSpacing.lg) {
+                        Image(systemName: "square.stack.3d.up.fill")
+                            .font(.system(size: 48, weight: .medium))
+                            .foregroundStyle(OrdoColors.accent)
+                            .symbolEffect(.pulse, options: .repeating.speed(0.5))
+
+                        VStack(spacing: OrdoSpacing.xs) {
+                            Text("Ordo")
+                                .font(OrdoTypography.largeTitle)
+
+                            Text("Your Odoo, Native")
+                                .font(OrdoTypography.subheadline)
+                                .foregroundStyle(OrdoColors.textSecondary)
+                        }
                     }
-                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, OrdoSpacing.lg)
+                    .listRowBackground(Color.clear)
                 }
 
-                Section {
-                    TextField("Backend API URL", text: $draft.backendBaseURL)
-                        .accessibilityIdentifier("login-backend-url-field")
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
-                        .focused($focusedField, equals: .backendBaseURL)
-                        .submitLabel(.next)
-                } header: {
-                    Text("Middleware")
-                } footer: {
-                    Text("Example: \(AppConfig.fallbackBaseURL)")
-                }
-
+                // MARK: - Server
                 Section {
                     TextField("Odoo URL", text: $draft.odooURL)
                         .accessibilityIdentifier("login-odoo-url-field")
@@ -77,6 +76,7 @@ struct LoginView: View {
                     Text("Server")
                 }
 
+                // MARK: - Account
                 Section {
                     TextField("Username", text: $draft.username)
                         .accessibilityIdentifier("login-username-field")
@@ -93,12 +93,31 @@ struct LoginView: View {
                     Text("Account")
                 }
 
+                // MARK: - Advanced (Collapsible)
+                Section {
+                    DisclosureGroup("Advanced Settings", isExpanded: $showAdvanced) {
+                        TextField("Backend API URL", text: $draft.backendBaseURL)
+                            .accessibilityIdentifier("login-backend-url-field")
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            .autocorrectionDisabled()
+                            .focused($focusedField, equals: .backendBaseURL)
+                            .submitLabel(.done)
+                    }
+                } footer: {
+                    if showAdvanced {
+                        Text("Example: \(AppConfig.fallbackBaseURL)")
+                    }
+                }
+
+                // MARK: - Error
                 if let errorMessage {
                     Section {
-                        Text(errorMessage)
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(OrdoColors.danger)
                     }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .navigationTitle("Sign In")
@@ -122,6 +141,7 @@ struct LoginView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(OrdoColors.accent)
                 .accessibilityIdentifier("login-submit-button")
                 .controlSize(.large)
                 .disabled(!canSubmit)
@@ -135,14 +155,15 @@ struct LoginView: View {
             }
             .onSubmit {
                 switch focusedField {
-                case .backendBaseURL: focusedField = .odooURL
                 case .odooURL: focusedField = .database
                 case .database: focusedField = .username
                 case .username: focusedField = .password
                 case .password: submit()
+                case .backendBaseURL: focusedField = .odooURL
                 case nil: break
                 }
             }
+            .animation(.smooth, value: errorMessage != nil)
         }
     }
 

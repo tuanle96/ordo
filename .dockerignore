@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+shared/node_modules/
+
+# Build output
+dist/
+backend/dist/
+shared/dist/
+coverage/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# iOS (not needed in backend container)
+ios/
+
+# Odoo source (not needed in backend container)
+odoo-src/
+odoo-instances/
+
+# Environment files (injected via docker-compose)
+.env
+.env.local
+backend/.env
+backend/.env.local
+
+# Docs & plans
+docs/
+plans/
+*.md
+!README.md
+
+# Misc
+summary
+*.resolved

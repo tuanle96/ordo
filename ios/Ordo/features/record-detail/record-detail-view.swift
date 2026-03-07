@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RecordDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var recentItems: RecentItemsStore
     @StateObject private var viewModel: RecordDetailViewModel
     @State private var isEditing = false
     @State private var draft: FormDraft?
@@ -13,8 +14,16 @@ struct RecordDetailView: View {
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.record == nil {
-                ProgressView("Loading record…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ScrollView {
+                    VStack(spacing: OrdoSpacing.lg) {
+                        OrdoSkeletonCard(lines: 2)
+                        OrdoSkeletonCard(lines: 4)
+                        OrdoSkeletonCard(lines: 3)
+                    }
+                    .padding(.horizontal, OrdoSpacing.lg)
+                    .padding(.vertical, OrdoSpacing.sm)
+                }
+                .background(OrdoColors.surfaceGrouped)
             } else if let errorMessage = viewModel.errorMessage {
                 ContentUnavailableView(
                     "Couldn’t Load Record",
@@ -31,20 +40,17 @@ struct RecordDetailView: View {
                     }
 
                     Section {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(record["display_name"]?.displayText ?? record["name"]?.displayText ?? schema.title)
-                                .font(.title3.weight(.semibold))
-                                .accessibilityIdentifier("record-detail-title")
-
-                            if let statusField = schema.header.statusbar?.field,
-                               let status = record[statusField]?.displayText,
-                               status != "—" {
-                                Label(status, systemImage: "circle.fill")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
+                        RecordHeaderCard(
+                            displayName: record["display_name"]?.displayText ?? record["name"]?.displayText ?? schema.title,
+                            status: {
+                                if let statusField = schema.header.statusbar?.field,
+                                   let status = record[statusField]?.displayText,
+                                   status != "—" {
+                                    return status
+                                }
+                                return nil
+                            }()
+                        )
                     }
 
                     SchemaRendererView(schema: schema, record: record, draft: draft, isEditing: isEditing)
@@ -84,6 +90,8 @@ struct RecordDetailView: View {
             await viewModel.load(using: appState)
             if let record = viewModel.record {
                 draft = FormDraft(record: record)
+                let displayName = record["display_name"]?.displayText ?? record["name"]?.displayText ?? "Record"
+                recentItems.add(model: viewModel.descriptor.model, recordID: viewModel.recordID, displayName: displayName)
             }
         }
     }

@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct OrdoApp: App {
     @StateObject private var appState: AppState
+    @StateObject private var recentItems = RecentItemsStore()
 
     init() {
         _appState = StateObject(wrappedValue: UITestAppStateFactory.make() ?? AppState.live())
@@ -19,6 +20,7 @@ struct OrdoApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(recentItems)
         }
     }
 }

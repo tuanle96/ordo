@@ -38,7 +38,12 @@ struct RecordListView: View {
                                     NavigationLink {
                                         RecordDetailView(descriptor: viewModel.descriptor, recordID: result.id)
                                     } label: {
-                                        Text(result.name)
+                                        RecordCardRow(summary: RecordRowSummary(
+                                            id: result.id,
+                                            title: result.name,
+                                            subtitle: nil,
+                                            footnote: nil
+                                        ))
                                     }
                                 }
                             }
@@ -50,21 +55,7 @@ struct RecordListView: View {
                             NavigationLink {
                                 RecordDetailView(descriptor: viewModel.descriptor, recordID: summary.id)
                             } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(summary.title)
-                                        .font(.headline)
-                                    if let subtitle = summary.subtitle {
-                                        Text(subtitle)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    if let footnote = summary.footnote {
-                                        Text(footnote)
-                                            .font(.footnote)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                                .padding(.vertical, 2)
+                                RecordCardRow(summary: summary)
                             }
                             .accessibilityIdentifier("record-row-\(summary.id)")
                             .task {

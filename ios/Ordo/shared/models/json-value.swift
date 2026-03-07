@@ -64,7 +64,7 @@ enum JSONValue: Codable, Hashable {
         case .number(let value):
             return value.rounded() == value ? String(Int(value)) : String(value)
         case .bool(let value):
-            return value ? "Yes" : "No"
+            return value ? "Yes" : "—"
         case .array(let values):
             if values.count == 2, let label = values.last?.stringValue {
                 return label
@@ -90,8 +90,10 @@ enum JSONValue: Codable, Hashable {
             return values.isEmpty
         case .null:
             return true
-        case .number, .bool:
+        case .number:
             return false
+        case .bool(let value):
+            return !value
         }
     }
 }

@@ -17,6 +17,27 @@ struct ReadOnlyFieldRow: View {
                     .accessibilityIdentifier("field-value-\(model.id)")
             }
             .accessibilityIdentifier("field-row-\(model.id)")
+        case .phone:
+            ActionableFieldRow(
+                label: model.label,
+                value: model.value,
+                action: .phone(model.value),
+                fieldID: model.id
+            )
+        case .email:
+            ActionableFieldRow(
+                label: model.label,
+                value: model.value,
+                action: .email(model.value),
+                fieldID: model.id
+            )
+        case .url:
+            ActionableFieldRow(
+                label: model.label,
+                value: model.value,
+                action: .url(model.value),
+                fieldID: model.id
+            )
         case .unsupported(let fieldType):
             LabeledContent(model.label) {
                 VStack(alignment: .trailing, spacing: 2) {

@@ -2,25 +2,51 @@ import SwiftUI
 
 struct BrowseHomeView: View {
     var body: some View {
-        List(ModelRegistry.supported) { descriptor in
-            NavigationLink {
-                RecordListView(descriptor: descriptor)
-            } label: {
-                Label {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(descriptor.title)
-                            .font(.headline)
-                        Text(descriptor.subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: OrdoSpacing.lg) {
+                OrdoCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(ModelRegistry.supported.enumerated()), id: \.element.id) { index, descriptor in
+                            NavigationLink {
+                                RecordListView(descriptor: descriptor)
+                            } label: {
+                                HStack(spacing: OrdoSpacing.md) {
+                                    Image(systemName: descriptor.systemImage)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 40, height: 40)
+                                        .background(OrdoColors.accent, in: RoundedRectangle(cornerRadius: OrdoRadius.sm, style: .continuous))
+
+                                    VStack(alignment: .leading, spacing: OrdoSpacing.xs) {
+                                        Text(descriptor.title)
+                                            .font(OrdoTypography.headline)
+                                            .foregroundStyle(OrdoColors.textPrimary)
+                                        Text(descriptor.subtitle)
+                                            .font(OrdoTypography.subheadline)
+                                            .foregroundStyle(OrdoColors.textSecondary)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(OrdoColors.textTertiary)
+                                }
+                                .padding(.vertical, OrdoSpacing.md)
+                            }
+                            .accessibilityIdentifier("browse-model-\(descriptor.model.replacingOccurrences(of: ".", with: "-"))")
+
+                            if index < ModelRegistry.supported.count - 1 {
+                                Divider()
+                            }
+                        }
                     }
-                } icon: {
-                    Image(systemName: descriptor.systemImage)
-                        .foregroundStyle(.tint)
                 }
             }
-            .accessibilityIdentifier("browse-model-\(descriptor.model.replacingOccurrences(of: ".", with: "-"))")
+            .padding(.horizontal, OrdoSpacing.lg)
+            .padding(.vertical, OrdoSpacing.sm)
         }
+        .background(OrdoColors.surfaceGrouped)
         .navigationTitle("Browse")
         .accessibilityIdentifier("browse-home-screen")
     }

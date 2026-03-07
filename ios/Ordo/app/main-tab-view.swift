@@ -24,6 +24,7 @@ struct MainTabView: View {
                 Label("Settings", systemImage: "gearshape")
             }
         }
+        .tint(OrdoColors.accent)
     }
 }
 

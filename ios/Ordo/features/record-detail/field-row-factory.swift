@@ -5,6 +5,9 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
         case standard
         case multiline
         case status
+        case phone
+        case email
+        case url
         case unsupported(FieldType)
     }
 
@@ -38,6 +41,12 @@ enum FieldRowFactory {
         if supportedTypes.contains(field.type) {
             if field.type == .statusbar {
                 style = .status
+            } else if field.name.contains("phone") || field.name.contains("mobile") {
+                style = .phone
+            } else if field.name.contains("email") {
+                style = .email
+            } else if field.name == "website" || field.widget == "url" {
+                style = .url
             } else if multilineTypes.contains(field.type) {
                 style = .multiline
             } else {
