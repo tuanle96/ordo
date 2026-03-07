@@ -1,14 +1,43 @@
 import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { createHttpLogger } from './common/logging/pino.config';
+import { PinoLoggerService } from './common/logging/pino-logger.service';
 
 export function configureHttpApp(app: INestApplication): void {
-    const prefix = process.env.API_PREFIX ?? 'api/v1/mobile';
+    const configService = app.get(ConfigService);
+    const prefix = configService.get<string>('API_PREFIX', 'api/v1/mobile');
+    const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+    const corsAllowedOrigins = parseAllowedOrigins(configService.get<string>('CORS_ALLOWED_ORIGINS'));
 
     // Keep /health unprefixed for local smoke checks and future infrastructure probes.
     app.setGlobalPrefix(prefix, { exclude: ['health'] });
+    app.useLogger(app.get(PinoLoggerService));
+    app.use(createHttpLogger(configService));
+    app.enableCors({
+        origin: (
+            origin: string | undefined,
+            callback: (error: Error | null, allow?: boolean) => void,
+        ) => {
+            if (!origin) {
+                callback(null, true);
+                return;
+            }
+
+            if (isAllowedOrigin(origin, corsAllowedOrigins, nodeEnv)) {
+                callback(null, true);
+                return;
+            }
+
+            callback(null, false);
+        },
+        methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        optionsSuccessStatus: 204,
+    });
     app.useGlobalPipes(
         new ValidationPipe({
             whitelist: true,
@@ -18,4 +47,28 @@ export function configureHttpApp(app: INestApplication): void {
     );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new TransformInterceptor());
+}
+
+function parseAllowedOrigins(rawOrigins?: string): string[] {
+    if (!rawOrigins) {
+        return [];
+    }
+
+    return rawOrigins
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0);
+}
+
+function isAllowedOrigin(origin: string, allowlist: string[], nodeEnv: string): boolean {
+    if (allowlist.includes(origin)) {
+        return true;
+    }
+
+    const isLocalDevelopment = nodeEnv === 'development' || nodeEnv === 'test';
+    if (!isLocalDevelopment) {
+        return false;
+    }
+
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 }

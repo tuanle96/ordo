@@ -111,6 +111,45 @@ Handoff 6 Phase 05 hardens the shipped write slice instead of widening it:
 - **Targeted regression coverage** for discard confirmation, save failure, and relation normalization edge cases
 - **Repository status cleanup** so roadmap, changelog, README, and legacy plan files align with the completed write-capable Phase 1 state
 
+## Phase 2 architecture scope (Phase 01)
+
+Phase 2 Phase 01 moves backend session persistence from single-process memory into shared infrastructure:
+
+- **Redis-backed Odoo session store** replaces the in-memory `Map`, using TTL-backed keys as the canonical source of session expiry truth
+- **Shared Redis provider module** (`RedisModule` + `RedisService`) centralizes connection lifecycle so later schema-cache work reuses the same path instead of creating a second client stack
+- **Async session-store integration** keeps auth, schema, and record flows fail-closed while preserving their existing public API surface
+- **Lazy connection + safe shutdown** support both runtime reconnect scenarios and test-app teardown without requiring a live Redis daemon for unit/E2E defaults
+- **Multi-instance readiness** improves because active upstream Odoo session handles can now survive backend restarts rather than being lost with process memory
+
+## Phase 2 architecture scope (Phase 02)
+
+Phase 2 Phase 02 adds the first Redis-backed performance layer on top of that foundation:
+
+- **Read-through schema caching** for `GET /schema/:model` stores the final `MobileFormSchema` payload rather than intermediate XML/parser state
+- **Conservative cache keys** include tenant, user, version, language, and model dimensions to avoid leaking form differences across Odoo instances or user contexts
+- **Fixed 1 hour TTL** keeps the behavior simple and predictable; this phase intentionally does not add invalidation endpoints or per-model tuning knobs
+- **Fail-open cache behavior** means Redis read/write problems degrade to live schema generation with warnings instead of interrupting API correctness
+- **Schema-local cache helper** (`SchemaCacheService`) keeps the optimization close to the schema module instead of introducing a premature generic caching abstraction
+
+## Phase 2 architecture scope (Phase 03)
+
+Phase 2 Phase 03 hardens the unauthenticated HTTP edge instead of widening features:
+
+- **Route-level throttling** applies only to `POST /auth/login` and `POST /auth/refresh`, keeping normal authenticated record/schema traffic unaffected
+- **Environment-driven auth limits** let deployment environments tune login and refresh burst ceilings without changing request/response contracts
+- **Explicit CORS bootstrap policy** centralizes browser-origin handling in `configureHttpApp()` rather than leaving CORS behavior implicit
+- **Fail-closed preflight handling** omits CORS allow headers for unlisted origins, shrinking the browser attack surface while still allowing localhost during dev/test
+
+## Phase 2 architecture scope (Phase 04)
+
+Phase 2 Phase 04 makes backend behavior observable without dragging in a full observability platform:
+
+- **Pino as the single logging engine** for JSON application logs plus HTTP request lifecycle logging
+- **Central redaction policy** prevents auth headers, cookies, passwords, refresh tokens, and upstream Odoo cookie material from leaking into logs
+- **Request ID propagation** via `x-request-id` gives each HTTP log line a lightweight correlation handle without introducing tracing infrastructure
+- **Test-safe logging mode** disables noisy request logging in `NODE_ENV=test` so Jest output stays readable and deterministic
+- **Bounded structured service events** replace ad-hoc string logs for Redis connectivity, schema-cache failures, upstream Odoo failures, and exception handling
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:

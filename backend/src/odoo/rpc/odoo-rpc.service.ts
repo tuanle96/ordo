@@ -1,6 +1,7 @@
 import {
     BadGatewayException,
     Injectable,
+    Logger,
     ServiceUnavailableException,
     UnauthorizedException,
 } from '@nestjs/common';
@@ -19,6 +20,8 @@ import type { OdooAuthenticatedSession } from '../session/odoo-session.types';
 
 @Injectable()
 export class OdooRpcService {
+    private readonly logger = new Logger(OdooRpcService.name);
+
     constructor(private readonly configService: ConfigService) { }
 
     normalizeBaseUrl(odooUrl: string): string {
@@ -202,6 +205,11 @@ export class OdooRpcService {
         });
 
         if (!response.ok) {
+            this.logger.error({
+                event: 'odoo_upstream_http_error',
+                path,
+                status: response.status,
+            });
             throw new BadGatewayException(`Odoo upstream request failed with status ${response.status}`);
         }
 
@@ -229,6 +237,11 @@ export class OdooRpcService {
                 ),
             });
         } catch (error) {
+            this.logger.error({
+                event: 'odoo_upstream_unreachable',
+                url: input,
+                error: error instanceof Error ? error.message : 'unknown error',
+            });
             throw new ServiceUnavailableException(
                 `Unable to reach Odoo upstream: ${error instanceof Error ? error.message : 'unknown error'}`,
             );

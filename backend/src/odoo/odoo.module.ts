@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { RedisModule } from '../common/redis/redis.module';
 import { AdapterFactoryService } from './adapters/adapter-factory.service';
 import { OdooV17Adapter } from './adapters/odoo-v17.adapter';
 import { OdooV18Adapter } from './adapters/odoo-v18.adapter';
@@ -10,6 +11,7 @@ import { MobileSchemaBuilderService } from './schema/mobile-schema-builder.servi
 import { OdooSessionStoreService } from './session/odoo-session-store.service';
 
 @Module({
+    imports: [RedisModule],
     providers: [
         OdooRpcService,
         OdooSessionStoreService,

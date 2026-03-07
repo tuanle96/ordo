@@ -33,7 +33,7 @@ export class RecordService {
         model: string,
         query: RecordQueryDto,
     ): Promise<RecordListResult> {
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         return adapter.searchRecords(session, model, query);
     }
 
@@ -44,7 +44,7 @@ export class RecordService {
         query: RecordQueryDto,
     ): Promise<RecordData> {
         this.logger.debug(`⏳ getRecord ${model}#${id} fields=${query.fields?.join(',') ?? 'ALL'}`);
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         const record = await adapter.getRecord(session, model, id, query.fields);
 
         // Log field types to diagnose iOS decoding issues
@@ -63,7 +63,7 @@ export class RecordService {
         model: string,
         query: SearchQueryDto,
     ): Promise<NameSearchResult[]> {
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         return adapter.nameSearch(session, model, query.query ?? '', query.domain, query.limit);
     }
 
@@ -72,7 +72,7 @@ export class RecordService {
         model: string,
         body: RecordMutationDto,
     ): Promise<RecordMutationResult> {
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         const id = await adapter.createRecord(session, model, body.values);
         const record = await adapter.getRecord(session, model, id, body.fields);
 
@@ -85,7 +85,7 @@ export class RecordService {
         id: number,
         body: RecordMutationDto,
     ): Promise<RecordMutationResult> {
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         await adapter.updateRecord(session, model, id, body.values);
         const record = await adapter.getRecord(session, model, id, body.fields);
 
@@ -97,7 +97,7 @@ export class RecordService {
         model: string,
         id: number,
     ): Promise<DeleteRecordResult> {
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         await adapter.deleteRecord(session, model, id);
 
         return { id, deleted: true };
@@ -110,7 +110,7 @@ export class RecordService {
         actionName: string,
         body: RecordActionDto,
     ): Promise<RecordActionResult> {
-        const { session, adapter } = this.resolveContext(currentUser);
+        const { session, adapter } = await this.resolveContext(currentUser);
         const rawResult = await adapter.runRecordAction(session, model, id, actionName);
         const changed = rawResult !== false;
 
@@ -123,12 +123,12 @@ export class RecordService {
         };
     }
 
-    private resolveContext(currentUser: TokenPayload): {
+    private async resolveContext(currentUser: TokenPayload): Promise<{
         session: OdooSessionContext;
         adapter: OdooAdapter;
-    } {
+    }> {
         return {
-            session: this.sessionStore.getOrThrow(currentUser.sessionHandle),
+            session: await this.sessionStore.getOrThrow(currentUser.sessionHandle),
             adapter: this.adapterFactory.getAdapter(currentUser.version),
         };
     }

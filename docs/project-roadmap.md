@@ -13,6 +13,10 @@
 | Handoff 6 — iOS save flow & validation (Phase 03) | Complete | Refresh-aware auth retry; save/discard UX with confirmation; dirty tracking and required-field validation; fixture-backed PATCH flow; new unit/UI tests (16/16 passing, xcodebuild verified) |
 | Handoff 6 — Relation editors & model expansion (Phase 04) | Complete | `many2one` search/select/clear editor shipped; relation payload normalization added; `crm.lead` and narrow `sale.order` browse/detail support added; nested relation editors remain deferred |
 | Handoff 6 — Testing hardening & docs (Phase 05) | Complete | Save-failure path hardened to preserve drafts inline; discard-confirmation and relation-clear regressions covered; repo build/tests and iOS validations rerun; stale Handoff 4 plan status corrected |
+| Phase 2 — Production hardening (Phase 01) | In Progress | Redis-backed Odoo session store landed with shared Redis provider, validated backend build/test pass, and multi-instance-safe session persistence foundation |
+| Phase 2 — Production hardening (Phase 02) | In Progress | Redis-backed `GET /schema/:model` cache landed with conservative tenant/user/lang/version/model keys, 1h TTL, and fail-open fallback when Redis is unavailable |
+| Phase 2 — Production hardening (Phase 03) | In Progress | Auth perimeter now has route-scoped throttling for `login`/`refresh` plus explicit env-driven CORS allowlisting with fail-closed preflight behavior |
+| Phase 2 — Production hardening (Phase 04) | In Progress | Pino-based structured logging landed with central redaction, request IDs, JSON app logs outside test mode, and deterministic Jest output |
 
 ## Scope reminders
 

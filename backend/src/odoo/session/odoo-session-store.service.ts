@@ -2,42 +2,47 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 
+import { RedisService } from '../../common/redis/redis.service';
 import type { OdooSessionContext } from './odoo-session.types';
 
 @Injectable()
 export class OdooSessionStoreService {
-    private readonly sessions = new Map<string, OdooSessionContext>();
+    private readonly keyPrefix: string;
 
-    constructor(private readonly configService: ConfigService) { }
+    constructor(
+        private readonly configService: ConfigService,
+        private readonly redisService: RedisService,
+    ) {
+        this.keyPrefix = `${this.configService.get<string>('REDIS_KEY_PREFIX', 'ordo')}:session`;
+    }
 
-    create(session: Omit<OdooSessionContext, 'handle' | 'expiresAt'>): OdooSessionContext {
-        this.cleanupExpired();
+    async create(session: Omit<OdooSessionContext, 'handle' | 'expiresAt'>): Promise<OdooSessionContext> {
         const created: OdooSessionContext = {
             ...session,
             handle: randomUUID(),
             expiresAt: this.computeExpiry(),
         };
 
-        this.sessions.set(created.handle, created);
+        await this.redisService.setJson(this.toKey(created.handle), created, this.getTtlSeconds());
         return created;
     }
 
-    get(handle: string): OdooSessionContext | null {
-        const session = this.sessions.get(handle);
+    async get(handle: string): Promise<OdooSessionContext | null> {
+        const session = await this.redisService.getJson<OdooSessionContext>(this.toKey(handle));
         if (!session) {
             return null;
         }
 
         if (session.expiresAt <= Date.now()) {
-            this.sessions.delete(handle);
+            await this.redisService.delete(this.toKey(handle));
             return null;
         }
 
         return session;
     }
 
-    getOrThrow(handle: string): OdooSessionContext {
-        const session = this.get(handle);
+    async getOrThrow(handle: string): Promise<OdooSessionContext> {
+        const session = await this.get(handle);
         if (!session) {
             throw new UnauthorizedException('Upstream Odoo session expired. Please log in again.');
         }
@@ -45,8 +50,8 @@ export class OdooSessionStoreService {
         return session;
     }
 
-    touch(handle: string): OdooSessionContext | null {
-        const session = this.get(handle);
+    async touch(handle: string): Promise<OdooSessionContext | null> {
+        const session = await this.get(handle);
         if (!session) {
             return null;
         }
@@ -55,12 +60,12 @@ export class OdooSessionStoreService {
             ...session,
             expiresAt: this.computeExpiry(),
         };
-        this.sessions.set(handle, refreshed);
+        await this.redisService.setJson(this.toKey(handle), refreshed, this.getTtlSeconds());
         return refreshed;
     }
 
-    touchOrThrow(handle: string): OdooSessionContext {
-        const session = this.touch(handle);
+    async touchOrThrow(handle: string): Promise<OdooSessionContext> {
+        const session = await this.touch(handle);
         if (!session) {
             throw new UnauthorizedException('Upstream Odoo session expired. Please log in again.');
         }
@@ -69,16 +74,14 @@ export class OdooSessionStoreService {
     }
 
     private computeExpiry(): number {
-        const ttlSeconds = this.configService.get<number>('ODOO_SESSION_TTL_SECONDS', 1800);
-        return Date.now() + ttlSeconds * 1000;
+        return Date.now() + this.getTtlSeconds() * 1000;
     }
 
-    private cleanupExpired(): void {
-        const now = Date.now();
-        for (const [handle, session] of this.sessions.entries()) {
-            if (session.expiresAt <= now) {
-                this.sessions.delete(handle);
-            }
-        }
+    private getTtlSeconds(): number {
+        return this.configService.get<number>('ODOO_SESSION_TTL_SECONDS', 1800);
+    }
+
+    private toKey(handle: string): string {
+        return `${this.keyPrefix}:${handle}`;
     }
 }

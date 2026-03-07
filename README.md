@@ -82,6 +82,7 @@ Broader nested relation editors (`one2many`, `many2many`), deeper field type cov
 | Backend          | NestJS 11 + TypeScript 5.x              |
 | Runtime          | Node.js 22 LTS                          |
 | Auth             | `@nestjs/jwt` + `@nestjs/passport`      |
+| Redis Store      | `ioredis` (sessions + schema cache) |
 | Odoo RPC         | Custom JSON-RPC client (fetch-based)    |
 | Validation       | `class-validator` + `class-transformer` |
 | Shared Types     | TypeScript package (`@ordo/shared`)     |
@@ -125,6 +126,7 @@ JWT_ACCESS_SECRET=your-access-secret
 JWT_REFRESH_SECRET=your-refresh-secret
 JWT_ACCESS_EXPIRES_IN_SECONDS=900
 JWT_REFRESH_EXPIRES_IN_SECONDS=604800
+REDIS_URL=redis://127.0.0.1:6379
 ODOO_REQUEST_TIMEOUT_MS=15000
 ODOO_SESSION_TTL_SECONDS=1800
 ```
@@ -309,15 +311,15 @@ The **Version Adapter** pattern normalizes API differences. Adding support for a
 - [x] Broaden iOS test coverage around save failures and relation edge cases
 - [x] Final docs cleanup for the completed write slice
 
-### Phase 2 — Production Hardening *(Next)*
+### Phase 2 — Production Hardening *(In Progress)*
 
-- [ ] Redis session store (replace in-memory `Map`)
-- [ ] Schema caching with Redis (1h TTL)
-- [ ] Rate limiting on auth endpoints
-- [ ] CORS configuration
-- [ ] Structured logging (Pino/Winston)
+- [x] Redis session store (replace in-memory `Map`)
+- [x] Schema caching with Redis (1h TTL)
+- [x] Rate limiting on auth endpoints
+- [x] CORS configuration
+- [x] Structured logging (Pino)
 - [ ] iOS unit + UI tests
-- [ ] Migrate to `@Observable` (iOS 17+)
+- [ ] Migrate to `@Observable` (iOS 17+, explicitly deferred until hardening work is green)
 
 ### Phase 3 — Inventory & Offline
 

@@ -28,6 +28,45 @@ export class EnvironmentVariables {
     @Min(1000)
     ODOO_REQUEST_TIMEOUT_MS?: number = 15000;
 
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    REDIS_URL?: string = 'redis://127.0.0.1:6379';
+
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    REDIS_KEY_PREFIX?: string = 'ordo';
+
+    @IsOptional()
+    @IsNumber()
+    @Min(1000)
+    REDIS_CONNECT_TIMEOUT_MS?: number = 5000;
+
+    @IsOptional()
+    @IsString()
+    CORS_ALLOWED_ORIGINS?: string;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    AUTH_LOGIN_RATE_LIMIT?: number = 5;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    AUTH_LOGIN_RATE_TTL_SECONDS?: number = 60;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    AUTH_REFRESH_RATE_LIMIT?: number = 20;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    AUTH_REFRESH_RATE_TTL_SECONDS?: number = 60;
+
     @IsString()
     @MinLength(12)
     JWT_ACCESS_SECRET!: string;

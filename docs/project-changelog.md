@@ -1,5 +1,96 @@
 # Project Changelog
 
+## 2026-03-07 (Production Hardening — Phase 2 Phase 04 Structured Logging)
+
+### Added
+
+- **Pino-based structured logging** for backend application logs plus `pino-http` request lifecycle logging with request IDs
+- **Central redaction rules** covering authorization headers, cookies, passwords, refresh tokens, and upstream Odoo cookie material
+- **Custom logger service** so backend logs emit JSON outside test mode while Jest remains quiet and deterministic
+
+### Changed
+
+- Nest bootstrap now buffers early logs and swaps to the structured logger during app configuration
+- Redis, schema-cache, upstream Odoo, and exception handling logs now emit bounded structured events instead of loose string-only messages
+- HTTP requests now carry `x-request-id` correlation IDs and structured method/path/status log lines in non-test environments
+
+### Verified
+
+- `npm run build --workspace backend` — backend compiles with the new logging stack
+- `npm run test --workspace backend` — backend regression suite passes (10 suites / 28 tests) with quiet test output
+
+### Notes
+
+- This phase intentionally stops at local structured output; log shipping, metrics, and tracing remain deferred infrastructure concerns
+
+## 2026-03-07 (Production Hardening — Phase 2 Phase 03 Auth Perimeter Hardening)
+
+### Added
+
+- **Route-scoped auth throttling** on `POST /auth/login` and `POST /auth/refresh` using Nest throttler with environment-driven limits and TTLs
+- **Explicit CORS allowlist configuration** driven by `CORS_ALLOWED_ORIGINS`, with sane localhost allowances only in development/test environments
+- **Auth hardening E2E coverage** for repeated login/refresh abuse and preflight behavior for allowed vs denied browser origins
+
+### Changed
+
+- Backend bootstrap now enables explicit CORS instead of relying on implicit defaults
+- Public auth edge now returns `429` on burst abuse while keeping authenticated browse/detail routes untouched
+- Unlisted browser origins now fail closed during preflight without `access-control-allow-origin` headers
+
+### Verified
+
+- `npm run build --workspace backend` — backend compiles with throttler and CORS wiring
+- `npm run test --workspace backend` — backend regression suite passes (10 suites / 28 tests)
+
+### Notes
+
+- Current CORS policy is intentionally narrow and env-driven; this phase does not try to solve broader gateway/WAF policy concerns
+
+## 2026-03-07 (Production Hardening — Phase 2 Phase 02 Redis Schema Cache)
+
+### Added
+
+- **Redis-backed schema cache** for `GET /schema/:model` responses with a fixed 1 hour TTL
+- **`SchemaCacheService`** to own conservative cache-key construction (`odooUrl`, `db`, `version`, `uid`, `lang`, `model`) and keep caching logic local to the schema module
+- **Schema cache regression coverage** for key shape, TTL, fail-open Redis error handling, and `SchemaService` cache hit/miss behavior
+
+### Changed
+
+- `SchemaService.getFormSchema()` now uses read-through caching: Redis lookup first, live Odoo schema generation on miss, then backfill into Redis
+- Schema cache failures now log warnings and fall back to uncached generation instead of breaking schema reads
+
+### Verified
+
+- `npm run build --workspace backend` — backend compiles with schema cache wiring
+- `npm run test --workspace backend` — backend regression suite passes (10 suites / 25 tests)
+
+### Notes
+
+- Schema cache intentionally accepts stale-by-TTL behavior for up to 1 hour; invalidation endpoints remain deferred to later hardening work
+
+## 2026-03-07 (Production Hardening — Phase 2 Phase 01 Redis Session Store)
+
+### Added
+
+- **Redis-backed Odoo session persistence** replacing the process-local in-memory session `Map`; session handles now resolve through Redis TTL-backed keys instead of backend memory
+- **Shared Redis module/service** built on `ioredis` so later phases can reuse the same connection path for schema caching and other backend hardening work
+- **Redis env validation and sample config** covering `REDIS_URL`, connection timeout, key prefix, and session-key namespace defaults
+
+### Changed
+
+- `OdooSessionStoreService` now persists serialized `OdooSessionContext` blobs under namespaced Redis keys while keeping the same auth-facing `create/get/getOrThrow/touch/touchOrThrow/delete` behavior
+- Auth, schema, and record services now await the Redis-backed session store without changing their public API contracts
+- Redis client shutdown now handles lazy, not-yet-connected test app instances safely so Nest teardown does not fail in E2E runs
+
+### Verified
+
+- `npm run build --workspace backend` — backend compiles with the new Redis dependency and module wiring
+- `npm run test --workspace backend` — backend regression suite passes (8 suites / 20 tests), including E2E teardown after the Redis lifecycle fix
+
+### Notes
+
+- This phase intentionally stops at session persistence; schema caching, auth rate limits, explicit CORS, and structured logging remain queued in later Phase 2 slices
+
 ## 2026-03-07 (Testing Hardening & Docs — Handoff 6 Phase 05)
 
 ### Added

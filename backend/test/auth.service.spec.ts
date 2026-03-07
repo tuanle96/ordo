@@ -35,7 +35,7 @@ describe('AuthService', () => {
             getAdapter: jest.fn(),
         };
         const sessionStore = {
-            create: jest.fn().mockReturnValue({ handle: 'session-handle-123' }),
+            create: jest.fn().mockResolvedValue({ handle: 'session-handle-123' }),
         };
 
         const service = new AuthService(
@@ -111,7 +111,7 @@ describe('AuthService', () => {
                 .mockResolvedValueOnce('new-refresh-token'),
         } as unknown as JwtService;
         const sessionStore = {
-            touchOrThrow: jest.fn().mockReturnValue({
+            touchOrThrow: jest.fn().mockResolvedValue({
                 handle: 'session-handle-123',
                 odooUrl: 'http://127.0.0.1:38421',
                 db: 'odoo17',

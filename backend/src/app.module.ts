@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { resolve } from 'node:path';
 
 import { validateEnvironment } from './common/config/validate-environment';
+import { PinoLoggerService } from './common/logging/pino-logger.service';
+import { RedisModule } from './common/redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { RecordModule } from './modules/record/record.module';
@@ -16,11 +19,19 @@ import { OdooModule } from './odoo/odoo.module';
             envFilePath: [resolve(__dirname, '../.env'), resolve(__dirname, '../../.env')],
             validate: validateEnvironment,
         }),
+        ThrottlerModule.forRoot([
+            {
+                limit: 1000,
+                ttl: 60_000,
+            },
+        ]),
+        RedisModule,
         AuthModule,
         HealthModule,
         SchemaModule,
         RecordModule,
         OdooModule,
     ],
+    providers: [PinoLoggerService],
 })
 export class AppModule { }

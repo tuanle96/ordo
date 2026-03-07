@@ -45,7 +45,7 @@ export class AuthService {
             cookieHeader: upstreamSession.cookieHeader,
         }, upstreamSession.uid);
 
-        const storedSession = this.sessionStore.create({
+        const storedSession = await this.sessionStore.create({
             odooUrl: this.odooRpcService.normalizeBaseUrl(input.odooUrl),
             db: input.db,
             uid: upstreamSession.uid,
@@ -81,7 +81,7 @@ export class AuthService {
             throw new UnauthorizedException('Refresh token is invalid or expired');
         }
 
-        const session = this.sessionStore.touchOrThrow(payload.sessionHandle);
+        const session = await this.sessionStore.touchOrThrow(payload.sessionHandle);
         const refreshedPayload = this.buildTokenPayload({
             ...payload,
             sessionHandle: session.handle,
