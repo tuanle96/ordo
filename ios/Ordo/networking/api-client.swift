@@ -1,6 +1,8 @@
 import Foundation
+import OSLog
 
 final class APIClient {
+    private static let logger = Logger(subsystem: "com.ordo.app", category: "api-client")
     private let session: URLSession
     private(set) var baseURL: URL
 
@@ -74,11 +76,15 @@ final class APIClient {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
+        Self.logger.debug("→ \(method, privacy: .public) \(requestURL.absoluteString, privacy: .public)")
+
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIClientError.invalidResponse
         }
+
+        Self.logger.debug("← HTTP \(httpResponse.statusCode, privacy: .public) (\(data.count, privacy: .public) bytes) for \(route, privacy: .public)")
 
         let decoder = JSONDecoder()
 
@@ -93,6 +99,28 @@ final class APIClient {
             }
             return envelope.data
         } catch {
+            // Log the raw response body for debugging
+            let bodyPreview = String(data: data.prefix(2000), encoding: .utf8) ?? "<non-UTF8 data>"
+            Self.logger.error("‼️ Decoding FAILED for route \(route, privacy: .public)")
+            Self.logger.error("‼️ Response body (first 2000 chars):\n\(bodyPreview, privacy: .public)")
+            Self.logger.error("‼️ Decoding error detail: \(String(describing: error), privacy: .public)")
+
+            // Log structured DecodingError details
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .typeMismatch(let type, let context):
+                    Self.logger.error("‼️ TYPE MISMATCH: expected \(String(describing: type), privacy: .public) at keyPath: \(context.codingPath.map(\.stringValue).joined(separator: "."), privacy: .public) — \(context.debugDescription, privacy: .public)")
+                case .valueNotFound(let type, let context):
+                    Self.logger.error("‼️ VALUE NOT FOUND: \(String(describing: type), privacy: .public) at keyPath: \(context.codingPath.map(\.stringValue).joined(separator: "."), privacy: .public) — \(context.debugDescription, privacy: .public)")
+                case .keyNotFound(let key, let context):
+                    Self.logger.error("‼️ KEY NOT FOUND: '\(key.stringValue, privacy: .public)' at keyPath: \(context.codingPath.map(\.stringValue).joined(separator: "."), privacy: .public) — \(context.debugDescription, privacy: .public)")
+                case .dataCorrupted(let context):
+                    Self.logger.error("‼️ DATA CORRUPTED at keyPath: \(context.codingPath.map(\.stringValue).joined(separator: "."), privacy: .public) — \(context.debugDescription, privacy: .public)")
+                @unknown default:
+                    Self.logger.error("‼️ UNKNOWN DecodingError: \(String(describing: decodingError), privacy: .public)")
+                }
+            }
+
             if let envelope = try? decoder.decode(APIEnvelope<JSONValue>.self, from: data), !envelope.errors.isEmpty {
                 throw APIClientError.server(statusCode: httpResponse.statusCode, errors: envelope.errors)
             }

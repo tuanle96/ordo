@@ -26,6 +26,8 @@ enum FieldRowFactory {
         .date,
         .datetime,
         .many2one,
+        .monetary,
+        .priority,
         .statusbar,
     ]
 
@@ -54,6 +56,14 @@ enum FieldRowFactory {
     }
 
     static func formattedValue(for field: FieldSchema, rawValue: JSONValue) -> String {
+        if field.type == .priority {
+            return formattedPriority(for: rawValue)
+        }
+
+        if field.type == .monetary {
+            return formattedMonetaryValue(for: field, rawValue: rawValue)
+        }
+
         if field.type == .selection,
            let key = rawValue.stringValue,
            let option = field.selection?.first(where: { $0.first == key }),
@@ -62,5 +72,26 @@ enum FieldRowFactory {
         }
 
         return rawValue.displayText
+    }
+
+    private static func formattedPriority(for rawValue: JSONValue) -> String {
+        let value = rawValue.stringValue ?? rawValue.displayText
+        let priority = max(0, min(Int(value) ?? rawValue.intValue ?? 0, 3))
+        guard priority > 0 else { return "Not set" }
+        return String(repeating: "★", count: priority) + String(repeating: "☆", count: max(0, 3 - priority))
+    }
+
+    private static func formattedMonetaryValue(for field: FieldSchema, rawValue: JSONValue) -> String {
+        guard case .number(let amount) = rawValue else { return rawValue.displayText }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = field.digits?.last ?? 2
+        formatter.maximumFractionDigits = field.digits?.last ?? 2
+        let formattedAmount = formatter.string(from: NSNumber(value: amount)) ?? rawValue.displayText
+
+        return formattedAmount
     }
 }

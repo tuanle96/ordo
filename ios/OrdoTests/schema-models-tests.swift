@@ -3,6 +3,37 @@ import Testing
 @testable import Ordo
 
 struct SchemaModelsTests {
+        @Test
+        func unknownFieldTypesDecodeAsUnsupported() throws {
+                // Defensive decoder coverage: the backend currently normalizes unknown types,
+                // but the app still needs to survive unexpected schema payloads gracefully.
+                let json = """
+                {
+                    "model": "res.partner",
+                    "title": "Partners",
+                    "header": { "actions": [] },
+                    "sections": [
+                        {
+                            "label": null,
+                            "fields": [
+                                {
+                                    "name": "x_custom_payload",
+                                    "type": "json",
+                                    "label": "Custom Payload"
+                                }
+                            ]
+                        }
+                    ],
+                    "tabs": [],
+                    "hasChatter": false
+                }
+                """.data(using: .utf8)!
+
+                let schema = try JSONDecoder().decode(MobileFormSchema.self, from: json)
+
+                #expect(schema.sections.first?.fields.first?.type == .unsupported)
+        }
+
     @Test
     func tabSectionsDecodeFromContent() throws {
         let section = FormSection(

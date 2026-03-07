@@ -2,6 +2,30 @@ import { ConditionParserService } from '../src/odoo/schema/condition-parser.serv
 import { MobileSchemaBuilderService } from '../src/odoo/schema/mobile-schema-builder.service';
 
 describe('MobileSchemaBuilderService', () => {
+    it('normalizes unsupported Odoo field types into safe mobile fallbacks', () => {
+        const service = new MobileSchemaBuilderService(new ConditionParserService());
+        const xml = `
+      <form string="Partners">
+        <sheet>
+        <group>
+          <field name="x_custom_payload" />
+        </group>
+        </sheet>
+      </form>
+    `;
+
+        const schema = service.build('res.partner', xml, {
+            x_custom_payload: { type: 'json', string: 'Custom Payload' },
+        });
+
+        expect(schema.sections).toEqual([
+            {
+                label: null,
+                fields: [expect.objectContaining({ name: 'x_custom_payload', type: 'text' })],
+            },
+        ]);
+    });
+
     it('maps a narrow Odoo form XML into the mobile schema contract', () => {
         const service = new MobileSchemaBuilderService(new ConditionParserService());
         const xml = `

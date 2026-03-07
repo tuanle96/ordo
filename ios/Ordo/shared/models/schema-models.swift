@@ -19,6 +19,18 @@ enum FieldType: String, Codable {
     case statusbar
     case priority
     case signature
+    case unsupported
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = FieldType(rawValue: rawValue) ?? .unsupported
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 struct Condition: Codable, Hashable {
@@ -44,7 +56,7 @@ struct FieldSchema: Codable, Hashable {
     let required: Bool?
     let readonly: Bool?
     let invisible: Condition?
-    let domain: String?
+    let domain: JSONValue?
     let comodel: String?
     let selection: [[String]]?
     let currencyField: String?

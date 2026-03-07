@@ -43,14 +43,22 @@ final class RecordDetailViewModel: ObservableObject {
             cacheMessage = "Showing saved data from \(cachedRecord.relativeTimestamp)."
         }
 
+        Self.logger.info("⏳ Loading record \(self.descriptor.model, privacy: .public)#\(self.recordID, privacy: .public)")
+
         do {
+            Self.logger.debug("📐 Fetching schema for \(self.descriptor.model, privacy: .public)…")
             let schema = try await appState.apiClient.schema(model: descriptor.model, token: token)
+            Self.logger.debug("📐 Schema OK — \(schema.requestedFieldNames.count, privacy: .public) fields")
+
+            Self.logger.debug("📄 Fetching record \(self.descriptor.model, privacy: .public)#\(self.recordID, privacy: .public) with fields: \(schema.requestedFieldNames.joined(separator: ", "), privacy: .public)")
             let record = try await appState.apiClient.record(
                 model: descriptor.model,
                 id: recordID,
                 fields: schema.requestedFieldNames,
                 token: token
             )
+            Self.logger.debug("📄 Record OK — \(record.count, privacy: .public) keys: \(record.keys.sorted().joined(separator: ", "), privacy: .public)")
+
             self.schema = schema
             self.record = record
             cacheMessage = nil
@@ -65,6 +73,7 @@ final class RecordDetailViewModel: ObservableObject {
                 Self.logger.error("Failed to save record cache for \(self.descriptor.model, privacy: .public)#\(self.recordID, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         } catch {
+            Self.logger.error("❌ Failed to load \(self.descriptor.model, privacy: .public)#\(self.recordID, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {
                 appState.signOut()
             } else if schema == nil || record == nil {

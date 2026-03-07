@@ -73,6 +73,8 @@ final class RecordListViewModel: ObservableObject {
             cacheMessage = "Showing saved data from \(cached.relativeTimestamp)."
         }
 
+        Self.logger.info("📋 Loading page for \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public) replacing=\(replacing, privacy: .public)")
+
         do {
             let result = try await appState.apiClient.listRecords(
                 model: descriptor.model,
@@ -81,6 +83,7 @@ final class RecordListViewModel: ObservableObject {
                 offset: offset,
                 token: token
             )
+            Self.logger.debug("📋 Page loaded: \(result.items.count, privacy: .public) items for \(self.descriptor.model, privacy: .public)")
             applyPage(result, offset: offset, replacing: replacing)
             cacheMessage = nil
             do {
@@ -89,6 +92,7 @@ final class RecordListViewModel: ObservableObject {
                 Self.logger.error("Failed to save list cache for \(self.descriptor.model, privacy: .public) offset \(offset, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         } catch {
+            Self.logger.error("❌ Failed to load list \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {
                 appState.signOut()
             } else if !replacing,

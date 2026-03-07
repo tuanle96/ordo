@@ -23,7 +23,7 @@ struct ReadOnlyFieldRow: View {
                     Text(model.value)
                         .multilineTextAlignment(.trailing)
                         .accessibilityIdentifier("field-value-\(model.id)")
-                    Text("Unsupported type: \(fieldType.rawValue)")
+                    Text(fieldType == .unsupported ? "Unsupported field" : "Unsupported type: \(fieldType.rawValue)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

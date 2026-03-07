@@ -1,5 +1,38 @@
 # Project Changelog
 
+## 2026-03-06 (iOS Dynamic Form Engine — Local Edit + Schema Rules Slice)
+
+### Added
+
+- **Client-side schema rule evaluator** for the existing `Condition` contract emitted by the backend; detail rendering now honors field-level `invisible` rules against current record or draft values
+- **Local draft edit mode** on record detail with an `Edit` / `Cancel` affordance and in-memory draft state only; no backend writes or save actions introduced yet
+- **Editable controls for the minimum useful subset**: `char`, `text`, `boolean`, and `selection`
+- **Focused regression coverage** for condition evaluation, expanded field rendering, unsupported edit-mode fallback, and a UI path that enters detail edit mode while verifying visibility rules
+
+### Changed
+
+- `SchemaRendererView` now collapses invisible fields and hides empty sections/tabs instead of rendering hollow containers
+- Fields marked `readonly: true` remain display-only even while the screen is in local edit mode
+- Read-only detail rendering now supports **`priority`** and **`monetary`** as first-class field types instead of unsupported fallback rows
+- UI smoke fixtures now include visibility-rule, readonly, monetary, priority, and draft-edit scenarios for the detail screen
+
+### Fixed
+
+- **MEDIUM (2026-03-06 customer detail hardening)**: customer detail screens no longer fail schema decoding when an Odoo instance exposes unsupported/custom field types inside the form view; backend now normalizes unknown field types to safe mobile fallbacks and iOS defensively decodes unexpected types as `.unsupported`
+- **LOW (2026-03-06 customer detail polish)**: unsupported dynamic fields now render a generic "Unsupported field" hint instead of the awkward `unsupported` raw enum value
+
+### Notes
+
+- This slice implements **conditional visibility** and **static readonly** only. The current backend schema contract does not yet expose conditional readonly expressions, so iOS does not invent one.
+- Edit mode is intentionally draft-only for now: no validation gate, no save CTA, no persistence, no backend write endpoint.
+
+### Verified
+
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — unit tests pass, including the new `ConditionEvaluatorTests` and expanded `FieldRowFactoryTests`
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/testSmokeLoginBrowseAndDetail -only-testing:OrdoUITests/testSmokeRestoresSessionAfterRelaunch -only-testing:OrdoUITests/testDetailEditModeShowsEditorsAndHonorsVisibilityRules test` — targeted UI tests pass
+- `npm test --workspace backend -- --runInBand mobile-schema-builder.service.spec.ts && npm run lint --workspace backend` — backend schema builder tests and TypeScript lint pass after field-type normalization
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/SchemaModelsTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused iOS tests for unknown-type decoding and unsupported-field fallback pass
+
 ## 2026-03-06 (iOS Dynamic Form Engine — Read-only Foundation)
 
 ### Added

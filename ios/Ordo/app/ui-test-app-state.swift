@@ -140,14 +140,20 @@ private enum UITestFixtures {
         header: FormHeader(statusbar: nil, actions: []),
         sections: [FormSection(label: "Contact", fields: [
             FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "nickname", type: .char, label: "Nickname", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: "Optional nickname", digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "email", type: .char, label: "Email", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "phone", type: .char, label: "Phone", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "is_company", type: .boolean, label: "Company", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "customer_rank", type: .selection, label: "Customer Rank", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: [["standard", "Standard"], ["vip", "VIP"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "priority", type: .priority, label: "Priority", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "city", type: .char, label: "City", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
         ])],
         tabs: [FormTab(label: "Notes", content: ["sections": encodedSections([
             FormSection(label: "Notes", fields: [
                 FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "internal_note", type: .text, label: "Internal Note", required: nil, readonly: nil, invisible: Condition(field: "is_company", op: "==", value: "false", values: nil), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             ]),
         ])])],
         hasChatter: false
@@ -175,11 +181,18 @@ private enum UITestFixtures {
             "id": .number(Double(id)),
             "display_name": .string(names[index]),
             "name": .string(names[index]),
+            "nickname": .string("VIP \(id)"),
             "email": .string(emails[index]),
             "phone": .string(phones[index]),
+            "is_company": .bool(false),
+            "customer_rank": .string(index == 0 ? "vip" : "standard"),
+            "credit_limit": .number(2500.5),
+            "priority": .string(index == 0 ? "2" : "1"),
             "city": .string(cities[index]),
             "country_id": .array([.number(233), .string("United States")]),
+            "currency_id": .array([.number(1), .string("USD")]),
             "comment": .string("Preferred customer"),
+            "internal_note": .string("Backoffice only"),
         ]
     }
 

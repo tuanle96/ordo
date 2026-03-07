@@ -51,6 +51,25 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testDetailEditModeShowsEditorsAndHonorsVisibilityRules() throws {
+        let app = makeApp(resetStorage: true)
+        app.launch()
+
+        signIn(app)
+        app.tabBars.buttons["Browse"].tap()
+        app.cells["browse-model-res-partner"].tap()
+        app.cells["record-row-1"].tap()
+
+        let editButton = app.buttons["detail-edit-button"]
+        XCTAssertTrue(editButton.waitForExistence(timeout: 5))
+        editButton.tap()
+
+        XCTAssertTrue(app.textFields["field-editor-name"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.otherElements["field-row-internal_note"].exists)
+        XCTAssertTrue(app.staticTexts["field-value-credit_limit"].exists)
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             let app = makeApp(resetStorage: true)

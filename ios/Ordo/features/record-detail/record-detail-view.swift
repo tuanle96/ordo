@@ -3,6 +3,8 @@ import SwiftUI
 struct RecordDetailView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel: RecordDetailViewModel
+    @State private var isEditing = false
+    @State private var draft: FormDraft?
 
     init(descriptor: ModelDescriptor, recordID: Int) {
         _viewModel = StateObject(wrappedValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
@@ -45,11 +47,14 @@ struct RecordDetailView: View {
                         .padding(.vertical, 4)
                     }
 
-                    SchemaRendererView(schema: schema, record: record)
+                    SchemaRendererView(schema: schema, record: record, draft: draft, isEditing: isEditing)
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {
                     await viewModel.load(using: appState)
+                    if let record = viewModel.record, !isEditing {
+                        draft = FormDraft(record: record)
+                    }
                 }
             } else {
                 ContentUnavailableView("No Record Selected", systemImage: "doc.text")
@@ -57,8 +62,29 @@ struct RecordDetailView: View {
         }
         .navigationTitle(viewModel.descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel.schema != nil, viewModel.record != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isEditing ? "Cancel" : "Edit") {
+                        if isEditing {
+                            isEditing = false
+                            if let record = viewModel.record {
+                                draft = FormDraft(record: record)
+                            }
+                        } else if let record = viewModel.record {
+                            draft = FormDraft(record: record)
+                            isEditing = true
+                        }
+                    }
+                    .accessibilityIdentifier("detail-edit-button")
+                }
+            }
+        }
         .task {
             await viewModel.load(using: appState)
+            if let record = viewModel.record {
+                draft = FormDraft(record: record)
+            }
         }
     }
 }

@@ -3,12 +3,16 @@ import SwiftUI
 struct SchemaRendererView: View {
     let schema: MobileFormSchema
     let record: RecordData
+    var draft: FormDraft? = nil
+    var isEditing = false
 
     var body: some View {
         ForEach(Array(schema.sections.enumerated()), id: \.offset) { index, section in
             SchemaSectionView(
                 section: section,
                 record: record,
+                draft: draft,
+                isEditing: isEditing,
                 title: section.label ?? "Details",
                 identifierPrefix: "primary-\(index)"
             )
@@ -19,6 +23,8 @@ struct SchemaRendererView: View {
                 SchemaSectionView(
                     section: section,
                     record: record,
+                    draft: draft,
+                    isEditing: isEditing,
                     title: section.label ?? tab.label,
                     identifierPrefix: "tab-\(tabIndex)-\(sectionIndex)"
                 )
@@ -30,20 +36,48 @@ struct SchemaRendererView: View {
 private struct SchemaSectionView: View {
     let section: FormSection
     let record: RecordData
+    let draft: FormDraft?
+    let isEditing: Bool
     let title: String
     let identifierPrefix: String
 
-    private var rows: [ReadOnlyFieldRowModel] {
-        section.fields.compactMap { field in
-            FieldRowFactory.model(for: field, rawValue: record[field.name])
+    private var values: RecordData {
+        draft?.values ?? record
+    }
+
+    private var fields: [FieldSchema] {
+        section.fields.filter { !$0.isInvisible(in: values) }
+    }
+
+    private var rows: [FieldSchema] {
+        fields.filter { field in
+            let rawValue = values[field.name] ?? record[field.name]
+            if isEditing, draft != nil, !field.isStaticallyReadOnly, EditableFieldFactory.model(for: field) != nil {
+                return true
+            }
+            return FieldRowFactory.model(for: field, rawValue: rawValue) != nil
+        }
+    }
+
+    @ViewBuilder
+    private func row(for field: FieldSchema) -> some View {
+        let rawValue = values[field.name] ?? record[field.name]
+
+        if isEditing,
+           let draft,
+           !field.isStaticallyReadOnly,
+           let editor = EditableFieldFactory.model(for: field) {
+            EditableFieldRow(field: field, model: editor, draft: draft, fallbackValue: record[field.name])
+        } else if let row = FieldRowFactory.model(for: field, rawValue: rawValue) {
+            ReadOnlyFieldRow(model: row)
         }
     }
 
     var body: some View {
         if !rows.isEmpty {
             Section(title) {
-                ForEach(rows) { row in
-                    ReadOnlyFieldRow(model: row)
+                ForEach(rows, id: \.name) { field in
+                    row(for: field)
                 }
             }
             .accessibilityIdentifier("schema-section-\(identifierPrefix)")

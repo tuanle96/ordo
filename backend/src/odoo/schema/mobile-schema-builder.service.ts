@@ -7,6 +7,27 @@ import { ConditionParserService } from './condition-parser.service';
 
 @Injectable()
 export class MobileSchemaBuilderService {
+    private readonly supportedFieldTypes = new Set<FieldSchema['type']>([
+        'char',
+        'text',
+        'integer',
+        'float',
+        'boolean',
+        'selection',
+        'date',
+        'datetime',
+        'many2one',
+        'one2many',
+        'many2many',
+        'monetary',
+        'binary',
+        'image',
+        'html',
+        'statusbar',
+        'priority',
+        'signature',
+    ]);
+
     private readonly parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: '@_',
@@ -107,7 +128,7 @@ export class MobileSchemaBuilderService {
 
         return {
             name,
-            type: fieldNode['@_widget'] === 'statusbar' ? 'statusbar' : meta.type,
+            type: this.normalizeFieldType(meta.type, fieldNode['@_widget']),
             label: String(fieldNode['@_string'] ?? meta.string ?? name),
             required: Boolean(meta.required),
             readonly: Boolean(meta.readonly) || fieldNode['@_readonly'] === '1',
@@ -123,6 +144,29 @@ export class MobileSchemaBuilderService {
         };
     }
 
+    private normalizeFieldType(rawType: string, widget?: unknown): FieldSchema['type'] {
+        if (widget === 'statusbar') {
+            return 'statusbar';
+        }
+
+        if (this.supportedFieldTypes.has(rawType as FieldSchema['type'])) {
+            return rawType as FieldSchema['type'];
+        }
+
+        // Odoo instances can expose addon/custom field types that the mobile client
+        // does not model explicitly. Normalize them to a safe, read-only-capable type
+        // so schema decoding does not fail the entire detail screen on iOS.
+        switch (rawType) {
+            case 'json':
+            case 'properties':
+            case 'reference':
+            case 'many2one_reference':
+                return 'text';
+            default:
+                return 'text';
+        }
+    }
+
     private asArray<T>(value: T | T[] | undefined): T[] {
         if (value === undefined) {
             return [];
@@ -136,7 +180,7 @@ type XmlNode = Record<string, any>;
 
 interface OdooFieldMeta {
     string?: string;
-    type: FieldSchema['type'];
+    type: string;
     readonly?: boolean;
     required?: boolean;
     relation?: string;
