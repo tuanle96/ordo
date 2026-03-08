@@ -32,7 +32,7 @@ final class OrdoUITests: XCTestCase {
 
         assertHomeScreen(app)
 
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-crm-lead"].waitForExistence(timeout: standardTimeout))
         XCTAssertTrue(app.buttons["browse-model-sale-order"].exists)
 
@@ -90,7 +90,7 @@ final class OrdoUITests: XCTestCase {
         app.launch()
 
         signIn(app)
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(app)
@@ -108,7 +108,7 @@ final class OrdoUITests: XCTestCase {
         app.launch()
 
         signIn(app)
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(app)
@@ -134,7 +134,7 @@ final class OrdoUITests: XCTestCase {
         app.launch()
 
         signIn(app)
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(app)
@@ -170,7 +170,7 @@ final class OrdoUITests: XCTestCase {
         app.launch()
 
         signIn(app)
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(app)
@@ -210,7 +210,7 @@ final class OrdoUITests: XCTestCase {
         app.launch()
 
         signIn(app)
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(app)
@@ -250,7 +250,7 @@ final class OrdoUITests: XCTestCase {
         app.launch()
 
         signIn(app)
-        app.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(app)
         XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(app)
@@ -279,7 +279,7 @@ final class OrdoUITests: XCTestCase {
         firstLaunch.launch()
 
         signIn(firstLaunch)
-        firstLaunch.tabBars.buttons["Browse"].tap()
+        tapBrowseTab(firstLaunch)
         XCTAssertTrue(firstLaunch.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
         firstLaunch.buttons["browse-model-res-partner"].tap()
         openFirstRecordDetail(firstLaunch)
@@ -323,34 +323,32 @@ final class OrdoUITests: XCTestCase {
 
     private func signIn(_ app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars["Sign In"].waitForExistence(timeout: standardTimeout))
-        let loginForm = app.tables.firstMatch
-        XCTAssertTrue(loginForm.waitForExistence(timeout: standardTimeout))
 
         let odooField = app.textFields["login-odoo-url-field"]
         XCTAssertTrue(odooField.waitForExistence(timeout: standardTimeout))
         odooField.replaceTextIfNeeded(odooURL)
 
         let databaseField = app.textFields["login-database-field"]
-        XCTAssertTrue(reveal(databaseField, in: loginForm, timeout: standardTimeout))
+        XCTAssertTrue(reveal(databaseField, in: app, timeout: standardTimeout))
         databaseField.replaceTextIfNeeded(database)
 
         let usernameField = app.textFields["login-username-field"]
-        XCTAssertTrue(reveal(usernameField, in: loginForm, timeout: standardTimeout))
+        XCTAssertTrue(reveal(usernameField, in: app, timeout: standardTimeout))
         usernameField.replaceTextIfNeeded(username)
 
         let advancedSettingsButton = app.buttons["Advanced Settings"]
-        XCTAssertTrue(reveal(advancedSettingsButton, in: loginForm, timeout: standardTimeout))
+        XCTAssertTrue(reveal(advancedSettingsButton, in: app, timeout: standardTimeout))
 
         if !app.textFields["login-backend-url-field"].exists {
             advancedSettingsButton.tap()
         }
 
         let backendField = app.textFields["login-backend-url-field"]
-        XCTAssertTrue(reveal(backendField, in: loginForm, timeout: standardTimeout))
+        XCTAssertTrue(reveal(backendField, in: app, timeout: standardTimeout))
         backendField.replaceTextIfNeeded(backendURL)
 
         let passwordField = app.secureTextFields["login-password-field"]
-        XCTAssertTrue(reveal(passwordField, in: loginForm, timeout: standardTimeout))
+        XCTAssertTrue(reveal(passwordField, in: app, timeout: standardTimeout))
         passwordField.tap()
         passwordField.typeText("admin")
 
@@ -372,7 +370,22 @@ final class OrdoUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["main-tab-screen"].waitForExistence(timeout: extendedTimeout))
         let homeButton = app.tabBars.buttons["Home"]
         XCTAssertTrue(homeButton.waitForExistence(timeout: standardTimeout))
-        XCTAssertTrue(app.tabBars.buttons["Browse"].waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(browseTabButton(in: app).waitForExistence(timeout: standardTimeout))
+    }
+
+    private func browseTabButton(in app: XCUIApplication) -> XCUIElement {
+        let iconMatchedButton = app.tabBars.buttons["rectangle.stack.person.crop"]
+        if iconMatchedButton.exists {
+            return iconMatchedButton
+        }
+
+        return app.tabBars.buttons.matching(NSPredicate(format: "label == %@", "Browse")).firstMatch
+    }
+
+    private func tapBrowseTab(_ app: XCUIApplication) {
+        let browseButton = browseTabButton(in: app)
+        XCTAssertTrue(browseButton.waitForExistence(timeout: standardTimeout))
+        browseButton.tap()
     }
 
     private func openEditMode(_ app: XCUIApplication) {
@@ -407,12 +420,19 @@ final class OrdoUITests: XCTestCase {
     private func waitForReadOnlyDetail(_ app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: extendedTimeout))
         XCTAssertTrue(app.buttons["detail-edit-button"].waitForExistence(timeout: standardTimeout))
-        XCTAssertTrue(app.otherElements["field-row-name"].waitForExistence(timeout: standardTimeout))
+        let primarySection = app.descendants(matching: .any)["schema-section-primary-0"]
+        let firstTabSection = app.descendants(matching: .any)["schema-section-tab-0-0"]
+        let nameValue = app.staticTexts["field-value-name"]
+        XCTAssertTrue(
+            primarySection.waitForExistence(timeout: 5)
+                || firstTabSection.waitForExistence(timeout: 5)
+                || nameValue.waitForExistence(timeout: standardTimeout)
+        )
     }
 
     private func reveal(
         _ element: XCUIElement,
-        in container: XCUIElement,
+        in app: XCUIApplication,
         timeout: TimeInterval,
         maxSwipes: Int = 6
     ) -> Bool {
@@ -421,7 +441,7 @@ final class OrdoUITests: XCTestCase {
         }
 
         for _ in 0..<maxSwipes {
-            container.swipeUp()
+            app.swipeUp()
 
             if element.waitForExistence(timeout: 1.5) {
                 return true

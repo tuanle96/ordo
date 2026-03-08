@@ -1,8 +1,11 @@
 import type {
+    ChatterDetailsResult,
     ChatterMessage,
     ChatterThreadResult,
     MobileFormSchema,
     NameSearchResult,
+    OnchangeRequest,
+    OnchangeResult,
     RecordData,
     RecordListQuery,
     RecordListResult,
@@ -18,6 +21,11 @@ export interface OdooAdapter {
         model: string,
         values: RecordData,
     ): Promise<number>;
+    runOnchange(
+        session: OdooSessionContext,
+        model: string,
+        request: OnchangeRequest,
+    ): Promise<OnchangeResult>;
     updateRecord(
         session: OdooSessionContext,
         model: string,
@@ -60,10 +68,32 @@ export interface OdooAdapter {
         limit?: number,
         before?: number,
     ): Promise<ChatterThreadResult>;
+    getChatterDetails(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult>;
     postChatterNote(
         session: OdooSessionContext,
         model: string,
         id: number,
         body: string,
     ): Promise<ChatterMessage>;
+    followRecord(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult>;
+    unfollowRecord(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult>;
+    completeChatterActivity(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        activityId: number,
+        feedback?: string,
+    ): Promise<ChatterDetailsResult>;
 }

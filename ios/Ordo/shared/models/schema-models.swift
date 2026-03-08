@@ -87,6 +87,13 @@ struct FieldModifiers: Codable, Hashable {
     let required: ModifierRule?
 }
 
+struct OnchangeFieldMeta: Codable, Hashable {
+    let trigger: String
+    let source: String?
+    let dependencies: [String]?
+    let mergeReturnedValue: Bool?
+}
+
 struct ActionButton: Codable, Hashable {
     let name: String
     let label: String
@@ -123,6 +130,7 @@ struct FieldSchema: Codable, Hashable {
     let readonly: Bool?
     let invisible: Condition?
     let modifiers: FieldModifiers?
+    let onchange: OnchangeFieldMeta?
     let domain: JSONValue?
     let comodel: String?
     let selection: [[String]]?
@@ -141,6 +149,7 @@ struct FieldSchema: Codable, Hashable {
         readonly: Bool? = nil,
         invisible: Condition? = nil,
         modifiers: FieldModifiers? = nil,
+        onchange: OnchangeFieldMeta? = nil,
         domain: JSONValue? = nil,
         comodel: String? = nil,
         selection: [[String]]? = nil,
@@ -158,6 +167,7 @@ struct FieldSchema: Codable, Hashable {
         self.readonly = readonly
         self.invisible = invisible
         self.modifiers = modifiers
+        self.onchange = onchange
         self.domain = domain
         self.comodel = comodel
         self.selection = selection

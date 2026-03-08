@@ -2,6 +2,25 @@ import Foundation
 
 typealias RecordData = [String: JSONValue]
 
+struct OnchangeRequest: Codable {
+    let values: RecordData
+    let triggerField: String
+    let recordId: Int?
+    let fields: [String]?
+}
+
+struct OnchangeWarning: Codable, Hashable {
+    let title: String
+    let message: String
+    let type: String?
+}
+
+struct OnchangeResult: Codable {
+    let values: RecordData
+    let warnings: [OnchangeWarning]?
+    let domains: [String: JSONValue]?
+}
+
 struct RecordMutationRequest: Codable {
     let values: RecordData
     let fields: [String]?

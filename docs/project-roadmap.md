@@ -21,6 +21,7 @@
 | Phase 2 — Next iOS slice (Phase 06A) | ✅ Complete | Recent-items relaunch determinism seam isolated and verified with the targeted relaunch UI test green before observation changes landed |
 | Phase 2 — Next iOS slice (Phase 06B) | ✅ Complete | `RecentItemsStore` migrated to `@Observable`; `OrdoApp` root ownership plus `HomeView` and `RecordDetailView` consumer patterns validated with green unit and targeted UI coverage |
 | Phase 07 — iOS form editors & list browsing improvements | ✅ Complete | Many2many editable tags shipped; browse table mode + sort landed; chatter read + post-note MVP shipped with lazy-load UI and adapter delegation |
+| Phase 08 — iOS create flow & primitive editor expansion | In Progress | Record detail now supports create-mode navigation from browse lists plus editable `integer`, `float`, `date`, and `datetime` fields backed by draft normalization, validation, and canonical POST readback; deterministic create-flow UI/E2E coverage remains pending |
 
 ## Scope reminders
 

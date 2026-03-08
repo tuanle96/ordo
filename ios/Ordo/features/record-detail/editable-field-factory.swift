@@ -4,6 +4,10 @@ struct EditableFieldRowModel {
     enum Style {
         case text
         case multiline
+        case integer
+        case float
+        case date
+        case datetime
         case toggle
         case selection(options: [[String]])
         case many2one(comodel: String)
@@ -20,6 +24,14 @@ enum EditableFieldFactory {
             return .init(style: .text)
         case .text:
             return .init(style: .multiline)
+        case .integer:
+            return .init(style: .integer)
+        case .float:
+            return .init(style: .float)
+        case .date:
+            return .init(style: .date)
+        case .datetime:
+            return .init(style: .datetime)
         case .boolean:
             return .init(style: .toggle)
         case .selection:
@@ -44,6 +56,7 @@ struct EditableFieldRow: View {
     let draft: FormDraft
     let fallbackValue: JSONValue?
     let validationMessage: String?
+    let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
 
     @State private var isShowingRelationPicker = false
 
@@ -70,6 +83,44 @@ struct EditableFieldRow: View {
                     .accessibilityIdentifier("field-editor-\(field.name)")
                 validationText
             }
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .integer:
+            NumericFieldEditor(
+                field: field,
+                text: numericStringBinding,
+                keyboardType: .numberPad,
+                validationMessage: validationMessage
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .float:
+            NumericFieldEditor(
+                field: field,
+                text: numericStringBinding,
+                keyboardType: .decimalPad,
+                validationMessage: validationMessage
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .date:
+            TemporalFieldEditor(
+                field: field,
+                fallbackValue: fallbackValue,
+                validationMessage: validationMessage,
+                displayedComponents: [.date],
+                includeTime: false,
+                onValueChange: onValueChange,
+                draft: draft
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .datetime:
+            TemporalFieldEditor(
+                field: field,
+                fallbackValue: fallbackValue,
+                validationMessage: validationMessage,
+                displayedComponents: [.date, .hourAndMinute],
+                includeTime: true,
+                onValueChange: onValueChange,
+                draft: draft
+            )
             .accessibilityIdentifier("field-row-\(field.name)")
         case .toggle:
             VStack(alignment: .leading, spacing: 6) {
@@ -116,7 +167,7 @@ struct EditableFieldRow: View {
 
                     if relationLabel != nil {
                         Button("Clear") {
-                            draft.setValue(nil, for: field.name)
+                            applyChange(nil)
                         }
                         .font(.subheadline.weight(.medium))
                         .accessibilityIdentifier("field-clear-\(field.name)")
@@ -132,7 +183,7 @@ struct EditableFieldRow: View {
                     comodel: comodel,
                     currentValue: draft.value(for: field.name, fallback: fallbackValue),
                     onSelect: { selection in
-                        draft.setValue(selection, for: field.name)
+                        applyChange(selection)
                     }
                 )
                 .environment(appState)
@@ -178,7 +229,7 @@ struct EditableFieldRow: View {
 
                     if !selectedRelations.isEmpty {
                         Button("Clear") {
-                            draft.setValue(.array([]), for: field.name)
+                            applyChange(.array([]))
                         }
                         .font(.subheadline.weight(.medium))
                         .accessibilityIdentifier("field-clear-\(field.name)")
@@ -194,7 +245,7 @@ struct EditableFieldRow: View {
                     comodel: comodel,
                     currentSelections: selectedRelations,
                     onSelect: { selections in
-                        draft.setValue(.array(selections.map { .relation(id: $0.id, label: $0.label) }), for: field.name)
+                        applyChange(.array(selections.map { .relation(id: $0.id, label: $0.label) }))
                     }
                 )
                 .environment(appState)
@@ -215,7 +266,27 @@ struct EditableFieldRow: View {
     private var stringBinding: Binding<String> {
         Binding(
             get: { draft.value(for: field.name, fallback: fallbackValue)?.stringValue ?? "" },
-            set: { draft.setValue($0.isEmpty ? nil : .string($0), for: field.name) }
+            set: { applyChange($0.isEmpty ? nil : .string($0)) }
+        )
+    }
+
+    private var numericStringBinding: Binding<String> {
+        Binding(
+            get: {
+                let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+                switch value {
+                case .string(let rawString):
+                    return rawString
+                case .number(let number):
+                    return number.rounded() == number ? String(Int(number)) : String(number)
+                default:
+                    return ""
+                }
+            },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                applyChange(trimmed.isEmpty ? nil : .string(trimmed))
+            }
         )
     }
 
@@ -227,7 +298,7 @@ struct EditableFieldRow: View {
                 }
                 return false
             },
-            set: { draft.setValue(.bool($0), for: field.name) }
+            set: { applyChange(.bool($0)) }
         )
     }
 
@@ -239,7 +310,7 @@ struct EditableFieldRow: View {
                 }
                 return options.first?.first ?? ""
             },
-            set: { draft.setValue($0.isEmpty ? nil : .string($0), for: field.name) }
+            set: { applyChange($0.isEmpty ? nil : .string($0)) }
         )
     }
 
@@ -255,7 +326,156 @@ struct EditableFieldRow: View {
 
     private func removeRelation(_ relationID: Int) {
         let remaining = selectedRelations.filter { $0.id != relationID }
-        draft.setValue(.array(remaining.map { .relation(id: $0.id, label: $0.label) }), for: field.name)
+        applyChange(.array(remaining.map { .relation(id: $0.id, label: $0.label) }))
+    }
+
+    private func applyChange(_ value: JSONValue?) {
+        if let onValueChange {
+            onValueChange(field, value)
+        } else {
+            draft.setValue(value, for: field.name)
+        }
+    }
+}
+
+private struct NumericFieldEditor: View {
+    let field: FieldSchema
+    let text: Binding<String>
+    let keyboardType: UIKeyboardType
+    let validationMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LabeledContent(field.label) {
+                TextField(field.placeholder ?? field.label, text: text)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(keyboardType)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("field-editor-\(field.name)")
+            }
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-error-\(field.name)")
+            }
+        }
+    }
+}
+
+private struct TemporalFieldEditor: View {
+    let field: FieldSchema
+    let fallbackValue: JSONValue?
+    let validationMessage: String?
+    let displayedComponents: DatePickerComponents
+    let includeTime: Bool
+    let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
+
+    @Bindable var draft: FormDraft
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(field.label)
+                .font(.subheadline.weight(.medium))
+
+            if let currentDate = resolvedDate {
+                DatePicker(
+                    field.label,
+                    selection: dateBinding(currentDate),
+                    displayedComponents: displayedComponents
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .accessibilityLabel(field.label)
+                .accessibilityIdentifier("field-editor-\(field.name)")
+
+                Button("Clear") {
+                    applyChange(nil)
+                }
+                .font(.subheadline.weight(.medium))
+                .accessibilityIdentifier("field-clear-\(field.name)")
+            } else {
+                Button(includeTime ? "Set Date & Time" : "Set Date") {
+                    applyChange(.string(Self.string(from: Date(), includeTime: includeTime)))
+                }
+                .accessibilityIdentifier("field-editor-\(field.name)")
+            }
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-error-\(field.name)")
+            }
+        }
+    }
+
+    private var resolvedDate: Date? {
+        let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+        return Self.date(from: value, includeTime: includeTime)
+    }
+
+    private func dateBinding(_ fallbackDate: Date) -> Binding<Date> {
+        Binding(
+            get: { resolvedDate ?? fallbackDate },
+            set: { newValue in
+                applyChange(.string(Self.string(from: newValue, includeTime: includeTime)))
+            }
+        )
+    }
+
+    private func applyChange(_ value: JSONValue?) {
+        if let onValueChange {
+            onValueChange(field, value)
+        } else {
+            draft.setValue(value, for: field.name)
+        }
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let dateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+
+    private static let shortDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+
+    private static func date(from value: JSONValue?, includeTime: Bool) -> Date? {
+        guard case .string(let rawString)? = value else { return nil }
+        let trimmed = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if includeTime {
+            return dateTimeFormatter.date(from: trimmed)
+                ?? shortDateTimeFormatter.date(from: trimmed)
+                ?? ISO8601DateFormatter().date(from: trimmed)
+        }
+
+        return dateFormatter.date(from: trimmed)
+    }
+
+    private static func string(from date: Date, includeTime: Bool) -> String {
+        includeTime ? dateTimeFormatter.string(from: date) : dateFormatter.string(from: date)
     }
 }
 

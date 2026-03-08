@@ -38,11 +38,50 @@ struct SchemaModelsTests {
     func tabSectionsDecodeFromContent() throws {
         let section = FormSection(
             label: "Notes",
-            fields: [FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)]
+            fields: [FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)]
         )
         let tab = FormTab(label: "Extra", content: ["sections": try encodedJSONValue(from: [section])])
 
         #expect(tab.sections == [section])
+    }
+
+    @Test
+    func fieldOnchangeMetadataDecodesWhenPresent() throws {
+        let json = """
+        {
+            "model": "res.partner",
+            "title": "Partners",
+            "header": { "actions": [] },
+            "sections": [
+                {
+                    "label": null,
+                    "fields": [
+                        {
+                            "name": "country_id",
+                            "type": "many2one",
+                            "label": "Country",
+                            "onchange": {
+                                "trigger": "country_id",
+                                "source": "view",
+                                "dependencies": ["company_id"],
+                                "mergeReturnedValue": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            "tabs": [],
+            "hasChatter": false
+        }
+        """.data(using: .utf8)!
+
+        let schema = try JSONDecoder().decode(MobileFormSchema.self, from: json)
+        let onchange = try #require(schema.sections.first?.fields.first?.onchange)
+
+        #expect(onchange.trigger == "country_id")
+        #expect(onchange.source == "view")
+        #expect(onchange.dependencies == ["company_id"])
+        #expect(onchange.mergeReturnedValue == true)
     }
 
     @Test
@@ -51,8 +90,8 @@ struct SchemaModelsTests {
             model: "res.partner",
             title: "Customer",
             header: FormHeader(statusbar: .init(field: "state", visibleStates: nil), actions: []),
-            sections: [FormSection(label: "Main", fields: [FieldSchema(name: "name", type: .char, label: "Name", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)])],
-            tabs: [FormTab(label: "Extra", content: ["sections": try encodedJSONValue(from: [FormSection(label: "Notes", fields: [FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)])])])],
+            sections: [FormSection(label: "Main", fields: [FieldSchema(name: "name", type: .char, label: "Name", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)])],
+            tabs: [FormTab(label: "Extra", content: ["sections": try encodedJSONValue(from: [FormSection(label: "Notes", fields: [FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)])])])],
             hasChatter: false
         )
 

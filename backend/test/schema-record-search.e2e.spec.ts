@@ -23,6 +23,10 @@ describe('Schema, record, and search endpoints', () => {
             offset: 0,
         }),
         getRecord: jest.fn().mockResolvedValue(odooFixtures.records[0]),
+        runOnchange: jest.fn().mockResolvedValue({
+            values: { name: 'Updated by onchange' },
+            warnings: [{ title: 'Heads up', message: 'Partner defaults refreshed.' }],
+        }),
         createRecord: jest.fn().mockResolvedValue({ id: 3, record: odooFixtures.records[0] }),
         updateRecord: jest.fn().mockResolvedValue({ id: 3, record: odooFixtures.records[0] }),
         deleteRecord: jest.fn().mockResolvedValue({ id: 3, deleted: true }),
@@ -150,6 +154,22 @@ describe('Schema, record, and search endpoints', () => {
             id: 3,
             changed: true,
             record: odooFixtures.records[0],
+        });
+
+        const onchangeResponse = await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/records/res.partner/onchange')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({ values: { country_id: 21 }, triggerField: 'country_id', recordId: 3, fields: ['id', 'name', 'country_id'] })
+            .expect(201);
+
+        expect(recordServiceMock.runOnchange).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            expect.objectContaining({ values: { country_id: 21 }, triggerField: 'country_id', recordId: 3, fields: ['id', 'name', 'country_id'] }),
+        );
+        expect(onchangeResponse.body.data).toEqual({
+            values: { name: 'Updated by onchange' },
+            warnings: [{ title: 'Heads up', message: 'Partner defaults refreshed.' }],
         });
     });
 

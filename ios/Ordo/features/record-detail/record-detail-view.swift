@@ -9,9 +9,15 @@ struct RecordDetailView: View {
     @State private var draft: FormDraft?
     @State private var showDiscardConfirmation = false
 
-    init(descriptor: ModelDescriptor, recordID: Int) {
+    init(descriptor: ModelDescriptor, recordID: Int? = nil) {
         _viewModel = State(initialValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
-        _chatterViewModel = State(initialValue: RecordChatterViewModel(model: descriptor.model, recordID: recordID))
+        _chatterViewModel = State(initialValue: RecordChatterViewModel(model: descriptor.model, recordID: recordID ?? 0))
+        _isEditing = State(initialValue: recordID == nil)
+        _draft = State(initialValue: recordID == nil ? FormDraft(record: [:]) : nil)
+    }
+
+    private var isCreating: Bool {
+        viewModel.isCreating
     }
 
     var body: some View {
@@ -36,7 +42,7 @@ struct RecordDetailView: View {
                 )
             } else if let schema = viewModel.schema, let record = viewModel.record {
                 List {
-                    if let cacheMessage = viewModel.cacheMessage {
+                    if let cacheMessage = viewModel.cacheMessage, !isCreating {
                         Section {
                             OfflineStateBanner(title: "Showing saved record", message: cacheMessage)
                                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
@@ -60,9 +66,27 @@ struct RecordDetailView: View {
                         }
                     }
 
+                    if isEditing, !viewModel.onchangeWarnings.isEmpty {
+                        Section {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(Array(viewModel.onchangeWarnings.enumerated()), id: \.offset) { index, warning in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(warning.title)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.orange)
+                                        Text(warning.message)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .accessibilityIdentifier("detail-onchange-warning-\(index)")
+                                }
+                            }
+                        }
+                    }
+
                     Section {
                         RecordHeaderCard(
-                            displayName: record["display_name"]?.displayText ?? record["name"]?.displayText ?? schema.title,
+                            displayName: record["display_name"]?.displayText ?? record["name"]?.displayText ?? (isCreating ? "New \(schema.title)" : schema.title),
                             status: {
                                 if let statusField = schema.header.statusbar?.field,
                                    let status = record[statusField]?.displayText,
@@ -79,11 +103,15 @@ struct RecordDetailView: View {
                         record: record,
                         draft: draft,
                         isEditing: isEditing,
-                        validationErrors: viewModel.validationErrors
+                        validationErrors: viewModel.validationErrors,
+                        onFieldChange: { field, value in
+                            guard let draft else { return }
+                            viewModel.applyFieldEdit(value, for: field, draft: draft, using: appState)
+                        }
                     )
                     .id("schema-\(viewModel.recordID)-\(isEditing ? "editing" : "readonly")")
 
-                    if schema.hasChatter {
+                    if schema.hasChatter, !isCreating, viewModel.recordID != nil {
                         ChatterSectionView(viewModel: chatterViewModel)
                     }
                 }
@@ -93,7 +121,8 @@ struct RecordDetailView: View {
                     if let record = viewModel.record, !isEditing {
                         draft = FormDraft(record: record)
                     }
-                    if viewModel.schema?.hasChatter == true {
+                    if viewModel.schema?.hasChatter == true, let recordID = viewModel.recordID {
+                        chatterViewModel = RecordChatterViewModel(model: viewModel.descriptor.model, recordID: recordID)
                         await chatterViewModel.refresh(using: appState)
                     }
                 }
@@ -119,7 +148,7 @@ struct RecordDetailView: View {
                             ProgressView()
                                 .accessibilityIdentifier("detail-save-progress")
                         } else if viewModel.canSave(draft: draft) {
-                            Button("Save") {
+                            Button(isCreating ? "Create" : "Save") {
                                 Task {
                                     await handleSaveTap()
                                 }
@@ -150,10 +179,13 @@ struct RecordDetailView: View {
             await viewModel.load(using: appState)
             if let record = viewModel.record {
                 draft = FormDraft(record: record)
-                let displayName = record["display_name"]?.displayText ?? record["name"]?.displayText ?? "Record"
-                recentItems.add(model: viewModel.descriptor.model, recordID: viewModel.recordID, displayName: displayName)
+                if let recordID = viewModel.recordID {
+                    let displayName = record["display_name"]?.displayText ?? record["name"]?.displayText ?? "Record"
+                    recentItems.add(model: viewModel.descriptor.model, recordID: recordID, displayName: displayName)
+                    chatterViewModel = RecordChatterViewModel(model: viewModel.descriptor.model, recordID: recordID)
+                }
             }
-            if viewModel.schema?.hasChatter == true {
+            if viewModel.schema?.hasChatter == true, viewModel.recordID != nil {
                 await chatterViewModel.loadIfNeeded(using: appState)
             }
         }
@@ -184,8 +216,11 @@ struct RecordDetailView: View {
 
         self.draft = FormDraft(record: savedRecord)
         isEditing = false
-        let displayName = savedRecord["display_name"]?.displayText ?? savedRecord["name"]?.displayText ?? "Record"
-        recentItems.add(model: viewModel.descriptor.model, recordID: viewModel.recordID, displayName: displayName)
+        if let recordID = viewModel.recordID {
+            chatterViewModel = RecordChatterViewModel(model: viewModel.descriptor.model, recordID: recordID)
+            let displayName = savedRecord["display_name"]?.displayText ?? savedRecord["name"]?.displayText ?? "Record"
+            recentItems.add(model: viewModel.descriptor.model, recordID: recordID, displayName: displayName)
+        }
     }
 }
 

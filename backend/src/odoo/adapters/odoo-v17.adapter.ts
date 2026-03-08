@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type {
+    ChatterActivity,
+    ChatterDetailsResult,
+    ChatterFollower,
     ChatterMessage,
     ChatterThreadResult,
     MobileFormSchema,
     NameSearchResult,
+    OnchangeRequest,
+    OnchangeResult,
     RecordData,
     RecordListQuery,
     RecordListResult,
@@ -56,6 +61,28 @@ export class OdooV17Adapter implements OdooAdapter {
             method: 'create',
             args: [values],
         });
+    }
+
+    async runOnchange(
+        session: OdooSessionContext,
+        model: string,
+        request: OnchangeRequest,
+    ): Promise<OnchangeResult> {
+        const fieldsSpec = await this.odooRpcService.getFieldsSpecWithSession(session, model);
+        const result = await this.odooRpcService.runModelOnchangeWithSession(
+            session,
+            model,
+            request.values,
+            request.triggerField,
+            fieldsSpec,
+            request.recordId,
+        );
+
+        return {
+            values: this.normalizeOnchangeValues(result.value),
+            warnings: this.normalizeOnchangeWarnings(result.warning),
+            domains: this.normalizeOnchangeDomains(result.domain),
+        };
     }
 
     async updateRecord(
@@ -210,6 +237,74 @@ export class OdooV17Adapter implements OdooAdapter {
         };
     }
 
+    async getChatterDetails(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult> {
+        const currentPartnerId = await this.getCurrentPartnerId(session);
+        const followerDomain: unknown[] = [
+            ['res_id', '=', id],
+            ['res_model', '=', model],
+        ];
+        const activityDomain: unknown[] = [
+            ['res_id', '=', id],
+            ['res_model', '=', model],
+        ];
+
+        const [followersRaw, followersCount, selfFollowerRaw, activitiesRaw] = await Promise.all([
+            this.odooRpcService.callKwWithSession<OdooFormattedFollower[]>({
+                session,
+                model,
+                method: 'message_get_followers',
+                args: [[id]],
+                kwargs: {
+                    limit: 100,
+                },
+            }),
+            this.odooRpcService.callKwWithSession<number>({
+                session,
+                model: 'mail.followers',
+                method: 'search_count',
+                args: [followerDomain],
+            }),
+            this.odooRpcService.callKwWithSession<OdooFormattedFollower[]>({
+                session,
+                model: 'mail.followers',
+                method: 'search_read',
+                args: [[
+                    ...followerDomain,
+                    ['partner_id', '=', currentPartnerId],
+                ]],
+                kwargs: {
+                    limit: 1,
+                    fields: ['id', 'partner_id', 'name', 'email', 'is_active'],
+                },
+            }),
+            this.odooRpcService.callKwWithSession<OdooFormattedActivity[]>({
+                session,
+                model: 'mail.activity',
+                method: 'search_read',
+                args: [activityDomain],
+                kwargs: {
+                    fields: ['id', 'activity_type_id', 'summary', 'note', 'date_deadline', 'state', 'can_write', 'user_id'],
+                    order: 'date_deadline asc, id asc',
+                },
+            }),
+        ]);
+
+        const followers = followersRaw.map((follower) => this.mapChatterFollower(follower, currentPartnerId));
+        const selfFollower = followers.find((follower) => follower.isSelf)
+            ?? selfFollowerRaw.map((follower) => this.mapChatterFollower(follower, currentPartnerId))[0];
+
+        return {
+            followers,
+            followersCount,
+            selfFollower,
+            activities: activitiesRaw.map((activity) => this.mapChatterActivity(activity)),
+        };
+    }
+
     async postChatterNote(
         session: OdooSessionContext,
         model: string,
@@ -237,6 +332,76 @@ export class OdooV17Adapter implements OdooAdapter {
         return this.mapChatterMessage(message);
     }
 
+    async followRecord(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult> {
+        const partnerId = await this.getCurrentPartnerId(session);
+
+        await this.odooRpcService.callKwWithSession<boolean>({
+            session,
+            model,
+            method: 'message_subscribe',
+            args: [[id], [partnerId]],
+        });
+
+        return this.getChatterDetails(session, model, id);
+    }
+
+    async unfollowRecord(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult> {
+        const partnerId = await this.getCurrentPartnerId(session);
+
+        await this.odooRpcService.callKwWithSession<boolean>({
+            session,
+            model,
+            method: 'message_unsubscribe',
+            args: [[id], [partnerId]],
+        });
+
+        return this.getChatterDetails(session, model, id);
+    }
+
+    async completeChatterActivity(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        activityId: number,
+        feedback?: string,
+    ): Promise<ChatterDetailsResult> {
+        const matchingActivities = await this.odooRpcService.callKwWithSession<Array<{ id: number }>>({
+            session,
+            model: 'mail.activity',
+            method: 'search_read',
+            args: [[
+                ['id', '=', activityId],
+                ['res_id', '=', id],
+                ['res_model', '=', model],
+            ]],
+            kwargs: {
+                limit: 1,
+                fields: ['id'],
+            },
+        });
+
+        if (matchingActivities.length === 0) {
+            throw new NotFoundException(`Activity ${activityId} was not found on ${model}:${id}`);
+        }
+
+        await this.odooRpcService.callKwWithSession<number | false>({
+            session,
+            model: 'mail.activity',
+            method: 'action_feedback',
+            args: feedback ? [[activityId], feedback] : [[activityId]],
+        });
+
+        return this.getChatterDetails(session, model, id);
+    }
+
     private mapChatterMessage(message: OdooFormattedMessage): ChatterMessage {
         return {
             id: message.id,
@@ -256,6 +421,82 @@ export class OdooV17Adapter implements OdooAdapter {
         };
     }
 
+    private mapChatterFollower(
+        follower: OdooFormattedFollower,
+        currentPartnerId: number,
+    ): ChatterFollower {
+        const partner = this.extractIdName(follower.partner_id);
+
+        return {
+            id: follower.id,
+            partnerId: partner?.id ?? 0,
+            name: follower.name ?? follower.display_name ?? partner?.name ?? 'Unknown follower',
+            email: this.normalizeOptionalString(follower.email),
+            isActive: follower.is_active ?? true,
+            isSelf: partner?.id === currentPartnerId,
+        };
+    }
+
+    private mapChatterActivity(activity: OdooFormattedActivity): ChatterActivity {
+        const activityType = this.extractIdName(activity.activity_type_id);
+        const assignedUser = this.extractIdName(activity.user_id);
+        const note = typeof activity.note === 'string' ? activity.note : '';
+
+        return {
+            id: activity.id,
+            typeId: activityType?.id,
+            typeName: activityType?.name ?? 'Activity',
+            summary: this.normalizeOptionalString(activity.summary),
+            note,
+            plainNote: this.toPlainText(note),
+            dateDeadline: activity.date_deadline,
+            state: activity.state ?? 'planned',
+            canWrite: activity.can_write ?? false,
+            assignedUser,
+        };
+    }
+
+    private async getCurrentPartnerId(session: OdooSessionContext): Promise<number> {
+        const [user] = await this.odooRpcService.callKwWithSession<OdooCurrentUserRecord[]>({
+            session,
+            model: 'res.users',
+            method: 'read',
+            args: [[session.uid]],
+            kwargs: {
+                fields: ['partner_id'],
+            },
+        });
+        const partner = this.extractIdName(user?.partner_id);
+
+        if (!partner?.id) {
+            throw new BadGatewayException('Unable to resolve the authenticated partner for chatter follower operations.');
+        }
+
+        return partner.id;
+    }
+
+    private extractIdName(value: OdooRelationValue): { id: number; name: string } | undefined {
+        if (Array.isArray(value) && typeof value[0] === 'number') {
+            return {
+                id: value[0],
+                name: typeof value[1] === 'string' ? value[1] : String(value[0]),
+            };
+        }
+
+        if (typeof value === 'number') {
+            return {
+                id: value,
+                name: String(value),
+            };
+        }
+
+        return undefined;
+    }
+
+    private normalizeOptionalString(value: string | false | null | undefined): string | undefined {
+        return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+    }
+
     private toPlainText(value: string): string {
         return value
             .replace(/<br\s*\/?>/gi, '\n')
@@ -272,6 +513,50 @@ export class OdooV17Adapter implements OdooAdapter {
             .replace(/\n{3,}/g, '\n\n')
             .replace(/[ \t]{2,}/g, ' ')
             .trim();
+    }
+
+    private normalizeOnchangeValues(value: unknown): RecordData {
+        if (value === undefined || value === null) {
+            return {};
+        }
+
+        if (!this.isPlainObject(value)) {
+            throw new BadGatewayException('Odoo onchange returned an unsupported value payload.');
+        }
+
+        return value as RecordData;
+    }
+
+    private normalizeOnchangeWarnings(warning: unknown): OnchangeResult['warnings'] {
+        if (warning === undefined || warning === null) {
+            return undefined;
+        }
+
+        if (!this.isPlainObject(warning) || typeof warning.title !== 'string' || typeof warning.message !== 'string') {
+            throw new BadGatewayException('Odoo onchange returned an unsupported warning payload.');
+        }
+
+        return [{
+            title: warning.title,
+            message: warning.message,
+            type: warning.type === 'warning' || warning.type === 'info' ? warning.type : undefined,
+        }];
+    }
+
+    private normalizeOnchangeDomains(domain: unknown): OnchangeResult['domains'] {
+        if (domain === undefined || domain === null) {
+            return undefined;
+        }
+
+        if (!this.isPlainObject(domain)) {
+            throw new BadGatewayException('Odoo onchange returned an unsupported domain payload.');
+        }
+
+        return domain;
+    }
+
+    private isPlainObject(value: unknown): value is Record<string, unknown> {
+        return typeof value === 'object' && value !== null && !Array.isArray(value);
     }
 }
 
@@ -299,4 +584,30 @@ interface OdooFormattedMessage {
         name: string;
         type: string;
     } | false;
+}
+
+type OdooRelationValue = [number, string] | number | false | null | undefined;
+
+interface OdooCurrentUserRecord {
+    partner_id?: OdooRelationValue;
+}
+
+interface OdooFormattedFollower {
+    id: number;
+    partner_id?: OdooRelationValue;
+    name?: string;
+    display_name?: string;
+    email?: string | false;
+    is_active?: boolean;
+}
+
+interface OdooFormattedActivity {
+    id: number;
+    activity_type_id?: OdooRelationValue;
+    summary?: string | false;
+    note?: string | false;
+    date_deadline: string;
+    state?: string;
+    can_write?: boolean;
+    user_id?: OdooRelationValue;
 }

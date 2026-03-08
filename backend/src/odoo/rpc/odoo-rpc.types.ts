@@ -1,4 +1,4 @@
-import type { LoginRequest } from '@ordo/shared';
+import type { LoginRequest, RecordData } from '@ordo/shared';
 
 import type { OdooSessionContext } from '../session/odoo-session.types';
 
@@ -49,4 +49,24 @@ export interface OdooCurrentUserProfile {
     tz?: string | false | null;
     groups_id?: number[];
     group_ids?: number[];
+}
+
+export interface OdooFieldsSpec {
+    [fieldName: string]: {
+        fields?: OdooFieldsSpec;
+    };
+}
+
+export interface OdooOnchangeWarning {
+    title: string;
+    message: string;
+    type?: string;
+    className?: string;
+    sticky?: boolean;
+}
+
+export interface OdooOnchangeResponse {
+    value?: RecordData;
+    warning?: OdooOnchangeWarning | null;
+    domain?: Record<string, unknown>;
 }

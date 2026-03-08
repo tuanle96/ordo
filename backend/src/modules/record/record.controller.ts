@@ -12,9 +12,11 @@ import {
 } from '@nestjs/common';
 
 import type {
+    ChatterDetailsResult,
     ChatterMessage,
     ChatterThreadResult,
     DeleteRecordResult,
+    OnchangeResult,
     RecordActionResult,
     RecordData,
     RecordListResult,
@@ -25,8 +27,10 @@ import type {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { ChatterQueryDto } from './dto/chatter-query.dto';
+import { CompleteChatterActivityDto } from './dto/complete-chatter-activity.dto';
 import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
 import { RecordActionDto } from './dto/record-action.dto';
+import { RecordOnchangeDto } from './dto/record-onchange.dto';
 import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
 import { RecordService } from './record.service';
@@ -65,6 +69,15 @@ export class RecordController {
         return this.recordService.listChatter(currentUser, model, id, query);
     }
 
+    @Get(':model/:id/chatter/details')
+    getChatterDetails(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+    ): Promise<ChatterDetailsResult> {
+        return this.recordService.getChatterDetails(currentUser, model, id);
+    }
+
     @Post(':model/:id/chatter/note')
     postChatterNote(
         @CurrentUser() currentUser: TokenPayload,
@@ -75,6 +88,35 @@ export class RecordController {
         return this.recordService.postChatterNote(currentUser, model, id, body);
     }
 
+    @Post(':model/:id/chatter/follow')
+    followRecord(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+    ): Promise<ChatterDetailsResult> {
+        return this.recordService.followRecord(currentUser, model, id);
+    }
+
+    @Delete(':model/:id/chatter/follow')
+    unfollowRecord(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+    ): Promise<ChatterDetailsResult> {
+        return this.recordService.unfollowRecord(currentUser, model, id);
+    }
+
+    @Post(':model/:id/chatter/activities/:activityId/done')
+    completeChatterActivity(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+        @Param('activityId', ParseIntPipe) activityId: number,
+        @Body() body: CompleteChatterActivityDto = new CompleteChatterActivityDto(),
+    ): Promise<ChatterDetailsResult> {
+        return this.recordService.completeChatterActivity(currentUser, model, id, activityId, body);
+    }
+
     @Post(':model')
     createRecord(
         @CurrentUser() currentUser: TokenPayload,
@@ -82,6 +124,15 @@ export class RecordController {
         @Body() body: RecordMutationDto,
     ): Promise<RecordMutationResult> {
         return this.recordService.createRecord(currentUser, model, body);
+    }
+
+    @Post(':model/onchange')
+    runOnchange(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Body() body: RecordOnchangeDto,
+    ): Promise<OnchangeResult> {
+        return this.recordService.runOnchange(currentUser, model, body);
     }
 
     @Patch(':model/:id')

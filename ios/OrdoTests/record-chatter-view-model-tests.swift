@@ -14,6 +14,10 @@ struct RecordChatterViewModelTests {
                 return (200, try JSONEncoder().encode(ChatterEnvelope(data: AuthenticatedPrincipal.preview)))
             }
 
+            if path.contains("/records/res.partner/1/chatter/details") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: detailsResult)))
+            }
+
             if path.contains("/records/res.partner/1/chatter") && request.httpMethod == "GET" {
                 return (200, try JSONEncoder().encode(ChatterEnvelope(data: threadResult)))
             }
@@ -27,6 +31,9 @@ struct RecordChatterViewModelTests {
         await viewModel.loadIfNeeded(using: appState)
 
         #expect(viewModel.messages.count == 1)
+        #expect(viewModel.followersCount == 1)
+        #expect(viewModel.isFollowing == true)
+        #expect(viewModel.activities.count == 1)
         #expect(viewModel.messages.first?.plainBody == "Internal note")
         #expect(viewModel.hasMore == false)
         #expect(viewModel.errorMessage == nil)
@@ -58,6 +65,77 @@ struct RecordChatterViewModelTests {
         #expect(viewModel.messages.count == 1)
         #expect(viewModel.messages.first?.id == 91)
         #expect(viewModel.draftBody.isEmpty)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func toggleFollowingUpdatesFollowerState() async throws {
+        ChatterViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter/details") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: detailsResult)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: threadResult)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter/follow") && request.httpMethod == "DELETE" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: unfollowedDetailsResult)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeAppState()
+        let viewModel = RecordChatterViewModel(model: "res.partner", recordID: 1)
+        await viewModel.refresh(using: appState)
+
+        let didToggle = await viewModel.toggleFollowing(using: appState)
+
+        #expect(didToggle == true)
+        #expect(viewModel.isFollowing == false)
+        #expect(viewModel.followersCount == 0)
+        #expect(viewModel.followers.isEmpty)
+    }
+
+    @Test
+    func completeActivityRefreshesActivities() async throws {
+        ChatterViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter/details") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: detailsResult)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: threadResult)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter/activities/44/done") && request.httpMethod == "POST" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: completedActivityDetailsResult)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeAppState()
+        let viewModel = RecordChatterViewModel(model: "res.partner", recordID: 1)
+        await viewModel.refresh(using: appState)
+
+        let didComplete = await viewModel.completeActivity(id: 44, using: appState)
+
+        #expect(didComplete == true)
+        #expect(viewModel.activities.isEmpty)
         #expect(viewModel.errorMessage == nil)
     }
 
@@ -93,6 +171,27 @@ private let threadResult = ChatterThreadResult(
     limit: 20,
     hasMore: false,
     nextBefore: nil
+)
+
+private let detailsResult = ChatterDetailsResult(
+    followers: [ChatterFollower(id: 15, partnerId: 7, name: "Administrator", email: "admin@example.com", isActive: true, isSelf: true)],
+    followersCount: 1,
+    selfFollower: ChatterFollower(id: 15, partnerId: 7, name: "Administrator", email: "admin@example.com", isActive: true, isSelf: true),
+    activities: [ChatterActivity(id: 44, typeId: 3, typeName: "To Do", summary: "Follow up", note: "<p>Call back tomorrow</p>", plainNote: "Call back tomorrow", dateDeadline: "2026-03-10", state: "planned", canWrite: true, assignedUser: ChatterActivityAssignee(id: 2, name: "Administrator"))]
+)
+
+private let unfollowedDetailsResult = ChatterDetailsResult(
+    followers: [],
+    followersCount: 0,
+    selfFollower: nil,
+    activities: detailsResult.activities
+)
+
+private let completedActivityDetailsResult = ChatterDetailsResult(
+    followers: detailsResult.followers,
+    followersCount: detailsResult.followersCount,
+    selfFollower: detailsResult.selfFollower,
+    activities: []
 )
 
 private final class ChatterViewModelTestURLProtocol: URLProtocol {

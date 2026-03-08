@@ -2,6 +2,41 @@ import { ConditionParserService } from '../src/odoo/schema/condition-parser.serv
 import { MobileSchemaBuilderService } from '../src/odoo/schema/mobile-schema-builder.service';
 
 describe('MobileSchemaBuilderService', () => {
+    it('adds explicit onchange metadata only when the view declares it', () => {
+        const service = new MobileSchemaBuilderService(new ConditionParserService());
+        const xml = `
+            <form string="Partners">
+              <sheet>
+                <group>
+                  <field name="country_id" on_change="onchange_country_id(country_id, company_id)" />
+                  <field name="name" />
+                </group>
+              </sheet>
+            </form>
+        `;
+
+        const schema = service.build('res.partner', xml, {
+            country_id: { type: 'many2one', string: 'Country', relation: 'res.country' },
+            name: { type: 'char', string: 'Name' },
+        });
+
+        expect(schema.sections[0]?.fields).toEqual([
+            expect.objectContaining({
+                name: 'country_id',
+                onchange: {
+                    trigger: 'country_id',
+                    source: 'view',
+                    dependencies: ['company_id'],
+                    mergeReturnedValue: true,
+                },
+            }),
+            expect.objectContaining({
+                name: 'name',
+                onchange: undefined,
+            }),
+        ]);
+    });
+
     it('normalizes unsupported Odoo field types into safe mobile fallbacks', () => {
         const service = new MobileSchemaBuilderService(new ConditionParserService());
         const xml = `

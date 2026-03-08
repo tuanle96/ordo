@@ -40,6 +40,13 @@ export interface FieldModifiers {
     required?: ConditionRule;
 }
 
+export interface OnchangeFieldMeta {
+    trigger: string;
+    source?: 'view' | 'spec';
+    dependencies?: string[];
+    mergeReturnedValue?: boolean;
+}
+
 export interface ActionButton {
     name: string;
     label: string;
@@ -58,6 +65,7 @@ export interface FieldSchema {
     readonly?: boolean;
     invisible?: Condition;
     modifiers?: FieldModifiers;
+    onchange?: OnchangeFieldMeta;
     domain?: string;
     comodel?: string;
     selection?: [string, string][];

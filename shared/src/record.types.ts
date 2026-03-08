@@ -1,5 +1,24 @@
 export type RecordData = Record<string, unknown>;
 
+export interface OnchangeRequest {
+    values: RecordData;
+    triggerField: string;
+    recordId?: number;
+    fields?: string[];
+}
+
+export interface OnchangeWarning {
+    title: string;
+    message: string;
+    type?: 'warning' | 'info';
+}
+
+export interface OnchangeResult {
+    values: RecordData;
+    warnings?: OnchangeWarning[];
+    domains?: Record<string, unknown>;
+}
+
 export interface RecordMutationRequest {
     values: RecordData;
     fields?: string[];

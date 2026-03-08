@@ -85,6 +85,15 @@ struct RecordListView: View {
         .navigationTitle(viewModel.descriptor.title)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    RecordDetailView(descriptor: viewModel.descriptor)
+                } label: {
+                    Label("New Record", systemImage: "plus")
+                }
+                .accessibilityIdentifier("record-list-create-button")
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Picker("Layout", selection: Binding(
                         get: { viewModel.viewMode },

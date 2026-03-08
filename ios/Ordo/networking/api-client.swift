@@ -78,9 +78,26 @@ final class APIClient {
         return try await perform(route: "records/\(model)/\(id)/chatter", queryItems: queryItems, token: token)
     }
 
+    func chatterDetails(model: String, id: Int, token: String) async throws -> ChatterDetailsResult {
+        try await perform(route: "records/\(model)/\(id)/chatter/details", token: token)
+    }
+
     func postChatterNote(model: String, id: Int, body: String, token: String) async throws -> ChatterMessage {
         let payload = try JSONEncoder().encode(PostChatterNoteRequest(body: body))
         return try await perform(route: "records/\(model)/\(id)/chatter/note", method: "POST", token: token, body: payload)
+    }
+
+    func followRecord(model: String, id: Int, token: String) async throws -> ChatterDetailsResult {
+        try await perform(route: "records/\(model)/\(id)/chatter/follow", method: "POST", token: token)
+    }
+
+    func unfollowRecord(model: String, id: Int, token: String) async throws -> ChatterDetailsResult {
+        try await perform(route: "records/\(model)/\(id)/chatter/follow", method: "DELETE", token: token)
+    }
+
+    func completeChatterActivity(model: String, id: Int, activityId: Int, feedback: String? = nil, token: String) async throws -> ChatterDetailsResult {
+        let payload = try JSONEncoder().encode(CompleteChatterActivityRequest(feedback: feedback))
+        return try await perform(route: "records/\(model)/\(id)/chatter/activities/\(activityId)/done", method: "POST", token: token, body: payload)
     }
 
     func updateRecord(
@@ -92,6 +109,36 @@ final class APIClient {
     ) async throws -> RecordMutationResult {
         let body = try JSONEncoder().encode(RecordMutationRequest(values: values, fields: fields))
         return try await perform(route: "records/\(model)/\(id)", method: "PATCH", token: token, body: body)
+    }
+
+    func createRecord(
+        model: String,
+        values: RecordData,
+        fields: [String],
+        token: String
+    ) async throws -> RecordMutationResult {
+        let body = try JSONEncoder().encode(RecordMutationRequest(values: values, fields: fields))
+        return try await perform(route: "records/\(model)", method: "POST", token: token, body: body)
+    }
+
+    func onchange(
+        model: String,
+        values: RecordData,
+        triggerField: String,
+        recordId: Int?,
+        fields: [String],
+        token: String
+    ) async throws -> OnchangeResult {
+        let body = try JSONEncoder().encode(
+            OnchangeRequest(
+                values: values,
+                triggerField: triggerField,
+                recordId: recordId,
+                fields: fields
+            )
+        )
+
+        return try await perform(route: "records/\(model)/onchange", method: "POST", token: token, body: body)
     }
 
     private func perform<T: Decodable>(

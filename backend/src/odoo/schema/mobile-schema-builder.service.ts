@@ -6,6 +6,7 @@ import type {
     Condition,
     ConditionRule,
     FieldModifiers,
+    OnchangeFieldMeta,
     FieldSchema,
     FormSection,
     FormTab,
@@ -173,6 +174,7 @@ export class MobileSchemaBuilderService {
             readonly: this.staticBoolean(modifiers.readonly),
             invisible: this.extractSingleCondition(modifiers.invisible),
             modifiers: this.compactModifiers(modifiers),
+            onchange: this.buildOnchangeMeta(fieldNode),
             domain: typeof fieldNode['@_domain'] === 'string' ? fieldNode['@_domain'] : meta.domain,
             comodel: meta.relation,
             selection: meta.selection,
@@ -240,6 +242,53 @@ export class MobileSchemaBuilderService {
         return modifiers.invisible || modifiers.readonly || modifiers.required
             ? modifiers
             : undefined;
+    }
+
+    private buildOnchangeMeta(fieldNode: XmlNode): OnchangeFieldMeta | undefined {
+        const trigger = String(fieldNode['@_name'] ?? '').trim();
+        if (!trigger) {
+            return undefined;
+        }
+
+        const rawOnchange = this.firstNonEmptyString(fieldNode['@_on_change'], fieldNode['@_onchange']);
+        if (!rawOnchange) {
+            return undefined;
+        }
+
+        return {
+            trigger,
+            source: 'view',
+            dependencies: this.extractOnchangeDependencies(rawOnchange, trigger),
+            mergeReturnedValue: true,
+        };
+    }
+
+    private extractOnchangeDependencies(expression: string, trigger: string): string[] | undefined {
+        const match = expression.match(/\(([^)]*)\)/);
+        if (!match) {
+            return undefined;
+        }
+
+        const dependencies = match[1]
+            .split(',')
+            .map((value) => value.trim())
+            .filter((value) => this.isFieldIdentifier(value) && value !== trigger);
+
+        return dependencies.length > 0 ? Array.from(new Set(dependencies)) : undefined;
+    }
+
+    private firstNonEmptyString(...values: unknown[]): string | undefined {
+        for (const value of values) {
+            if (typeof value === 'string' && value.trim()) {
+                return value.trim();
+            }
+        }
+
+        return undefined;
+    }
+
+    private isFieldIdentifier(value: string): boolean {
+        return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value);
     }
 
     private normalizeFieldType(rawType: string, widget?: unknown): FieldSchema['type'] {

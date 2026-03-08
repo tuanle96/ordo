@@ -15,6 +15,33 @@ export interface ChatterMessage {
     author?: ChatterAuthor;
 }
 
+export interface ChatterFollower {
+    id: number;
+    partnerId: number;
+    name: string;
+    email?: string;
+    isActive: boolean;
+    isSelf: boolean;
+}
+
+export interface ChatterActivityAssignee {
+    id: number;
+    name: string;
+}
+
+export interface ChatterActivity {
+    id: number;
+    typeId?: number;
+    typeName: string;
+    summary?: string;
+    note: string;
+    plainNote: string;
+    dateDeadline: string;
+    state: string;
+    canWrite: boolean;
+    assignedUser?: ChatterActivityAssignee;
+}
+
 export interface ChatterThreadResult {
     messages: ChatterMessage[];
     limit: number;
@@ -22,6 +49,17 @@ export interface ChatterThreadResult {
     nextBefore?: number;
 }
 
+export interface ChatterDetailsResult {
+    followers: ChatterFollower[];
+    followersCount: number;
+    selfFollower?: ChatterFollower;
+    activities: ChatterActivity[];
+}
+
 export interface PostChatterNoteRequest {
     body: string;
+}
+
+export interface CompleteChatterActivityRequest {
+    feedback?: string;
 }

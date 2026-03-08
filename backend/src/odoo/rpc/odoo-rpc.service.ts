@@ -10,12 +10,16 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import type { RecordData } from '@ordo/shared';
+
 import type {
     DetectedOdooVersion,
     OdooCallKwRequest,
     OdooCurrentUserProfile,
     OdooCurrentUserRequest,
     OdooExecuteKwRequest,
+    OdooFieldsSpec,
+    OdooOnchangeResponse,
     OdooRpcAuthRequest,
     OdooVersionInfo,
 } from './odoo-rpc.types';
@@ -161,6 +165,47 @@ export class OdooRpcService {
             args: request.args ?? [],
             kwargs: request.kwargs ?? {},
         }, request.session.cookieHeader);
+    }
+
+    async getFieldsSpecWithSession(
+        session: Pick<OdooCallKwRequest['session'], 'odooUrl' | 'cookieHeader'>,
+        model: string,
+    ): Promise<OdooFieldsSpec> {
+        return this.callKwByPathWithSession<OdooFieldsSpec>({
+            session,
+            model,
+            method: '_get_fields_spec',
+        });
+    }
+
+    async runModelOnchangeWithSession(
+        session: Pick<OdooCallKwRequest['session'], 'odooUrl' | 'cookieHeader'>,
+        model: string,
+        values: RecordData,
+        triggerField: string,
+        fieldsSpec: OdooFieldsSpec,
+        recordId?: number,
+    ): Promise<OdooOnchangeResponse> {
+        return this.callKwByPathWithSession<OdooOnchangeResponse>({
+            session,
+            model,
+            method: 'onchange',
+            args: [recordId ? [recordId] : [], values, [triggerField], fieldsSpec],
+        });
+    }
+
+    private async callKwByPathWithSession<T>(request: OdooCallKwRequest): Promise<T> {
+        return this.postJsonRoute<T>(
+            this.normalizeBaseUrl(request.session.odooUrl),
+            `/web/dataset/call_kw/${request.model}/${request.method}`,
+            {
+                model: request.model,
+                method: request.method,
+                args: request.args ?? [],
+                kwargs: request.kwargs ?? {},
+            },
+            request.session.cookieHeader,
+        );
     }
 
     private async callService<T>(

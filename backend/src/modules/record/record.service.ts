@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import type {
+    ChatterDetailsResult,
     ChatterMessage,
     ChatterThreadResult,
     DeleteRecordResult,
     NameSearchResult,
+    OnchangeResult,
     RecordActionResult,
     RecordData,
     RecordListResult,
@@ -18,8 +20,10 @@ import type { OdooSessionContext } from '../../odoo/session/odoo-session.types';
 import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';
 import { RecordActionDto } from './dto/record-action.dto';
 import { ChatterQueryDto } from './dto/chatter-query.dto';
+import { CompleteChatterActivityDto } from './dto/complete-chatter-activity.dto';
 import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
 import { RecordMutationDto } from './dto/record-mutation.dto';
+import { RecordOnchangeDto } from './dto/record-onchange.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
 import { SearchQueryDto } from './dto/search-query.dto';
 
@@ -81,6 +85,15 @@ export class RecordService {
         return adapter.listChatter(session, model, id, query.limit, query.before);
     }
 
+    async getChatterDetails(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.getChatterDetails(session, model, id);
+    }
+
     async postChatterNote(
         currentUser: TokenPayload,
         model: string,
@@ -89,6 +102,35 @@ export class RecordService {
     ): Promise<ChatterMessage> {
         const { session, adapter } = await this.resolveContext(currentUser);
         return adapter.postChatterNote(session, model, id, body.body);
+    }
+
+    async followRecord(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.followRecord(session, model, id);
+    }
+
+    async unfollowRecord(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+    ): Promise<ChatterDetailsResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.unfollowRecord(session, model, id);
+    }
+
+    async completeChatterActivity(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+        activityId: number,
+        body: CompleteChatterActivityDto,
+    ): Promise<ChatterDetailsResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.completeChatterActivity(session, model, id, activityId, body.feedback);
     }
 
     async createRecord(
@@ -101,6 +143,15 @@ export class RecordService {
         const record = await adapter.getRecord(session, model, id, body.fields);
 
         return { id, record };
+    }
+
+    async runOnchange(
+        currentUser: TokenPayload,
+        model: string,
+        body: RecordOnchangeDto,
+    ): Promise<OnchangeResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.runOnchange(session, model, body);
     }
 
     async updateRecord(

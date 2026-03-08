@@ -1,5 +1,31 @@
 # Project Changelog
 
+## 2026-03-08 (iOS Create Flow & Primitive Editor Expansion)
+
+### Added
+
+- **iOS create-record flow** entered from browse lists via a toolbar `+` action and powered by the existing backend `POST /api/v1/mobile/records/:model` endpoint
+- **Editable primitive field support** on iOS for `integer`, `float`, `date`, and `datetime` fields in the schema-driven form engine
+- **Unit regression coverage** for numeric/temporal value normalization, format validation, editable-field routing, and create-mode mutation success
+
+### Changed
+
+- `RecordDetailView` / `RecordDetailViewModel` now support a schema-only create mode that starts in edit state, validates locally, posts mutations, then transitions into normal detail mode after canonical readback
+- `FormDraft` now normalizes string input for numeric and temporal fields into stable mutation payloads before POST/PATCH submission
+- Browse lists now expose a direct create entry point instead of remaining read/edit-only surfaces
+
+### Verified
+
+- **Known gap:** deterministic UI/E2E coverage for the new create flow is still pending; current validation is build + unit-test level only
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — iOS unit target passes, including the new create-flow and numeric/temporal validation coverage
+- Independent code review found no blocking issues; remaining gap is lack of UI/E2E coverage for the new create flow in the current slice
+
+### Notes
+
+- This slice intentionally stops at unit/integration-style validation; a deterministic UI test for the end-to-end create flow remains recommended follow-up work
+- Workflow action buttons and backend logout remain separate follow-up slices
+
 ## 2026-03-08 (Chatter MVP — Read Thread + Post Note)
 
 ### Added
