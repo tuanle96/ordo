@@ -31,13 +31,13 @@ describe('MobileSchemaBuilderService', () => {
         const xml = `
             <form string="Partners">
               <header>
-                <button name="archive" string="Archive" type="object" class="btn-primary" invisible="state == 'done'" />
+                <button name="archive" string="Archive" type="object" class="btn-primary" invisible="state == 'done'" states="draft,confirm" />
                 <field name="state" widget="statusbar" statusbar_visible="draft,done" />
               </header>
-              <sheet>
+              <sheet invisible="company_type == 'private'">
                 <group string="Main">
                   <field name="name" />
-                  <field name="email" widget="email" />
+                  <field name="email" widget="email" readonly="state == 'done'" />
                 </group>
                 <notebook>
                   <page string="Contacts">
@@ -66,7 +66,16 @@ describe('MobileSchemaBuilderService', () => {
                 label: 'Archive',
                 type: 'object',
                 style: 'primary',
-                invisible: { field: 'state', op: '==', value: 'done' },
+            invisible: undefined,
+            modifiers: {
+              invisible: {
+                type: 'or',
+                rules: [
+                  { type: 'condition', condition: { field: 'state', op: '==', value: 'done' } },
+                  { type: 'condition', condition: { field: 'state', op: 'not in', values: ['draft', 'confirm'] } },
+                ],
+              },
+            },
                 confirm: undefined,
             },
         ]);
@@ -74,8 +83,36 @@ describe('MobileSchemaBuilderService', () => {
             {
                 label: 'Main',
                 fields: [
-                    expect.objectContaining({ name: 'name', type: 'char', label: 'Name', required: true }),
-                    expect.objectContaining({ name: 'email', type: 'char', label: 'Email', widget: 'email' }),
+              expect.objectContaining({
+                name: 'name',
+                type: 'char',
+                label: 'Name',
+                required: true,
+                modifiers: {
+                  invisible: {
+                    type: 'condition',
+                    condition: { field: 'company_type', op: '==', value: 'private' },
+                  },
+                  required: { type: 'constant', constant: true },
+                },
+              }),
+              expect.objectContaining({
+                name: 'email',
+                type: 'char',
+                label: 'Email',
+                widget: 'email',
+                readonly: undefined,
+                modifiers: {
+                  invisible: {
+                    type: 'condition',
+                    condition: { field: 'company_type', op: '==', value: 'private' },
+                  },
+                  readonly: {
+                    type: 'condition',
+                    condition: { field: 'state', op: '==', value: 'done' },
+                  },
+                },
+              }),
                 ],
             },
         ]);

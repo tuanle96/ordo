@@ -168,6 +168,16 @@ Phase 2 Phase 06A/06B closes the recent-items relaunch seam first, then pilots S
 - **Validated root injection pattern** keeps `AppState` on the legacy `EnvironmentObject` path for now, but moves recent-items ownership to `@State` in `OrdoApp` with typed `.environment(...)` consumption in `HomeView` and `RecordDetailView`
 - **Explicit widening gate** means Phase 07 can now focus on `AppState`, feature view models, and `FormDraft` using a proven observation pattern instead of re-solving the recent-items seam
 
+## Dynamic form hardening scope (2026-03-08)
+
+The current dynamic-form slice hardens modifier correctness without attempting full Odoo onchange parity:
+
+- **Additive modifier-rule schema contract** preserves legacy flat `invisible` conditions while adding recursive `condition` / `and` / `or` / `not` / `constant` trees for `invisible`, `readonly`, and `required`
+- **Backend modifier parsing** now handles nested boolean expressions plus Odoo-style prefix-domain arrays, then merges simple container invisibility and `states`-based visibility into emitted field/button metadata
+- **iOS modifier-aware rendering and validation** evaluates visibility, readonly state, and required rules against current draft values so edit mode and local validation track dynamic schema state more closely
+- **Specific Odoo error translation** now maps common upstream permission, missing-record, and business-validation failures into clearer HTTP responses before they reach the mobile client
+- **Explicit non-goal retained**: no full onchange engine yet; server-driven onchange still needs round-trip mutation previews, dependency ordering, and draft-merge semantics beyond this hardening slice
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:

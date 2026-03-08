@@ -38,7 +38,7 @@ struct RecordListView: View {
                                     NavigationLink {
                                         RecordDetailView(descriptor: viewModel.descriptor, recordID: result.id)
                                     } label: {
-                                        RecordCardRow(summary: RecordRowSummary(
+                                        rowView(summary: RecordRowSummary(
                                             id: result.id,
                                             title: result.name,
                                             subtitle: nil,
@@ -51,11 +51,15 @@ struct RecordListView: View {
                     }
 
                     Section(viewModel.query.isEmpty ? "Recent Records" : "Browse") {
+                        if viewModel.viewMode == .table {
+                            TableHeaderRow()
+                        }
+
                         ForEach(viewModel.summaries) { summary in
                             NavigationLink {
                                 RecordDetailView(descriptor: viewModel.descriptor, recordID: summary.id)
                             } label: {
-                                RecordCardRow(summary: summary)
+                                rowView(summary: summary)
                             }
                             .accessibilityIdentifier("record-row-\(summary.id)")
                             .task {
@@ -79,6 +83,36 @@ struct RecordListView: View {
             }
         }
         .navigationTitle(viewModel.descriptor.title)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Layout", selection: Binding(
+                        get: { viewModel.viewMode },
+                        set: { viewModel.viewMode = $0 }
+                    )) {
+                        ForEach(RecordListViewModel.ViewMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+
+                    Picker("Sort", selection: Binding(
+                        get: { viewModel.sortOption },
+                        set: { newValue in
+                            Task {
+                                await viewModel.apply(sortOption: newValue, using: appState)
+                            }
+                        }
+                    )) {
+                        ForEach(RecordListViewModel.SortOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                } label: {
+                    Label("Browse Options", systemImage: viewModel.viewMode == .cards ? "rectangle.grid.1x2" : "tablecells")
+                }
+                .accessibilityIdentifier("record-list-options-button")
+            }
+        }
         .searchable(
             text: Binding(
                 get: { viewModel.query },
@@ -92,6 +126,32 @@ struct RecordListView: View {
         .task(id: viewModel.query) {
             await viewModel.performSearch(using: appState)
         }
+    }
+
+    @ViewBuilder
+    private func rowView(summary: RecordRowSummary) -> some View {
+        if viewModel.viewMode == .table {
+            RecordTableRow(summary: summary)
+        } else {
+            RecordCardRow(summary: summary)
+        }
+    }
+}
+
+private struct TableHeaderRow: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: OrdoSpacing.md) {
+            Text("Title")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Details")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Meta")
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .font(OrdoTypography.caption.weight(.semibold))
+        .foregroundStyle(OrdoColors.textTertiary)
+        .textCase(nil)
+        .accessibilityHidden(true)
     }
 }
 

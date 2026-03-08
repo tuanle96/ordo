@@ -29,6 +29,7 @@ enum FieldRowFactory {
         .date,
         .datetime,
         .many2one,
+        .many2many,
         .monetary,
         .priority,
         .statusbar,
@@ -80,6 +81,10 @@ enum FieldRowFactory {
             return option[1]
         }
 
+        if field.type == .many2many {
+            return formattedManyRelationValue(for: rawValue)
+        }
+
         return rawValue.displayText
     }
 
@@ -102,5 +107,19 @@ enum FieldRowFactory {
         let formattedAmount = formatter.string(from: NSNumber(value: amount)) ?? rawValue.displayText
 
         return formattedAmount
+    }
+
+    private static func formattedManyRelationValue(for rawValue: JSONValue) -> String {
+        let relations = rawValue.relationValues
+        if !relations.isEmpty {
+            return relations.map(\.label).joined(separator: ", ")
+        }
+
+        let count = rawValue.manyRelationIDs.count
+        if count > 0 {
+            return count == 1 ? "1 item selected" : "\(count) items selected"
+        }
+
+        return rawValue.displayText
     }
 }

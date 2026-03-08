@@ -7,8 +7,8 @@ protocol CacheStoring {
     func saveSchema(_ schema: MobileFormSchema, for model: String, scope: CacheScope) async throws
     func loadRecord(for model: String, id: Int, scope: CacheScope) async -> CachedValue<RecordData>?
     func saveRecord(_ record: RecordData, for model: String, id: Int, scope: CacheScope) async throws
-    func loadListPage(for model: String, limit: Int, offset: Int, scope: CacheScope) async -> CachedValue<RecordListResult>?
-    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, scope: CacheScope) async throws
+    func loadListPage(for model: String, limit: Int, offset: Int, order: String?, scope: CacheScope) async -> CachedValue<RecordListResult>?
+    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String?, scope: CacheScope) async throws
     func clear(scope: CacheScope?) async throws
 }
 
@@ -65,12 +65,12 @@ actor FileCacheStore: CacheStoring {
         try await saveValue(record, at: fileURL(for: .record(model: model, id: id), scope: scope))
     }
 
-    func loadListPage(for model: String, limit: Int, offset: Int, scope: CacheScope) async -> CachedValue<RecordListResult>? {
-        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset), scope: scope), lifetime: .list)
+    func loadListPage(for model: String, limit: Int, offset: Int, order: String? = nil, scope: CacheScope) async -> CachedValue<RecordListResult>? {
+        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order), scope: scope), lifetime: .list)
     }
 
-    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, scope: CacheScope) async throws {
-        try await saveValue(result, at: fileURL(for: .list(model: model, limit: limit, offset: offset), scope: scope))
+    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String? = nil, scope: CacheScope) async throws {
+        try await saveValue(result, at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order), scope: scope))
     }
 
     func clear(scope: CacheScope? = nil) async throws {
@@ -139,7 +139,7 @@ private enum CacheLifetime {
 private enum CacheKey {
     case schema(String)
     case record(model: String, id: Int)
-    case list(model: String, limit: Int, offset: Int)
+    case list(model: String, limit: Int, offset: Int, order: String?)
 
     var filename: String {
         switch self {
@@ -147,8 +147,8 @@ private enum CacheKey {
             return "schema-\(safe(model)).json"
         case .record(let model, let id):
             return "record-\(safe(model))-\(id).json"
-        case .list(let model, let limit, let offset):
-            return "list-\(safe(model))-\(limit)-\(offset).json"
+        case .list(let model, let limit, let offset, let order):
+            return "list-\(safe(model))-\(safe(order ?? "default"))-\(limit)-\(offset).json"
         }
     }
 

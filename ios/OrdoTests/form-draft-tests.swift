@@ -120,4 +120,83 @@ struct FormDraftTests {
         #expect(draft.changedValues(comparedTo: baseline, fields: fields).isEmpty)
         #expect(draft.isDirty(comparedTo: baseline, fields: fields) == false)
     }
+
+    @Test
+    func many2manyChangedValuesNormalizeToReplaceCommand() {
+        let baseline: RecordData = [
+            "category_id": .array([
+                .relation(id: 8, label: "VIP"),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .relation(id: 8, label: "VIP"),
+            .relation(id: 11, label: "Wholesale"),
+        ]), for: "category_id")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "category_id": .array([
+                .array([
+                    .number(6),
+                    .number(0),
+                    .array([.number(8), .number(11)]),
+                ]),
+            ]),
+        ])
+    }
+
+    @Test
+    func clearingMany2manyProducesReplaceCommandWithEmptyIDs() {
+        let baseline: RecordData = [
+            "category_id": .array([
+                .relation(id: 8, label: "VIP"),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([]), for: "category_id")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "category_id": .array([
+                .array([
+                    .number(6),
+                    .number(0),
+                    .array([]),
+                ]),
+            ]),
+        ])
+    }
+
+    @Test
+    func many2manyLabelChangeWithSameIDsIsNotDirty() {
+        let baseline: RecordData = [
+            "category_id": .array([
+                .relation(id: 8, label: "VIP"),
+                .relation(id: 11, label: "Wholesale"),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .relation(id: 11, label: "Wholesale Accounts"),
+            .relation(id: 8, label: "VIP Clients"),
+        ]), for: "category_id")
+
+        #expect(draft.changedValues(comparedTo: baseline, fields: fields).isEmpty)
+        #expect(draft.isDirty(comparedTo: baseline, fields: fields) == false)
+    }
 }

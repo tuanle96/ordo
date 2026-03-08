@@ -12,6 +12,10 @@ struct ModelDescriptor: Identifiable, Hashable {
 
     var id: String { model }
 
+    var primarySortField: String {
+        titleFields.first(where: { $0 != "display_name" }) ?? "id"
+    }
+
     func summary(from record: RecordData) -> RecordRowSummary? {
         guard let id = record["id"]?.intValue else { return nil }
 

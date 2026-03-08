@@ -33,12 +33,23 @@ final class APIClient {
         try await perform(route: "schema/\(model)", token: token)
     }
 
-    func listRecords(model: String, fields: [String], limit: Int, offset: Int, token: String) async throws -> RecordListResult {
-        let queryItems = [
+    func listRecords(
+        model: String,
+        fields: [String],
+        limit: Int,
+        offset: Int,
+        order: String? = nil,
+        token: String
+    ) async throws -> RecordListResult {
+        var queryItems = [
             URLQueryItem(name: "fields", value: fields.joined(separator: ",")),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "offset", value: String(offset)),
         ]
+
+        if let order, !order.isEmpty {
+            queryItems.append(URLQueryItem(name: "order", value: order))
+        }
 
         return try await perform(route: "records/\(model)", queryItems: queryItems, token: token)
     }

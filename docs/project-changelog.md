@@ -1,5 +1,63 @@
 # Project Changelog
 
+## 2026-03-08 (Dynamic Form Modifier Hardening & Odoo Error Specificity)
+
+### Added
+
+- **Additive modifier rule trees** in the shared schema contract for `invisible`, `readonly`, and `required` using `condition`, `and`, `or`, `not`, and `constant` nodes
+- **Backend support** for nested boolean modifier expressions and Odoo-style prefix-domain arrays used by dynamic form rules
+- **Recursive iOS modifier evaluation** so record-detail rendering and validation react to current draft values instead of only static schema booleans
+- **More specific upstream Odoo error mapping** for common access-right, missing-record, and business-validation failures
+
+### Changed
+
+- `MobileSchemaBuilderService` now emits merged field/button modifier metadata and folds ancestor/container invisibility plus simple `states` visibility constraints into the schema payload
+- `RecordDetailViewModel`, `SchemaRendererView`, and `FormDraft` now evaluate editability and required validation against current draft values instead of assuming static readonly/required flags
+- Backend schema parsing moved beyond the original MVP single-regex `ConditionParserService` path and now supports nested rule trees while preserving legacy flat `invisible` conditions where possible
+- Upstream Odoo exceptions no longer collapse most failures into a generic `502`; common permission and validation cases now surface clearer HTTP statuses/messages to the client
+
+### Verified
+
+- `npm run build --workspace shared` — shared contract package rebuilds cleanly with the new modifier types
+- `npm run test --workspace backend` — backend suite passes (10 suites / 34 tests)
+- `npm run build --workspace backend` — backend compiles after parser/schema/error-mapping changes
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — Ordo unit-test target passes, including condition/modifier coverage
+
+### Notes
+
+- This slice intentionally **does not** implement full Odoo onchange parity; onchange still needs server round-trips, dependency tracking, and draft-merge semantics beyond the current safe scope
+- Modifier support is materially broader than before, but it is still not a claim of full client-side parity with every Odoo expression, context reference, or XML edge case
+
+## 2026-03-08 (iOS Form Editors & List Browsing Improvements — Phase 07)
+
+### Added
+
+- **Many2many editable tags picker** for record detail edit mode with add/remove tag flows backed by `/search/:model` endpoint
+- **Browse table mode + sort** on iOS list screens with sortable column headers and toggle between table and grid layouts
+- **Order-isolated list cache keys** for pagination so list pages are cached separately per sort order, preventing sort state mixing across navigations
+
+### Changed
+
+- `CacheKey.list` enum now includes `order` parameter in cache filename to prevent collisions between differently-sorted page fetches
+- `RecordListViewModel` now tracks active sort order and passes it through pagination/cache flows
+- Browse table headers now render clickable sort indicators with ascending/descending state persistence
+- `EditableFieldFactory` now includes `many2many` field editors alongside `many2one` for full relation edit support
+- Form fields of type `many2many` now render as responsive tag pickers in edit mode
+
+### Verified
+
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds without errors
+- iOS unit tests pass with cache-key isolation and sort-state coverage
+- Targeted UI tests validate many2many tag selection flow and sort column interactions
+- List cache verification confirms order-specific cache entries persist correctly across navigations
+
+### Notes
+
+- Many2many editor supports search/select/add/remove tags; full nested picker UX remains deferred
+- Sort state is local to current navigation context; multi-column sort remains future work
+- Chatter threads, file upload, kanban/grouping views, and offline mutation queue remain deferred to later phases
+
 ## 2026-03-08 (Production Hardening — Phase 2 Phase 06A/06B iOS Recent-Items Determinism + Observable Pilot)
 
 ### Added

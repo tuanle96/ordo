@@ -39,15 +39,15 @@ The middleware handles version differences, authentication, and schema introspec
 | **Authentication**       | `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me`, JWT with session bridge | Login screen, Keychain persistence, session restore       |
 | **Version Detection**    | Auto-detect Odoo 17/18/19 via `/web/webclient/version_info` | —                                                         |
 | **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema        | —                                                         |
-| **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list, detail view, pull-to-refresh for `res.partner`, `crm.lead`, and narrow `sale.order` |
+| **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list with table/grid view modes, sortable columns, pull-to-refresh for `res.partner`, `crm.lead`, and narrow `sale.order` |
 | **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay, plus relation search for supported `many2one` editors |
-| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | Edit mode for `char`, `text`, `boolean`, `selection`, `many2one`; save/discard UX; dirty tracking; required-field validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` |
+| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | Edit mode for `char`, `text`, `boolean`, `selection`, `many2one`, `many2many` tags; save/discard UX; dirty tracking; required-field validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` |
 | **Offline Cache**        | —                                                           | File-based cache with actor isolation, stale-data banners |
 | **Health Check**         | `GET /health` (unprefixed)                                  | —                                                         |
 
 ### 🚧 Planned
 
-Broader nested relation editors (`one2many`, `many2many`), deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
+Nested `one2many` editors, kanban/grouping views, file upload, chatter threads, offline mutation queue, deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
 
 ---
 

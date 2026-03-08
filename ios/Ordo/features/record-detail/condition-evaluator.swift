@@ -7,16 +7,16 @@ enum ConditionEvaluator {
         switch condition.op {
         case "==":
             guard let value = condition.value else { return false }
-            return compare(candidates, against: value) == .orderedSame
+            return matchesEquality(candidates, against: value)
         case "!=":
             guard let value = condition.value else { return false }
-            return compare(candidates, against: value) != .orderedSame
+            return !matchesEquality(candidates, against: value)
         case "in":
             guard let values = condition.values else { return false }
-            return values.contains { compare(candidates, against: $0) == .orderedSame }
+            return values.contains { matchesEquality(candidates, against: $0) }
         case "not in":
             guard let values = condition.values else { return false }
-            return values.allSatisfy { compare(candidates, against: $0) != .orderedSame }
+            return values.allSatisfy { !matchesEquality(candidates, against: $0) }
         case ">":
             guard let value = condition.value else { return false }
             return compare(candidates, against: value) == .orderedDescending
@@ -34,6 +34,35 @@ enum ConditionEvaluator {
         default:
             return false
         }
+    }
+
+    static func matches(_ rule: ModifierRule, values: RecordData) -> Bool {
+        switch rule.type {
+        case "constant":
+            return rule.constant ?? false
+        case "condition":
+            guard let condition = rule.condition else { return false }
+            return matches(condition, values: values)
+        case "and":
+            return (rule.rules ?? []).allSatisfy { matches($0, values: values) }
+        case "or":
+            return (rule.rules ?? []).contains { matches($0, values: values) }
+        case "not":
+            guard let child = rule.rules?.first else { return false }
+            return !matches(child, values: values)
+        default:
+            return false
+        }
+    }
+
+    private static func matchesEquality(_ candidates: [String], against rhs: ConditionValue) -> Bool {
+        candidateStrings(for: rhs).contains { compare(candidates, against: $0) == .orderedSame }
+    }
+
+    private static func compare(_ candidates: [String], against rhs: ConditionValue) -> ComparisonResult? {
+        candidateStrings(for: rhs).lazy
+            .compactMap { compare(candidates, against: $0) }
+            .first
     }
 
     private static func compare(_ candidates: [String], against rhs: String) -> ComparisonResult? {
@@ -76,19 +105,51 @@ enum ConditionEvaluator {
                 .flatMap { candidateStrings(for: $0) }
                 .uniqued()
         case .null:
-            return []
+            return ["false", "null", ""]
+        }
+    }
+
+    private static func candidateStrings(for value: ConditionValue) -> [String] {
+        switch value {
+        case .string(let raw):
+            return [raw]
+        case .number(let raw):
+            if raw.rounded() == raw {
+                return [String(Int(raw)), String(raw)]
+            }
+            return [String(raw)]
+        case .bool(let raw):
+            return [raw ? "true" : "false"]
+        case .null:
+            return ["false", "null", ""]
         }
     }
 }
 
 extension FieldSchema {
     func isInvisible(in values: RecordData) -> Bool {
+        if let rule = modifiers?.invisible {
+            return ConditionEvaluator.matches(rule, values: values)
+        }
+
         guard let invisible else { return false }
         return ConditionEvaluator.matches(invisible, values: values)
     }
 
-    var isStaticallyReadOnly: Bool {
-        readonly == true
+    func isReadOnly(in values: RecordData) -> Bool {
+        if let rule = modifiers?.readonly {
+            return ConditionEvaluator.matches(rule, values: values)
+        }
+
+        return readonly == true
+    }
+
+    func isRequired(in values: RecordData) -> Bool {
+        if let rule = modifiers?.required {
+            return ConditionEvaluator.matches(rule, values: values)
+        }
+
+        return required == true
     }
 }
 

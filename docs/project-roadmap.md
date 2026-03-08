@@ -20,7 +20,7 @@
 | Phase 2 — Production hardening (Phase 05) | ✅ Complete | iOS unit coverage broadened around refresh, cache fallback, browse/detail state, and recents persistence; three Swift Testing suites now run serialized and green, establishing the baseline that Phase 06A/06B later used to close the relaunch seam |
 | Phase 2 — Next iOS slice (Phase 06A) | ✅ Complete | Recent-items relaunch determinism seam isolated and verified with the targeted relaunch UI test green before observation changes landed |
 | Phase 2 — Next iOS slice (Phase 06B) | ✅ Complete | `RecentItemsStore` migrated to `@Observable`; `OrdoApp` root ownership plus `HomeView` and `RecordDetailView` consumer patterns validated with green unit and targeted UI coverage |
-| Phase 2 — Next iOS slice (Phase 07) | ⏭️ Next | Widen the `@Observable` migration to `AppState`, feature view models, and `FormDraft` now that the recent-items pilot pattern is proven |
+| Phase 07 — iOS form editors & list browsing improvements | ✅ Complete | Many2many editable tags shipped; browse table mode + sort landed; list cache isolated by order value; offline-first foundation and kanban/grouping remain deferred |
 
 ## Scope reminders
 

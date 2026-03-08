@@ -24,11 +24,12 @@ final class FormDraft {
 
     func changedValues(comparedTo baseline: RecordData, fields: [FieldSchema]) -> RecordData {
         fields.reduce(into: RecordData()) { result, field in
-            let current = normalizedValue(for: field, value: value(for: field.name, fallback: baseline[field.name]))
-            let original = normalizedValue(for: field, value: baseline[field.name])
+            let currentRawValue = value(for: field.name, fallback: baseline[field.name])
+            let current = comparableValue(for: field, value: currentRawValue)
+            let original = comparableValue(for: field, value: baseline[field.name])
 
             guard current != original else { return }
-            result[field.name] = current ?? .null
+            result[field.name] = mutationValue(for: field, value: currentRawValue) ?? .null
         }
     }
 
@@ -38,7 +39,7 @@ final class FormDraft {
 
     func validationErrors(for fields: [FieldSchema]) -> [String: String] {
         fields.reduce(into: [String: String]()) { errors, field in
-            guard field.required == true else { return }
+            guard field.isRequired(in: storage) else { return }
 
             switch field.type {
             case .char, .text, .selection:
@@ -48,7 +49,11 @@ final class FormDraft {
                     errors[field.name] = "\(field.label) is required."
                 }
             case .many2one:
-                if normalizedValue(for: field, value: value(for: field.name, fallback: nil)) == nil {
+                if comparableValue(for: field, value: value(for: field.name, fallback: nil)) == nil {
+                    errors[field.name] = "\(field.label) is required."
+                }
+            case .many2many:
+                if manyRelationIDs(from: value(for: field.name, fallback: nil)).isEmpty {
                     errors[field.name] = "\(field.label) is required."
                 }
             case .boolean:
@@ -59,15 +64,37 @@ final class FormDraft {
         }
     }
 
-    private func normalizedValue(for field: FieldSchema, value: JSONValue?) -> JSONValue? {
-        guard let value else { return nil }
+    private func comparableValue(for field: FieldSchema, value: JSONValue?) -> JSONValue? {
+        guard let value else {
+            return field.type == .many2many ? .array([]) : nil
+        }
 
         switch field.type {
         case .many2one:
             guard let relationID = value.relationID else { return nil }
             return .number(Double(relationID))
+        case .many2many:
+            return .array(manyRelationIDs(from: value).sorted().map { .number(Double($0)) })
         default:
             return value
         }
+    }
+
+    private func mutationValue(for field: FieldSchema, value: JSONValue?) -> JSONValue? {
+        switch field.type {
+        case .many2one:
+            guard let relationID = value?.relationID else { return nil }
+            return .number(Double(relationID))
+        case .many2many:
+            let ids = manyRelationIDs(from: value).sorted().map { JSONValue.number(Double($0)) }
+            return .array([.array([.number(6), .number(0), .array(ids)])])
+        default:
+            return value
+        }
+    }
+
+    private func manyRelationIDs(from value: JSONValue?) -> [Int] {
+        guard let value else { return [] }
+        return Array(Set(value.relationValues.map(\.id))).sorted()
     }
 }

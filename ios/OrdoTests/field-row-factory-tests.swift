@@ -55,9 +55,11 @@ struct FieldRowFactoryTests {
     @Test
     func unsupportedFieldsRemainOutOfEditMode() {
         let many2one = FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let many2many = FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let html = FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
 
         let many2oneModel = EditableFieldFactory.model(for: many2one)
+        let many2manyModel = EditableFieldFactory.model(for: many2many)
 
         if case .many2one(let comodel)? = many2oneModel?.style {
             #expect(comodel == "res.country")
@@ -65,6 +67,25 @@ struct FieldRowFactoryTests {
             Issue.record("Expected many2one field to stay editable.")
         }
 
+        if case .many2many(let comodel)? = many2manyModel?.style {
+            #expect(comodel == "res.partner.category")
+        } else {
+            Issue.record("Expected many2many field to stay editable.")
+        }
+
         #expect(EditableFieldFactory.model(for: html) == nil)
+    }
+
+    @Test
+    func many2ManyReadOnlyUsesTagLabels() {
+        let field = FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .array([
+            .relation(id: 8, label: "VIP"),
+            .relation(id: 11, label: "Wholesale"),
+        ]))
+
+        #expect(model?.value == "VIP, Wholesale")
+        #expect(model?.style == .standard)
     }
 }

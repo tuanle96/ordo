@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { XMLParser } from 'fast-xml-parser';
 
-import type { ActionButton, FieldSchema, FormSection, FormTab, MobileFormSchema } from '@ordo/shared';
+import type {
+    ActionButton,
+    Condition,
+    ConditionRule,
+    FieldModifiers,
+    FieldSchema,
+    FormSection,
+    FormTab,
+    MobileFormSchema,
+} from '@ordo/shared';
 
 import { ConditionParserService } from './condition-parser.service';
 
@@ -40,30 +49,36 @@ export class MobileSchemaBuilderService {
     build(model: string, viewArch: string, fieldsMeta: Record<string, OdooFieldMeta>): MobileFormSchema {
         const parsed = this.parser.parse(viewArch) as { form?: XmlNode };
         const form = parsed.form ?? {};
+        const inheritedInvisible = this.nodeInvisibleRule(form);
 
         return {
             model,
             title: String(form['@_string'] ?? model),
             header: this.buildHeader(form.header, fieldsMeta),
-            sections: this.buildSections(form.sheet ?? form, fieldsMeta),
-            tabs: this.buildTabs(form.sheet?.notebook ?? form.notebook, fieldsMeta),
+            sections: this.buildSections(form.sheet ?? form, fieldsMeta, inheritedInvisible),
+            tabs: this.buildTabs(form.sheet?.notebook ?? form.notebook, fieldsMeta, inheritedInvisible),
             hasChatter: Boolean(form.chatter ?? form.sheet?.chatter),
         };
     }
 
     private buildHeader(header: XmlNode | undefined, fieldsMeta: Record<string, OdooFieldMeta>) {
-        const actions: ActionButton[] = this.asArray(header?.button).map((button) => ({
-            name: String(button['@_name'] ?? ''),
-            label: String(button['@_string'] ?? button['@_name'] ?? ''),
-            type: button['@_type'] === 'action' ? 'action' : 'object',
-            style: button['@_class']?.includes('danger')
-                ? 'danger'
-                : button['@_class']?.includes('primary')
-                    ? 'primary'
-                    : 'secondary',
-            invisible: this.conditionParser.parseInvisible(button['@_invisible']),
-            confirm: button['@_confirm'],
-        }));
+        const actions: ActionButton[] = this.asArray(header?.button).map((button) => {
+            const invisibleRule = this.mergeRules('or', this.nodeInvisibleRule(button), this.conditionParser.parseStates(button['@_states']));
+
+            return {
+                name: String(button['@_name'] ?? ''),
+                label: String(button['@_string'] ?? button['@_name'] ?? ''),
+                type: button['@_type'] === 'action' ? 'action' : 'object',
+                style: button['@_class']?.includes('danger')
+                    ? 'danger'
+                    : button['@_class']?.includes('primary')
+                        ? 'primary'
+                        : 'secondary',
+                invisible: this.extractSingleCondition(invisibleRule),
+                modifiers: invisibleRule ? { invisible: invisibleRule } : undefined,
+                confirm: button['@_confirm'],
+            };
+        });
 
         const statusField = this.asArray(header?.field).find((field) => field['@_widget'] === 'statusbar');
         const statusMeta = statusField ? fieldsMeta[String(statusField['@_name'])] : undefined;
@@ -83,37 +98,58 @@ export class MobileSchemaBuilderService {
         };
     }
 
-    private buildSections(container: XmlNode | undefined, fieldsMeta: Record<string, OdooFieldMeta>): FormSection[] {
+    private buildSections(
+        container: XmlNode | undefined,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+        inheritedInvisible?: ConditionRule,
+    ): FormSection[] {
+        const containerInvisible = this.mergeRules('or', inheritedInvisible, this.nodeInvisibleRule(container));
         const groups = this.asArray(container?.group);
         if (groups.length === 0) {
-            const fields = this.collectFields(container, fieldsMeta);
+            const fields = this.collectFields(container, fieldsMeta, containerInvisible);
             return fields.length > 0 ? [{ label: null, fields }] : [];
         }
 
         return groups
             .map((group) => ({
                 label: group['@_string'] ? String(group['@_string']) : null,
-                fields: this.collectFields(group, fieldsMeta),
+                fields: this.collectFields(group, fieldsMeta, containerInvisible),
             }))
             .filter((section) => section.fields.length > 0);
     }
 
-    private buildTabs(notebook: XmlNode | undefined, fieldsMeta: Record<string, OdooFieldMeta>): FormTab[] {
+    private buildTabs(
+        notebook: XmlNode | undefined,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+        inheritedInvisible?: ConditionRule,
+    ): FormTab[] {
         return this.asArray(notebook?.page).map((page) => ({
             label: String(page['@_string'] ?? 'Tab'),
             content: {
-                sections: this.buildSections(page, fieldsMeta),
+                sections: this.buildSections(
+                    page,
+                    fieldsMeta,
+                    this.mergeRules('or', inheritedInvisible, this.nodeInvisibleRule(page), this.conditionParser.parseStates(page['@_states'])),
+                ),
             },
         }));
     }
 
-    private collectFields(container: XmlNode | undefined, fieldsMeta: Record<string, OdooFieldMeta>): FieldSchema[] {
-        const directFields = this.asArray(container?.field).map((field) => this.toFieldSchema(field, fieldsMeta));
-        const nestedFields = this.asArray(container?.group).flatMap((group) => this.collectFields(group, fieldsMeta));
+    private collectFields(
+        container: XmlNode | undefined,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+        inheritedInvisible?: ConditionRule,
+    ): FieldSchema[] {
+        const directFields = this.asArray(container?.field).map((field) => this.toFieldSchema(field, fieldsMeta, inheritedInvisible));
+        const nestedFields = this.asArray(container?.group).flatMap((group) => this.collectFields(group, fieldsMeta, this.mergeRules('or', inheritedInvisible, this.nodeInvisibleRule(group))));
         return [...directFields, ...nestedFields].filter((field): field is FieldSchema => Boolean(field));
     }
 
-    private toFieldSchema(fieldNode: XmlNode, fieldsMeta: Record<string, OdooFieldMeta>): FieldSchema | null {
+    private toFieldSchema(
+        fieldNode: XmlNode,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+        inheritedInvisible?: ConditionRule,
+    ): FieldSchema | null {
         const name = String(fieldNode['@_name'] ?? '');
         if (!name) {
             return null;
@@ -124,15 +160,19 @@ export class MobileSchemaBuilderService {
             return null;
         }
 
-        const subfields = this.asArray(fieldNode.list?.field).map((child) => this.toFieldSchema(child, fieldsMeta)).filter(Boolean) as FieldSchema[];
+        const modifiers = this.buildFieldModifiers(fieldNode, meta, inheritedInvisible);
+        const subfields = this.asArray(fieldNode.list?.field)
+            .map((child) => this.toFieldSchema(child, fieldsMeta, modifiers.invisible))
+            .filter(Boolean) as FieldSchema[];
 
         return {
             name,
             type: this.normalizeFieldType(meta.type, fieldNode['@_widget']),
             label: String(fieldNode['@_string'] ?? meta.string ?? name),
-            required: Boolean(meta.required),
-            readonly: Boolean(meta.readonly) || fieldNode['@_readonly'] === '1',
-            invisible: this.conditionParser.parseInvisible(fieldNode['@_invisible']),
+            required: this.staticBoolean(modifiers.required),
+            readonly: this.staticBoolean(modifiers.readonly),
+            invisible: this.extractSingleCondition(modifiers.invisible),
+            modifiers: this.compactModifiers(modifiers),
             domain: typeof fieldNode['@_domain'] === 'string' ? fieldNode['@_domain'] : meta.domain,
             comodel: meta.relation,
             selection: meta.selection,
@@ -142,6 +182,64 @@ export class MobileSchemaBuilderService {
             searchable: meta.type === 'many2one' || meta.type === 'many2many',
             widget: fieldNode['@_widget'],
         };
+    }
+
+    private buildFieldModifiers(
+        fieldNode: XmlNode,
+        meta: OdooFieldMeta,
+        inheritedInvisible?: ConditionRule,
+    ): FieldModifiers {
+        return {
+            invisible: this.mergeRules(
+                'or',
+                inheritedInvisible,
+                this.nodeInvisibleRule(fieldNode),
+                this.conditionParser.parseStates(fieldNode['@_states']),
+            ),
+            readonly: this.ruleFromAttribute(fieldNode['@_readonly'], meta.readonly),
+            required: this.ruleFromAttribute(fieldNode['@_required'], meta.required),
+        };
+    }
+
+    private nodeInvisibleRule(node?: XmlNode): ConditionRule | undefined {
+        return typeof node?.['@_invisible'] === 'string'
+            ? this.conditionParser.parseRule(node['@_invisible'])
+            : undefined;
+    }
+
+    private ruleFromAttribute(raw: unknown, fallback?: boolean): ConditionRule | undefined {
+        if (typeof raw === 'string' && raw.trim()) {
+            return this.conditionParser.parseRule(raw.trim());
+        }
+
+        return fallback === undefined ? undefined : { type: 'constant', constant: fallback };
+    }
+
+    private mergeRules(type: 'and' | 'or', ...rules: Array<ConditionRule | undefined>): ConditionRule | undefined {
+        const filtered = rules.filter((rule): rule is ConditionRule => Boolean(rule));
+        if (filtered.length === 0) {
+            return undefined;
+        }
+
+        if (filtered.length === 1) {
+            return filtered[0];
+        }
+
+        return { type, rules: filtered };
+    }
+
+    private extractSingleCondition(rule?: ConditionRule): Condition | undefined {
+        return rule?.type === 'condition' ? rule.condition : undefined;
+    }
+
+    private staticBoolean(rule?: ConditionRule): boolean | undefined {
+        return rule?.type === 'constant' ? rule.constant : undefined;
+    }
+
+    private compactModifiers(modifiers: FieldModifiers): FieldModifiers | undefined {
+        return modifiers.invisible || modifiers.readonly || modifiers.required
+            ? modifiers
+            : undefined;
     }
 
     private normalizeFieldType(rawType: string, widget?: unknown): FieldSchema['type'] {

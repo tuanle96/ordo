@@ -5,6 +5,62 @@ import OSLog
 @MainActor
 @Observable
 final class RecordListViewModel {
+    enum ViewMode: String, CaseIterable, Identifiable {
+        case cards
+        case table
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .cards:
+                return "Cards"
+            case .table:
+                return "Table"
+            }
+        }
+    }
+
+    enum SortOption: String, CaseIterable, Identifiable {
+        case serverDefault
+        case newestFirst
+        case oldestFirst
+        case titleAscending
+        case titleDescending
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .serverDefault:
+                return "Default"
+            case .newestFirst:
+                return "Newest"
+            case .oldestFirst:
+                return "Oldest"
+            case .titleAscending:
+                return "Title A–Z"
+            case .titleDescending:
+                return "Title Z–A"
+            }
+        }
+
+        func order(for descriptor: ModelDescriptor) -> String? {
+            switch self {
+            case .serverDefault:
+                return nil
+            case .newestFirst:
+                return "id desc"
+            case .oldestFirst:
+                return "id asc"
+            case .titleAscending:
+                return "\(descriptor.primarySortField) asc"
+            case .titleDescending:
+                return "\(descriptor.primarySortField) desc"
+            }
+        }
+    }
+
     private static let logger = Logger(subsystem: "com.ordo.app", category: "record-list")
 
     private(set) var items: [RecordData] = []
@@ -14,6 +70,8 @@ final class RecordListViewModel {
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var canLoadMore = true
+    var viewMode: ViewMode = .cards
+    private(set) var sortOption: SortOption = .serverDefault
     var query = ""
 
     let descriptor: ModelDescriptor
@@ -26,6 +84,12 @@ final class RecordListViewModel {
 
     init(descriptor: ModelDescriptor) {
         self.descriptor = descriptor
+    }
+
+    func apply(sortOption: SortOption, using appState: AppState) async {
+        guard self.sortOption != sortOption else { return }
+        self.sortOption = sortOption
+        await load(using: appState)
     }
 
     func load(using appState: AppState) async {
@@ -47,6 +111,8 @@ final class RecordListViewModel {
             return
         }
 
+        let order = sortOption.order(for: descriptor)
+
         if replacing {
             isLoading = true
         } else {
@@ -61,12 +127,12 @@ final class RecordListViewModel {
         }
 
         if replacing,
-              let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: 0, scope: cacheScope) {
+          let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: 0, order: order, scope: cacheScope) {
             applyPage(cached.value, offset: 0, replacing: true)
             cacheMessage = "Showing saved data from \(cached.relativeTimestamp)."
         }
 
-        Self.logger.info("📋 Loading page for \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public) replacing=\(replacing, privacy: .public)")
+      Self.logger.info("📋 Loading page for \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public) replacing=\(replacing, privacy: .public) order=\(order ?? "default", privacy: .public)")
 
         do {
             let result = try await appState.withAuthenticatedToken { [self] token in
@@ -75,6 +141,7 @@ final class RecordListViewModel {
                     fields: self.descriptor.listFields,
                     limit: self.pageSize,
                     offset: offset,
+                    order: order,
                     token: token
                 )
             }
@@ -82,7 +149,7 @@ final class RecordListViewModel {
             applyPage(result, offset: offset, replacing: replacing)
             cacheMessage = nil
             do {
-                try await appState.cacheStore.saveListPage(result, for: descriptor.model, limit: pageSize, offset: offset, scope: cacheScope)
+                try await appState.cacheStore.saveListPage(result, for: descriptor.model, limit: pageSize, offset: offset, order: order, scope: cacheScope)
             } catch {
                 Self.logger.error("Failed to save list cache for \(self.descriptor.model, privacy: .public) offset \(offset, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
@@ -91,7 +158,7 @@ final class RecordListViewModel {
             if case APIClientError.unauthorized = error {
                 appState.signOut()
             } else if !replacing,
-                      let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: offset, scope: cacheScope) {
+                      let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: offset, order: order, scope: cacheScope) {
                 applyPage(cached.value, offset: offset, replacing: false)
                 cacheMessage = "Loaded more from saved data (\(cached.relativeTimestamp))."
             } else if !replacing {

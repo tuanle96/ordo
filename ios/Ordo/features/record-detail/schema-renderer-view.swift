@@ -56,7 +56,7 @@ private struct SchemaSectionView: View {
     private var rows: [FieldSchema] {
         fields.filter { field in
             let rawValue = values[field.name] ?? record[field.name]
-            if isEditing, draft != nil, !field.isStaticallyReadOnly, EditableFieldFactory.model(for: field) != nil {
+            if isEditing, draft != nil, !field.isReadOnly(in: values), EditableFieldFactory.model(for: field) != nil {
                 return true
             }
             return FieldRowFactory.model(for: field, rawValue: rawValue) != nil
@@ -69,7 +69,7 @@ private struct SchemaSectionView: View {
 
         if isEditing,
            let draft,
-           !field.isStaticallyReadOnly,
+              !field.isReadOnly(in: values),
            let editor = EditableFieldFactory.model(for: field) {
             EditableFieldRow(
                 field: field,

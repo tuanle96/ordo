@@ -182,7 +182,7 @@ final class RecordDetailViewModel {
         guard let schema else { return [] }
         return schema.allFields.filter { field in
             !field.isInvisible(in: values)
-                && !field.isStaticallyReadOnly
+                && !field.isReadOnly(in: values)
                 && EditableFieldFactory.model(for: field) != nil
         }
     }

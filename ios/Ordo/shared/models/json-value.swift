@@ -1,5 +1,10 @@
 import Foundation
 
+struct RelationValue: Hashable, Identifiable {
+    let id: Int
+    let label: String
+}
+
 enum JSONValue: Codable, Hashable {
     case string(String)
     case number(Double)
@@ -79,6 +84,34 @@ enum JSONValue: Codable, Hashable {
         default:
             return nil
         }
+    }
+
+    var relationValue: RelationValue? {
+        switch self {
+        case .array(let values):
+            guard values.count == 2, let id = values[0].intValue else { return nil }
+            return RelationValue(id: id, label: values[1].stringValue ?? "Record #\(id)")
+        case .number(let value):
+            let id = Int(value)
+            return RelationValue(id: id, label: "Record #\(id)")
+        default:
+            return nil
+        }
+    }
+
+    var relationValues: [RelationValue] {
+        if let relationValue {
+            return [relationValue]
+        }
+
+        guard case .array(let values) = self else { return [] }
+
+        var seen = Set<Int>()
+        return values.compactMap(\.relationValue).filter { seen.insert($0.id).inserted }
+    }
+
+    var manyRelationIDs: [Int] {
+        relationValues.map(\.id)
     }
 
     static func relation(id: Int, label: String) -> JSONValue {

@@ -18,11 +18,26 @@ export type FieldType =
     | 'priority'
     | 'signature';
 
+export type ConditionValue = string | number | boolean | null;
+
 export interface Condition {
     field: string;
     op: '==' | '!=' | 'in' | 'not in' | '>' | '<' | '>=' | '<=';
-    value?: string;
-    values?: string[];
+    value?: ConditionValue;
+    values?: ConditionValue[];
+}
+
+export interface ConditionRule {
+    type: 'condition' | 'and' | 'or' | 'not' | 'constant';
+    condition?: Condition;
+    rules?: ConditionRule[];
+    constant?: boolean;
+}
+
+export interface FieldModifiers {
+    invisible?: ConditionRule;
+    readonly?: ConditionRule;
+    required?: ConditionRule;
 }
 
 export interface ActionButton {
@@ -31,6 +46,7 @@ export interface ActionButton {
     type: 'object' | 'action';
     style?: 'primary' | 'secondary' | 'danger';
     invisible?: Condition;
+    modifiers?: Pick<FieldModifiers, 'invisible'>;
     confirm?: string;
 }
 
@@ -41,6 +57,7 @@ export interface FieldSchema {
     required?: boolean;
     readonly?: boolean;
     invisible?: Condition;
+    modifiers?: FieldModifiers;
     domain?: string;
     comodel?: string;
     selection?: [string, string][];

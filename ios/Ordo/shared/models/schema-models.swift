@@ -36,8 +36,55 @@ enum FieldType: String, Codable {
 struct Condition: Codable, Hashable {
     let field: String
     let op: String
-    let value: String?
-    let values: [String]?
+    let value: ConditionValue?
+    let values: [ConditionValue]?
+}
+
+enum ConditionValue: Codable, Hashable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let bool = try? container.decode(Bool.self) {
+            self = .bool(bool)
+        } else if let number = try? container.decode(Double.self) {
+            self = .number(number)
+        } else {
+            self = .string(try container.decode(String.self))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value):
+            try container.encode(value)
+        case .number(let value):
+            try container.encode(value)
+        case .bool(let value):
+            try container.encode(value)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
+struct ModifierRule: Codable, Hashable {
+    let type: String
+    let condition: Condition?
+    let rules: [ModifierRule]?
+    let constant: Bool?
+}
+
+struct FieldModifiers: Codable, Hashable {
+    let invisible: ModifierRule?
+    let readonly: ModifierRule?
+    let required: ModifierRule?
 }
 
 struct ActionButton: Codable, Hashable {
@@ -46,7 +93,26 @@ struct ActionButton: Codable, Hashable {
     let type: String
     let style: String?
     let invisible: Condition?
+    let modifiers: FieldModifiers?
     let confirm: String?
+
+    init(
+        name: String,
+        label: String,
+        type: String,
+        style: String? = nil,
+        invisible: Condition? = nil,
+        modifiers: FieldModifiers? = nil,
+        confirm: String? = nil
+    ) {
+        self.name = name
+        self.label = label
+        self.type = type
+        self.style = style
+        self.invisible = invisible
+        self.modifiers = modifiers
+        self.confirm = confirm
+    }
 }
 
 struct FieldSchema: Codable, Hashable {
@@ -56,6 +122,7 @@ struct FieldSchema: Codable, Hashable {
     let required: Bool?
     let readonly: Bool?
     let invisible: Condition?
+    let modifiers: FieldModifiers?
     let domain: JSONValue?
     let comodel: String?
     let selection: [[String]]?
@@ -65,6 +132,42 @@ struct FieldSchema: Codable, Hashable {
     let subfields: [FieldSchema]?
     let searchable: Bool?
     let widget: String?
+
+    init(
+        name: String,
+        type: FieldType,
+        label: String,
+        required: Bool? = nil,
+        readonly: Bool? = nil,
+        invisible: Condition? = nil,
+        modifiers: FieldModifiers? = nil,
+        domain: JSONValue? = nil,
+        comodel: String? = nil,
+        selection: [[String]]? = nil,
+        currencyField: String? = nil,
+        placeholder: String? = nil,
+        digits: [Int]? = nil,
+        subfields: [FieldSchema]? = nil,
+        searchable: Bool? = nil,
+        widget: String? = nil
+    ) {
+        self.name = name
+        self.type = type
+        self.label = label
+        self.required = required
+        self.readonly = readonly
+        self.invisible = invisible
+        self.modifiers = modifiers
+        self.domain = domain
+        self.comodel = comodel
+        self.selection = selection
+        self.currencyField = currencyField
+        self.placeholder = placeholder
+        self.digits = digits
+        self.subfields = subfields
+        self.searchable = searchable
+        self.widget = widget
+    }
 }
 
 struct FormHeader: Codable, Hashable {

@@ -79,6 +79,7 @@ struct RecordDetailView: View {
                         isEditing: isEditing,
                         validationErrors: viewModel.validationErrors
                     )
+                    .id("schema-\(viewModel.recordID)-\(isEditing ? "editing" : "readonly")")
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {

@@ -17,7 +17,7 @@ struct OrdoApp: App {
 
         let environment = ProcessInfo.processInfo.environment
         let recentItemsDefaults = environment["ORDO_UI_TEST_MODE"] == "smoke"
-            ? (UserDefaults(suiteName: "com.ordo.app.ui-tests") ?? .standard)
+            ? (UserDefaults(suiteName: UITestAppStateFactory.storageSuiteName(from: environment)) ?? .standard)
             : .standard
 
         _recentItems = State(initialValue: RecentItemsStore(defaults: recentItemsDefaults))

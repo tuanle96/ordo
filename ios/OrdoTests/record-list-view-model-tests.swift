@@ -23,7 +23,7 @@ struct RecordListViewModelTests {
 
         let appState = try await makeRestoredAppState()
         let cachedList = RecordListResult(items: [["id": .number(1), "name": .string("Azure Interior")]], limit: 30, offset: 0)
-        try await appState.cacheStore.saveListPage(cachedList, for: "res.partner", limit: 30, offset: 0, scope: try #require(appState.cacheScope))
+        try await appState.cacheStore.saveListPage(cachedList, for: "res.partner", limit: 30, offset: 0, order: nil, scope: try #require(appState.cacheScope))
 
         let viewModel = RecordListViewModel(descriptor: try #require(ModelRegistry.supported.first))
         await viewModel.load(using: appState)
@@ -58,6 +58,42 @@ struct RecordListViewModelTests {
         #expect(appState.phase == .login)
         #expect(appState.session == nil)
         #expect(appState.currentPrincipal == nil)
+    }
+
+    @Test
+    func applyingSortUsesOrderQueryAndIsolatesCacheByOrder() async throws {
+        var requestedOrders: [String?] = []
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let order = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "order" })?.value
+                requestedOrders.append(order)
+                let payload = RecordListResult(items: [["id": .number(2), "name": .string("Deco Addict")]], limit: 30, offset: 0)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordListViewModel(descriptor: try #require(ModelRegistry.supported.first))
+
+        await viewModel.apply(sortOption: .titleAscending, using: appState)
+
+        #expect(requestedOrders == ["name asc"])
+        #expect(viewModel.summaries.map(\.title) == ["Deco Addict"])
+
+        let cached = await appState.cacheStore.loadListPage(for: "res.partner", limit: 30, offset: 0, order: "name asc", scope: try #require(appState.cacheScope))
+        #expect(cached?.value.items.count == 1)
+
+        let defaultCache = await appState.cacheStore.loadListPage(for: "res.partner", limit: 30, offset: 0, order: nil, scope: try #require(appState.cacheScope))
+        #expect(defaultCache == nil)
     }
 
     private func makeRestoredAppState() async throws -> AppState {

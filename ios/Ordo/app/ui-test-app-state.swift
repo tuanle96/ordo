@@ -5,14 +5,16 @@ enum UITestAppStateFactory {
         let environment = ProcessInfo.processInfo.environment
         guard environment["ORDO_UI_TEST_MODE"] == "smoke" else { return nil }
 
-        let defaults = UserDefaults(suiteName: "com.ordo.app.ui-tests") ?? .standard
+        let suiteName = storageSuiteName(from: environment)
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         let sessionStore = UserDefaultsSessionStore(defaults: defaults)
         let fileManager = FileManager.default
         let cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appending(path: "OrdoUITestCache", directoryHint: .isDirectory)
+            .appending(path: environment["ORDO_UI_TEST_STORAGE_NAMESPACE"] ?? "default", directoryHint: .isDirectory)
 
         if environment["ORDO_UI_TEST_RESET_STORAGE"] == "1" {
-            try? sessionStore.clear()
+            defaults.removePersistentDomain(forName: suiteName)
             try? fileManager.removeItem(at: cacheDirectory)
         }
 
@@ -29,6 +31,14 @@ enum UITestAppStateFactory {
             apiClient: apiClient,
             cacheStore: cacheStore
         )
+    }
+
+    static func storageSuiteName(from environment: [String: String]) -> String {
+        guard let namespace = environment["ORDO_UI_TEST_STORAGE_NAMESPACE"], !namespace.isEmpty else {
+            return "com.ordo.app.ui-tests"
+        }
+
+        return "com.ordo.app.ui-tests.\(namespace)"
     }
 }
 
@@ -81,7 +91,8 @@ private final class UITestURLProtocol: URLProtocol {
             if components.count == 1, request.httpMethod == "GET" {
                 let model = components[0]
                 let offset = request.url.flatMap(Self.queryItems(from:))?["offset"].flatMap(Int.init) ?? 0
-                guard let result = UITestFixtures.listPage(for: model, offset: offset) else {
+                let order = request.url.flatMap(Self.queryItems(from:))?["order"]
+                guard let result = UITestFixtures.listPage(for: model, offset: offset, order: order) else {
                     return notFound(encoder: encoder)
                 }
                 let meta = UITestMeta(total: result.items.count, offset: result.offset, limit: result.limit, timestamp: nil)
@@ -203,6 +214,12 @@ private enum UITestFixtures {
         NameSearchResult(id: 12, name: "Proposition"),
     ]
 
+    static let partnerCategorySearchResults = [
+        NameSearchResult(id: 3, name: "Retail"),
+        NameSearchResult(id: 8, name: "VIP"),
+        NameSearchResult(id: 11, name: "Wholesale"),
+    ]
+
     static func schema(for model: String) -> MobileFormSchema? {
         switch model {
         case "res.partner":
@@ -226,25 +243,28 @@ private enum UITestFixtures {
             return userSearchResults
         case "crm.stage":
             return stageSearchResults
+        case "res.partner.category":
+            return partnerCategorySearchResults
         default:
             return nil
         }
     }
 
-    static func listPage(for model: String, offset: Int) -> RecordListResult? {
-        let items: [RecordData]
+    static func listPage(for model: String, offset: Int, order: String?) -> RecordListResult? {
+        let baseItems: [RecordData]
 
         switch model {
         case "res.partner":
-            items = [partnerRecord(id: 1), partnerRecord(id: 2), partnerRecord(id: 3)]
+            baseItems = [partnerRecord(id: 1), partnerRecord(id: 2), partnerRecord(id: 3)]
         case "crm.lead":
-            items = [leadRecord(id: 1), leadRecord(id: 2)]
+            baseItems = [leadRecord(id: 1), leadRecord(id: 2)]
         case "sale.order":
-            items = [saleOrderRecord(id: 1), saleOrderRecord(id: 2)]
+            baseItems = [saleOrderRecord(id: 1), saleOrderRecord(id: 2)]
         default:
             return nil
         }
 
+        let items = sort(records: baseItems, order: order)
         let pagedItems = offset == 0 ? items : []
         return RecordListResult(items: pagedItems, limit: 30, offset: offset)
     }
@@ -269,6 +289,9 @@ private enum UITestFixtures {
             if key == "name", let name = value.stringValue {
                 record[key] = value
                 record["display_name"] = .string(name)
+            } else if key == "category_id" {
+                let categoryValues = value.manyRelationIDs.compactMap { relationValue(for: key, id: $0) }
+                record[key] = categoryValues.isEmpty ? .array([]) : .array(categoryValues)
             } else if let relationID = value.relationID,
                       let relation = relationValue(for: key, id: relationID) {
                 record[key] = relation
@@ -299,11 +322,12 @@ private enum UITestFixtures {
             FieldSchema(name: "priority", type: .priority, label: "Priority", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "city", type: .char, label: "City", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: "No tags selected", digits: nil, subfields: nil, searchable: nil, widget: nil),
         ])],
         tabs: [FormTab(label: "Notes", content: ["sections": encodedSections([
             FormSection(label: "Notes", fields: [
                 FieldSchema(name: "comment", type: .text, label: "Notes", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
-                FieldSchema(name: "internal_note", type: .text, label: "Internal Note", required: nil, readonly: nil, invisible: Condition(field: "is_company", op: "==", value: "false", values: nil), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "internal_note", type: .text, label: "Internal Note", required: nil, readonly: nil, invisible: Condition(field: "is_company", op: "==", value: .bool(false), values: nil), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             ]),
         ])])],
         hasChatter: false
@@ -360,6 +384,9 @@ private enum UITestFixtures {
             "priority": .string(index == 0 ? "2" : "1"),
             "city": .string(cities[index]),
             "country_id": .array([.number(233), .string("United States")]),
+            "category_id": .array(index == 0
+                ? [.relation(id: 8, label: "VIP"), .relation(id: 11, label: "Wholesale")]
+                : [.relation(id: 3, label: "Retail")]),
             "currency_id": .array([.number(1), .string("USD")]),
             "comment": .string("Preferred customer"),
             "internal_note": .string("Backoffice only"),
@@ -445,8 +472,46 @@ private enum UITestFixtures {
             default:
                 return nil
             }
+        case "category_id":
+            switch id {
+            case 3:
+                return .relation(id: 3, label: "Retail")
+            case 8:
+                return .relation(id: 8, label: "VIP")
+            case 11:
+                return .relation(id: 11, label: "Wholesale")
+            default:
+                return nil
+            }
         default:
             return nil
+        }
+    }
+
+    private static func sort(records: [RecordData], order: String?) -> [RecordData] {
+        guard let order else { return records }
+
+        let components = order.split(separator: " ").map(String.init)
+        let field = components.first ?? "id"
+        let isDescending = components.dropFirst().first?.lowercased() == "desc"
+
+        return records.sorted { lhs, rhs in
+            let leftValue = lhs[field]?.displayText ?? ""
+            let rightValue = rhs[field]?.displayText ?? ""
+
+            if field == "id" {
+                let leftID = lhs[field]?.intValue ?? 0
+                let rightID = rhs[field]?.intValue ?? 0
+                return isDescending ? leftID > rightID : leftID < rightID
+            }
+
+            if leftValue == rightValue {
+                let leftID = lhs["id"]?.intValue ?? 0
+                let rightID = rhs["id"]?.intValue ?? 0
+                return leftID < rightID
+            }
+
+            return isDescending ? leftValue.localizedCaseInsensitiveCompare(rightValue) == .orderedDescending : leftValue.localizedCaseInsensitiveCompare(rightValue) == .orderedAscending
         }
     }
 

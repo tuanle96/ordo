@@ -1,7 +1,10 @@
 import {
+    BadRequestException,
     BadGatewayException,
+    ForbiddenException,
     Injectable,
     Logger,
+    NotFoundException,
     ServiceUnavailableException,
     UnauthorizedException,
 } from '@nestjs/common';
@@ -248,11 +251,34 @@ export class OdooRpcService {
         }
     }
 
-    private mapOdooError(error: OdooJsonRpcError): UnauthorizedException | BadGatewayException {
+    private mapOdooError(error: OdooJsonRpcError):
+        | UnauthorizedException
+        | ForbiddenException
+        | NotFoundException
+        | BadRequestException
+        | BadGatewayException {
         const message = this.extractUpstreamMessage(error);
+        const errorName = this.extractUpstreamErrorName(error).toLowerCase();
+        const normalizedMessage = message.toLowerCase();
 
-        if (message.toLowerCase().includes('accessdenied')) {
+        if (normalizedMessage.includes('accessdenied')) {
             return new UnauthorizedException('Wrong login/password');
+        }
+
+        if (errorName.includes('accesserror') || normalizedMessage.includes('accesserror')) {
+            return new ForbiddenException('You do not have permission to access this record or perform this action.');
+        }
+
+        if (errorName.includes('missingerror') || normalizedMessage.includes('missingerror') || normalizedMessage.includes('does not exist')) {
+            return new NotFoundException('The requested record was not found or is no longer available.');
+        }
+
+        if (
+            errorName.includes('validationerror')
+            || errorName.includes('usererror')
+            || errorName.includes('accesswarning')
+        ) {
+            return new BadRequestException(message);
         }
 
         return new BadGatewayException('Odoo upstream request failed');
@@ -265,6 +291,10 @@ export class OdooRpcService {
             error.message ??
             'Unknown Odoo upstream error'
         );
+    }
+
+    private extractUpstreamErrorName(error: OdooJsonRpcError): string {
+        return error.data?.name ?? error.message ?? 'Unknown Odoo upstream error';
     }
 
     private extractSessionCookie(response: Response): string | null {
