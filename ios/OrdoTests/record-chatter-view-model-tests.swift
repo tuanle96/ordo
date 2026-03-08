@@ -275,7 +275,8 @@ private final class ChatterViewModelTestURLProtocol: URLProtocol {
     override func startLoading() {
         guard let client, let url = request.url, let requestHandler = Self.requestHandler else { return }
         do {
-            let (statusCode, data) = try requestHandler(request)
+            let normalizedRequest = request.withMaterializedHTTPBody()
+            let (statusCode, data) = try requestHandler(normalizedRequest)
             let response = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
             client.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client.urlProtocol(self, didLoad: data)
@@ -283,6 +284,43 @@ private final class ChatterViewModelTestURLProtocol: URLProtocol {
         } catch {
             client.urlProtocol(self, didFailWithError: error)
         }
+    }
+}
+
+private extension URLRequest {
+    func withMaterializedHTTPBody() -> URLRequest {
+        guard httpBody == nil, let httpBodyStream else { return self }
+
+        let data = Data(reading: httpBodyStream)
+        var request = self
+        request.httpBody = data.isEmpty ? nil : data
+        return request
+    }
+}
+
+private extension Data {
+    init(reading stream: InputStream) {
+        stream.open()
+        defer { stream.close() }
+
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        var data = Data()
+
+        while true {
+            let readCount = stream.read(&buffer, maxLength: buffer.count)
+
+            if readCount < 0 {
+                break
+            }
+
+            if readCount == 0 {
+                break
+            }
+
+            data.append(buffer, count: readCount)
+        }
+
+        self = data
     }
 }
 

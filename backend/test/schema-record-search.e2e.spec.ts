@@ -186,4 +186,28 @@ describe('Schema, record, and search endpoints', () => {
         );
         expect(response.body.data).toEqual(odooFixtures.nameSearch);
     });
+
+    it('normalizes comma-delimited onchange fields and rejects invalid payloads', async () => {
+        await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/records/res.partner/onchange')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({ values: { country_id: 21 }, triggerField: 'country_id', fields: 'id,name,country_id' })
+            .expect(201);
+
+        expect(recordServiceMock.runOnchange).toHaveBeenLastCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            expect.objectContaining({
+                values: { country_id: 21 },
+                triggerField: 'country_id',
+                fields: ['id', 'name', 'country_id'],
+            }),
+        );
+
+        await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/records/res.partner/onchange')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({ values: { country_id: 21 } })
+            .expect(400);
+    });
 });

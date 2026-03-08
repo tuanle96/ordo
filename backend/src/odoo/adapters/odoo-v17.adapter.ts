@@ -19,6 +19,7 @@ import type {
 import { OdooAdapter } from './odoo-adapter.interface';
 import { OdooRpcService } from '../rpc/odoo-rpc.service';
 import { MobileSchemaBuilderService } from '../schema/mobile-schema-builder.service';
+import type { OdooFieldsSpec } from '../rpc/odoo-rpc.types';
 import type { OdooSessionContext } from '../session/odoo-session.types';
 
 @Injectable()
@@ -69,7 +70,7 @@ export class OdooV17Adapter implements OdooAdapter {
         model: string,
         request: OnchangeRequest,
     ): Promise<OnchangeResult> {
-        const fieldsSpec = await this.odooRpcService.getFieldsSpecWithSession(session, model);
+        const fieldsSpec = this.buildOnchangeFieldsSpec(request);
         const result = await this.odooRpcService.runModelOnchangeWithSession(
             session,
             model,
@@ -84,6 +85,19 @@ export class OdooV17Adapter implements OdooAdapter {
             warnings: this.normalizeOnchangeWarnings(result.warning),
             domains: this.normalizeOnchangeDomains(result.domain),
         };
+    }
+
+    private buildOnchangeFieldsSpec(request: OnchangeRequest): OdooFieldsSpec {
+        const fieldNames = Array.from(new Set([
+            ...(request.fields ?? []),
+            ...Object.keys(request.values ?? {}),
+            request.triggerField,
+        ].filter((fieldName): fieldName is string => typeof fieldName === 'string' && fieldName.length > 0)));
+
+        return fieldNames.reduce<OdooFieldsSpec>((spec, fieldName) => {
+            spec[fieldName] = {};
+            return spec;
+        }, {});
     }
 
     async updateRecord(

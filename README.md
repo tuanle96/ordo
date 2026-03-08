@@ -41,14 +41,14 @@ The middleware handles version differences, authentication, and schema introspec
 | **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema        | —                                                         |
 | **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list with table/grid view modes, sortable columns, pull-to-refresh for `res.partner`, `crm.lead`, and narrow `sale.order` |
 | **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay, plus relation search for supported `many2one` editors |
-| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | New-record flow plus edit mode for `char`, `text`, `integer`, `float`, `date`, `datetime`, `boolean`, `selection`, `many2one`, `many2many` tags; save/discard UX; dirty tracking; required-field + format validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` *(unit-validated; deterministic create-flow UI/E2E coverage still pending)* |
-| **Chatter**              | `GET /records/:model/:id/chatter` (paginated thread read), `POST /records/:model/:id/chatter/note` (post internal note), `GET /records/:model/:id/chatter/details` (followers + activities), `POST/DELETE /records/:model/:id/chatter/follow`, `POST /records/:model/:id/chatter/activities/:activityId/done` | Lazy-loaded chatter section below record form with thread display, author info, timestamps, send-note UX, follower state, follower list, and activity completion |
+| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | New-record flow plus edit mode for `char`, `text`, `integer`, `float`, `date`, `datetime`, `boolean`, `selection`, `many2one`, `many2many` tags; read-mode workflow action buttons with confirm/loading UX; save/discard UX; dirty tracking; required-field + format validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` *(workflow actions unit-validated; deterministic create-flow and action UI stabilization still pending)* |
+| **Chatter**              | `GET /records/:model/:id/chatter` (paginated thread read), `POST /records/:model/:id/chatter/note` (post internal note), `GET /records/:model/:id/chatter/details` (followers + activities + activity types), `POST/DELETE /records/:model/:id/chatter/follow`, `POST /records/:model/:id/chatter/activities` (schedule new activity), `POST /records/:model/:id/chatter/activities/:activityId/done` | Lazy-loaded chatter section below record form with thread display, author info, timestamps, send-note UX, follower state, follower list, activity scheduling, and activity completion |
 | **Offline Cache**        | —                                                           | File-based cache with actor isolation, stale-data banners |
 | **Health Check**         | `GET /health` (unprefixed)                                  | —                                                         |
 
 ### 🚧 Planned
 
-Nested `one2many` editors, kanban/grouping views, file upload, chatter activity scheduling / richer follower management / attachments, offline mutation queue, deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
+Nested `one2many` editors, kanban/grouping views, file upload, richer follower management / chatter attachments / broader mail parity, offline mutation queue, deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
 
 ---
 
@@ -254,9 +254,10 @@ All endpoints are prefixed with `/api/v1/mobile` (configurable via `API_PREFIX` 
 | `POST` | `/records/:model/:id/actions/:name` | Bearer | Execute a record-level action |
 | `GET`  | `/records/:model/:id/chatter` | Bearer | Read paginated chatter thread |
 | `POST` | `/records/:model/:id/chatter/note` | Bearer | Post an internal chatter note |
-| `GET`  | `/records/:model/:id/chatter/details` | Bearer | Read chatter followers and active activities |
+| `GET`  | `/records/:model/:id/chatter/details` | Bearer | Read chatter followers, active activities, and available activity types |
 | `POST` | `/records/:model/:id/chatter/follow` | Bearer | Follow the record as the current user |
 | `DELETE` | `/records/:model/:id/chatter/follow` | Bearer | Unfollow the record as the current user |
+| `POST` | `/records/:model/:id/chatter/activities` | Bearer | Schedule a new activity assigned to the current user |
 | `POST` | `/records/:model/:id/chatter/activities/:activityId/done` | Bearer | Mark an activity done with optional feedback |
 | `GET`  | `/search/:model`      | Bearer | Name search (autocomplete)         |
 

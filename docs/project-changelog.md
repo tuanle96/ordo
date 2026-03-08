@@ -1,5 +1,57 @@
 # Project Changelog
 
+## 2026-03-09 (Chatter Activity Scheduling MVP)
+
+### Added
+
+- **Shared chatter scheduling contracts** for available activity types plus `ScheduleChatterActivityRequest`
+- **Backend scheduling endpoint** at `POST /api/v1/mobile/records/:model/:id/chatter/activities` returning refreshed chatter details
+- **Odoo adapter scheduling support** using native `activity_schedule(...)` with current-user assignment and model-aware activity type lookup
+- **iOS chatter scheduling flow** with available activity types, narrow composer submission, and refreshed activity list rendering after success
+- **Focused regression coverage** for backend scheduling delegation/route behavior and iOS chatter schedule refresh behavior
+
+### Changed
+
+- `GET /api/v1/mobile/records/:model/:id/chatter/details` now also returns available activity types so the iOS app can render the schedule composer without a second metadata fetch
+- iOS chatter tests now materialize streamed request bodies before assertions, avoiding false negatives for POST payload inspection in transport-backed unit tests
+- Activity deadline formatting now preserves the user-selected local calendar day instead of shifting dates through UTC during request encoding
+
+### Verified
+
+- `npm run build` — shared + backend builds cleanly after the chatter scheduling contract expansion
+- `npm test --workspace backend -- --runInBand record-chatter.e2e.spec.ts record.service.spec.ts odoo-v17.adapter.spec.ts` — focused backend scheduling coverage passes (3 suites / 17 tests)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordChatterViewModelTests test` — targeted chatter viewmodel tests pass, including schedule activity refresh coverage
+
+### Notes
+
+- This MVP intentionally keeps assignment fixed to the current user and stops short of edit/delete/reassign flows
+- Richer follower management, chatter attachments, and broader mail wizard parity remain deferred follow-up work
+
+## 2026-03-08 (iOS Workflow Action Buttons UI)
+
+### Added
+
+- **Typed iOS record-action transport** via `RecordActionRequest` / `RecordActionResult` support in `APIClient`
+- **Record detail workflow action execution state** with visible-action filtering, single-flight protection, inline success/error feedback, and cache refresh after successful actions
+- **Schema-driven action button UI** in `RecordDetailView` for persisted read-mode records, including confirm dialogs and per-button loading state
+- **Mutable UI-test workflow fixtures** for `sale.order` confirmation and focused unit coverage for action visibility + action payload execution
+
+### Changed
+
+- Header actions now respect the same modifier/invisibility evaluation pattern already used by schema fields, so workflow buttons hide automatically after record state transitions
+- URLProtocol-based test harnesses now materialize streamed request bodies reliably before decoding POST payloads, removing false-negative assertions in action/onchange coverage
+
+### Verified
+
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -derivedDataPath /tmp/ordo-workflow-build-3 -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after the workflow action slice
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -derivedDataPath /tmp/ordo-workflow-tests-unit-2 -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — new workflow-action and onchange tests pass; one unrelated existing chatter test (`RecordChatterViewModelTests/scheduleActivityRefreshesActivities`) still failed in the broader suite during this session
+- Independent code review found no critical blockers in transport, visibility handling, create/edit isolation, or cache/state management
+
+### Notes
+
+- This slice intentionally stays **read-mode only** for persisted records; create-mode and edit-mode workflow execution remain deferred
+- Targeted simulator UI verification for the new confirm flow was attempted, but the current environment did not produce a clean green run in-session; mutable fixtures and accessibility hooks are in place for follow-up stabilization
+
 ## 2026-03-08 (Odoo Onchange Phase 03 — iOS Draft Merge & Validation)
 
 ### Added
@@ -22,7 +74,31 @@
 ### Notes
 
 - Returned domains are captured in view-model state but not yet broadly applied across relation editors; that remains explicit Phase 04 follow-up work
-- Overall full-onchange plan remains in progress until rollout hardening and deferred semantics are documented in Phase 04
+- Phase 04 hardening later narrowed backend onchange `fields_spec` generation to the request-scoped view fields after live Odoo 17 validation exposed that the previous model-wide spec could fail closed with `403` for real `res.partner` onchange calls
+
+## 2026-03-08 (Odoo Onchange Phase 04 — Backend Hardening & Live Validation)
+
+### Added
+
+- **Backend fail-closed regression coverage** for unsupported onchange `value`, `warning`, and `domain` payload shapes
+- **Onchange DTO E2E coverage** confirming comma-delimited `fields` normalize correctly and invalid payloads return `400`
+- **Live validation notes** for a real `res.partner` onchange request against local Odoo 17
+
+### Changed
+
+- Backend onchange orchestration now builds a **request-scoped `fields_spec`** from the trigger field, submitted values, and requested view fields instead of fetching a model-wide spec from Odoo
+- This keeps the upstream onchange call aligned with the narrow mobile form slice and avoids pulling unrelated/inaccessible fields into the live Odoo snapshot
+
+### Verified
+
+- `npm test --workspace backend -- --runInBand odoo-v17.adapter.spec.ts schema-record-search.e2e.spec.ts` — targeted backend onchange regressions pass
+- `npm run build --workspace backend` — backend compiles after the request-scoped `fields_spec` change
+- Live backend validation via local Odoo 17 (`res.partner`, `email` trigger) now returns `201` from `POST /api/v1/mobile/records/res.partner/onchange` with a valid payload after the request-scoped spec fix
+
+### Notes
+
+- The validated live response for the current narrow slice was `{ "values": {} }`, which is acceptable for triggers that do not recompute any exposed fields
+- Broad returned-domain application and full x2many parity remain deferred follow-up work
 
 ## 2026-03-08 (Chatter Followers & Activities Slice)
 

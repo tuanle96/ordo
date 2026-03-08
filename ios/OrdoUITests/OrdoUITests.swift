@@ -292,7 +292,7 @@ final class OrdoUITests: XCTestCase {
         XCTAssertTrue(confirmButton.waitForExistence(timeout: standardTimeout))
         confirmButton.tap()
 
-        let statusValue = app.staticTexts["field-value-state"]
+        let statusValue = app.staticTexts["record-detail-status"]
         XCTAssertTrue(statusValue.waitForExistence(timeout: standardTimeout))
         XCTAssertEqual(statusValue.label, "Sales Order")
         XCTAssertFalse(actionButton.waitForExistence(timeout: 2))

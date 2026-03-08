@@ -90,9 +90,10 @@ struct RecordDetailView: View {
                             displayName: record["display_name"]?.displayText ?? record["name"]?.displayText ?? (isCreating ? "New \(schema.title)" : schema.title),
                             status: {
                                 if let statusField = schema.header.statusbar?.field,
-                                   let status = record[statusField]?.displayText,
-                                   status != "—" {
-                                    return status
+                                   let statusSchema = schema.allFields.first(where: { $0.name == statusField }),
+                                   let rawStatus = record[statusField] {
+                                    let formattedStatus = FieldRowFactory.formattedValue(for: statusSchema, rawValue: rawStatus)
+                                    return formattedStatus == "—" ? nil : formattedStatus
                                 }
                                 return nil
                             }()

@@ -20,6 +20,7 @@ struct RecordHeaderCard: View {
                     .padding(.horizontal, OrdoSpacing.md)
                     .padding(.vertical, OrdoSpacing.xs + 2)
                     .background(OrdoColors.accentLight, in: Capsule())
+                    .accessibilityIdentifier("record-detail-status")
             }
         }
         .frame(maxWidth: .infinity)

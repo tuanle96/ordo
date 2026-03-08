@@ -178,6 +178,16 @@ The current dynamic-form slice hardens modifier correctness without attempting f
 - **Specific Odoo error translation** now maps common upstream permission, missing-record, and business-validation failures into clearer HTTP responses before they reach the mobile client
 - **Explicit non-goal retained**: no full onchange engine yet; server-driven onchange still needs round-trip mutation previews, dependency ordering, and draft-merge semantics beyond this hardening slice
 
+## Odoo onchange foundation scope (2026-03-08)
+
+The current onchange architecture now covers the first honest server-backed slice without claiming full Odoo parity:
+
+- **Explicit shared onchange contracts** (`OnchangeRequest`, `OnchangeResult`, `OnchangeWarning`, `OnchangeFieldMeta`) define a narrow transport for trigger field, current draft values, optional record identity, returned values, warnings, and domains
+- **Backend orchestration path** adds `POST /records/:model/onchange`, which resolves the upstream Odoo session, fetches a fields spec, calls Odoo's `onchange`, and normalizes value/warning/domain payloads fail-closed before returning them to iOS
+- **Schema-declared trigger metadata** means only fields explicitly marked by the parsed mobile schema participate in the first rollout; this avoids pretending every field/widget/context side effect is supported
+- **iOS draft-merge lifecycle** centralizes edits in `RecordDetailViewModel`, debounces text-like changes, cancels superseded requests, and merges returned values through `FormDraft` with field-version protection so stale responses cannot overwrite newer user edits
+- **Current support boundary is narrow by design**: inline warning display and stored returned domains are supported, but broad relation-editor domain application, offline replay, and full `one2many`/`many2many` parity remain deferred follow-up work
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:
