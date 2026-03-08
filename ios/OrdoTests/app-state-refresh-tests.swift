@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Ordo
 
+@Suite(.serialized)
 @MainActor
 struct AppStateRefreshTests {
     @Test
@@ -64,6 +65,48 @@ struct AppStateRefreshTests {
         #expect(appState.session?.accessToken == "refreshed-access")
         #expect(appState.session?.refreshToken == "refreshed-refresh")
         #expect(appState.currentPrincipal?.uid == 1)
+    }
+
+    @Test
+    func restoreSessionClearsSavedSessionWhenRefreshFails() async throws {
+        let defaults = UserDefaults(suiteName: "com.ordo.app.tests.refresh.failure") ?? .standard
+        let sessionStore = UserDefaultsSessionStore(defaults: defaults, key: "refresh-session-failure")
+        try? sessionStore.clear()
+
+        let expiredSession = StoredSession(
+            backendBaseURL: URL(string: AppConfig.fallbackBaseURL)!,
+            odooURL: "http://127.0.0.1:38421",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "expired-access",
+            refreshToken: "bad-refresh-token",
+            expiresAt: .now.addingTimeInterval(-120),
+            user: AuthUser(id: 1, name: "Demo Admin", email: "admin@example.com", lang: "en_US", tz: "UTC", avatarUrl: nil)
+        )
+        try sessionStore.save(expiredSession)
+
+        RefreshTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/refresh") {
+                return (401, Data())
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RefreshTestURLProtocol.self]
+        let apiClient = APIClient(baseURL: URL(string: AppConfig.fallbackBaseURL)!, session: URLSession(configuration: configuration))
+        let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let appState = AppState(config: .preview, sessionStore: sessionStore, apiClient: apiClient, cacheStore: cacheStore)
+
+        await appState.restoreSession()
+
+        #expect(appState.phase == .login)
+        #expect(appState.session == nil)
+        #expect(appState.currentPrincipal == nil)
+        #expect(appState.statusMessage == "Your saved session could not be restored. Please sign in again.")
     }
 }
 

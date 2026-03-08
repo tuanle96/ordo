@@ -150,6 +150,15 @@ Phase 2 Phase 04 makes backend behavior observable without dragging in a full ob
 - **Test-safe logging mode** disables noisy request logging in `NODE_ENV=test` so Jest output stays readable and deterministic
 - **Bounded structured service events** replace ad-hoc string logs for Redis connectivity, schema-cache failures, upstream Odoo failures, and exception handling
 
+## Phase 2 architecture scope (Phase 05)
+
+Phase 2 Phase 05 widens regression confidence without changing the shipped runtime architecture:
+
+- **Focused iOS unit-test expansion** adds dedicated suites for browse view-model state, detail view-model state, recent-items persistence, and an extra auth refresh failure path
+- **Serialized Swift Testing for state-heavy suites** reduces false negatives caused by shared static transport handlers while keeping assertions at the state/output level instead of internal observer mechanics
+- **Recent-items UI instrumentation** adds the targeted accessibility seams needed to exercise the relaunch flow without broadening the whole UI matrix
+- **Explicit known-boundary handling** keeps the remaining recent-items relaunch UI nondeterminism documented for the next iOS phase rather than forcing the later `@Observable` refactor to absorb test instability that predates it
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:

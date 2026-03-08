@@ -11,12 +11,26 @@ struct RecentItem: Codable, Identifiable, Hashable {
 }
 
 final class RecentItemsStore: ObservableObject {
-    private static let storageKey = "ordo.recentItems"
-    private static let maxItems = 10
+    private static let defaultStorageKey = "ordo.recentItems"
+    private static let defaultMaxItems = 10
+
+    private let defaults: UserDefaults
+    private let storageKey: String
+    private let maxItems: Int
+    private let dateProvider: () -> Date
 
     @Published private(set) var items: [RecentItem] = []
 
-    init() {
+    init(
+        defaults: UserDefaults = .standard,
+        storageKey: String = defaultStorageKey,
+        maxItems: Int = defaultMaxItems,
+        dateProvider: @escaping () -> Date = Date.init,
+    ) {
+        self.defaults = defaults
+        self.storageKey = storageKey
+        self.maxItems = maxItems
+        self.dateProvider = dateProvider
         load()
     }
 
@@ -28,12 +42,12 @@ final class RecentItemsStore: ObservableObject {
             model: model,
             recordID: recordID,
             displayName: displayName,
-            timestamp: Date()
+            timestamp: dateProvider()
         )
         current.insert(item, at: 0)
 
-        if current.count > Self.maxItems {
-            current = Array(current.prefix(Self.maxItems))
+        if current.count > maxItems {
+            current = Array(current.prefix(maxItems))
         }
 
         items = current
@@ -42,11 +56,11 @@ final class RecentItemsStore: ObservableObject {
 
     func clear() {
         items = []
-        UserDefaults.standard.removeObject(forKey: Self.storageKey)
+        defaults.removeObject(forKey: storageKey)
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+        guard let data = defaults.data(forKey: storageKey),
               let decoded = try? JSONDecoder().decode([RecentItem].self, from: data) else {
             return
         }
@@ -55,6 +69,6 @@ final class RecentItemsStore: ObservableObject {
 
     private func save() {
         guard let data = try? JSONEncoder().encode(items) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
+        defaults.set(data, forKey: storageKey)
     }
 }

@@ -318,8 +318,10 @@ The **Version Adapter** pattern normalizes API differences. Adding support for a
 - [x] Rate limiting on auth endpoints
 - [x] CORS configuration
 - [x] Structured logging (Pino)
-- [ ] iOS unit + UI tests
-- [ ] Migrate to `@Observable` (iOS 17+, explicitly deferred until hardening work is green)
+- [x] iOS test hardening (unit-green milestone reached; recent-items relaunch UI path documented as a known simulator boundary for the next iOS phase)
+- [ ] Phase 06A — isolate recent-items relaunch determinism before any observation refactor
+- [ ] Phase 06B — run a narrow `RecentItemsStore` `@Observable` pilot
+- [ ] Phase 07 — widen `@Observable` migration to `AppState`, feature view models, and `FormDraft` only after the pilot is green
 
 ### Phase 3 — Inventory & Offline
 

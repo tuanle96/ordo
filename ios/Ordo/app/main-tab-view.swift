@@ -25,6 +25,7 @@ struct MainTabView: View {
             }
         }
         .tint(OrdoColors.accent)
+        .accessibilityIdentifier("main-tab-screen")
     }
 }
 

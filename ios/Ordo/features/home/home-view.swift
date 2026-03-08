@@ -114,6 +114,7 @@ struct HomeView: View {
                                             }
                                             .padding(.vertical, OrdoSpacing.sm)
                                         }
+                                        .accessibilityIdentifier("recent-item-\(descriptor.model)-\(item.recordID)")
 
                                         if index < min(recentItems.items.count, 5) - 1 {
                                             Divider()

@@ -23,6 +23,7 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("launching-screen")
                     .navigationTitle("Ordo")
                 }
             case .login:

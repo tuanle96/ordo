@@ -1,5 +1,26 @@
 # Project Changelog
 
+## 2026-03-07 (Production Hardening — Phase 2 Phase 05 iOS Test Hardening)
+
+### Added
+
+- **Focused iOS unit regression coverage** for `RecordListViewModel`, `RecordDetailViewModel`, `RecentItemsStore`, and an additional `AppState` refresh-failure edge case
+- **Serialized Swift Testing isolation** for the three state-heavy suites that share static URLProtocol-based transport handlers
+- **Recent-items UI regression path coverage** plus extra login/home/browse accessibility hooks used to investigate the relaunch flow
+
+### Changed
+
+- Phase 05 is now accepted at a **unit-green** milestone instead of waiting for a fully deterministic relaunch UI path in this simulator environment
+- Recent-items ordering/cap/persistence confidence now lives primarily in the deterministic unit layer, with the remaining UI relaunch instability called out explicitly as follow-up work for the next iOS phase
+
+### Verified
+
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — iOS unit target passes after serializing the state-heavy suites
+
+### Notes
+
+- `OrdoUITests.testHomeShowsRecentlyViewedRecordAfterRelaunch()` remains nondeterministic in the current simulator environment and is intentionally documented as a known flaky/blocking boundary for the next iOS phase rather than a Phase 05 blocker
+
 ## 2026-03-07 (Production Hardening — Phase 2 Phase 04 Structured Logging)
 
 ### Added

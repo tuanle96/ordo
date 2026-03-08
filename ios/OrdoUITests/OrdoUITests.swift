@@ -9,6 +9,9 @@ import XCTest
 
 final class OrdoUITests: XCTestCase {
     private let backendURL = "http://127.0.0.1:3000/api/v1/mobile"
+    private let odooURL = "http://127.0.0.1:38421"
+    private let database = "odoo17"
+    private let username = "admin"
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -227,6 +230,28 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testHomeShowsRecentlyViewedRecordAfterRelaunch() throws {
+        let firstLaunch = makeApp(resetStorage: true)
+        firstLaunch.launch()
+
+        signIn(firstLaunch)
+        firstLaunch.tabBars.buttons["Browse"].tap()
+        XCTAssertTrue(firstLaunch.buttons["browse-model-res-partner"].waitForExistence(timeout: 10))
+        firstLaunch.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(firstLaunch.buttons["record-row-1"].waitForExistence(timeout: 10))
+        firstLaunch.buttons["record-row-1"].tap()
+        XCTAssertTrue(firstLaunch.staticTexts["record-detail-title"].waitForExistence(timeout: 10))
+
+        firstLaunch.terminate()
+
+        let secondLaunch = makeApp(resetStorage: false)
+        secondLaunch.launch()
+
+        XCTAssertTrue(secondLaunch.otherElements["main-tab-screen"].waitForExistence(timeout: 10))
+        XCTAssertTrue(secondLaunch.buttons["recent-item-res.partner-1"].waitForExistence(timeout: 10))
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             let app = makeApp(resetStorage: true)
@@ -245,18 +270,46 @@ final class OrdoUITests: XCTestCase {
     private func signIn(_ app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars["Sign In"].waitForExistence(timeout: 5))
 
+        let odooField = app.textFields["login-odoo-url-field"]
+        XCTAssertTrue(odooField.waitForExistence(timeout: 5))
+        odooField.replaceTextIfNeeded(odooURL)
+
+        let databaseField = app.textFields["login-database-field"]
+        XCTAssertTrue(databaseField.waitForExistence(timeout: 5))
+        databaseField.replaceTextIfNeeded(database)
+
+        let usernameField = app.textFields["login-username-field"]
+        XCTAssertTrue(usernameField.waitForExistence(timeout: 5))
+        usernameField.replaceTextIfNeeded(username)
+
+        let advancedSettingsButton = app.buttons["Advanced Settings"]
+        XCTAssertTrue(advancedSettingsButton.waitForExistence(timeout: 5))
+
+        if !app.textFields["login-backend-url-field"].exists {
+            advancedSettingsButton.tap()
+        }
+
         let backendField = app.textFields["login-backend-url-field"]
-        XCTAssertTrue(backendField.waitForExistence(timeout: 2))
-        backendField.clearAndTypeText(backendURL)
+        XCTAssertTrue(backendField.waitForExistence(timeout: 5))
+        backendField.replaceTextIfNeeded(backendURL)
 
         let passwordField = app.secureTextFields["login-password-field"]
-        XCTAssertTrue(passwordField.waitForExistence(timeout: 2))
+        XCTAssertTrue(passwordField.waitForExistence(timeout: 5))
         passwordField.tap()
         passwordField.typeText("admin")
 
+        let keyboardDoneButton = app.buttons["Done"]
+        if keyboardDoneButton.exists {
+            keyboardDoneButton.tap()
+        }
+
         let submitButton = app.buttons["login-submit-button"]
+        XCTAssertTrue(submitButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(submitButton.waitForEnabled(timeout: 5))
         XCTAssertTrue(submitButton.isHittable)
         submitButton.tap()
+
+        XCTAssertTrue(app.otherElements["main-tab-screen"].waitForExistence(timeout: 10))
     }
 }
 
@@ -270,5 +323,16 @@ private extension XCUIElement {
         }
 
         typeText(text)
+    }
+
+    func replaceTextIfNeeded(_ text: String) {
+        guard (value as? String) != text else { return }
+        clearAndTypeText(text)
+    }
+
+    func waitForEnabled(timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "isEnabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: self)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 }

@@ -116,10 +116,12 @@ struct LoginView: View {
                         Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote)
                             .foregroundStyle(OrdoColors.danger)
+                            .accessibilityIdentifier("login-error-message")
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
+            .accessibilityIdentifier("login-screen")
             .navigationTitle("Sign In")
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
