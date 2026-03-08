@@ -2,6 +2,7 @@ import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/comm
 
 import type {
     ChatterActivity,
+    ChatterActivityTypeOption,
     ChatterDetailsResult,
     ChatterFollower,
     ChatterMessage,
@@ -252,7 +253,7 @@ export class OdooV17Adapter implements OdooAdapter {
             ['res_model', '=', model],
         ];
 
-        const [followersRaw, followersCount, selfFollowerRaw, activitiesRaw] = await Promise.all([
+        const [followersRaw, followersCount, selfFollowerRaw, activitiesRaw, activityTypesRaw] = await Promise.all([
             this.odooRpcService.callKwWithSession<OdooFormattedFollower[]>({
                 session,
                 model,
@@ -291,6 +292,21 @@ export class OdooV17Adapter implements OdooAdapter {
                     order: 'date_deadline asc, id asc',
                 },
             }),
+            this.odooRpcService.callKwWithSession<OdooActivityTypeRecord[]>({
+                session,
+                model: 'mail.activity.type',
+                method: 'search_read',
+                args: [[
+                    ['active', '=', true],
+                    '|',
+                    ['res_model', '=', false],
+                    ['res_model', '=', model],
+                ]],
+                kwargs: {
+                    fields: ['id', 'name', 'summary', 'icon', 'default_note'],
+                    order: 'sequence asc, id asc',
+                },
+            }),
         ]);
 
         const followers = followersRaw.map((follower) => this.mapChatterFollower(follower, currentPartnerId));
@@ -302,6 +318,7 @@ export class OdooV17Adapter implements OdooAdapter {
             followersCount,
             selfFollower,
             activities: activitiesRaw.map((activity) => this.mapChatterActivity(activity)),
+            availableActivityTypes: activityTypesRaw.map((activityType) => this.mapChatterActivityType(activityType)),
         };
     }
 
@@ -402,6 +419,67 @@ export class OdooV17Adapter implements OdooAdapter {
         return this.getChatterDetails(session, model, id);
     }
 
+    async scheduleChatterActivity(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        activityTypeId: number,
+        values?: {
+            summary?: string;
+            note?: string;
+            dateDeadline?: string;
+        },
+    ): Promise<ChatterDetailsResult> {
+        const matchingTypes = await this.odooRpcService.callKwWithSession<Array<{ id: number }>>({
+            session,
+            model: 'mail.activity.type',
+            method: 'search_read',
+            args: [[
+                ['id', '=', activityTypeId],
+                ['active', '=', true],
+                '|',
+                ['res_model', '=', false],
+                ['res_model', '=', model],
+            ]],
+            kwargs: {
+                limit: 1,
+                fields: ['id'],
+            },
+        });
+
+        if (matchingTypes.length === 0) {
+            throw new NotFoundException(`Activity type ${activityTypeId} is not available for ${model}`);
+        }
+
+        const kwargs: Record<string, unknown> = {
+            activity_type_id: activityTypeId,
+            user_id: session.uid,
+            automated: false,
+        };
+
+        if (values?.summary) {
+            kwargs.summary = values.summary;
+        }
+
+        if (values?.note) {
+            kwargs.note = values.note;
+        }
+
+        if (values?.dateDeadline) {
+            kwargs.date_deadline = values.dateDeadline;
+        }
+
+        await this.odooRpcService.callKwWithSession<unknown>({
+            session,
+            model,
+            method: 'activity_schedule',
+            args: [[id]],
+            kwargs,
+        });
+
+        return this.getChatterDetails(session, model, id);
+    }
+
     private mapChatterMessage(message: OdooFormattedMessage): ChatterMessage {
         return {
             id: message.id,
@@ -453,6 +531,16 @@ export class OdooV17Adapter implements OdooAdapter {
             state: activity.state ?? 'planned',
             canWrite: activity.can_write ?? false,
             assignedUser,
+        };
+    }
+
+    private mapChatterActivityType(activityType: OdooActivityTypeRecord): ChatterActivityTypeOption {
+        return {
+            id: activityType.id,
+            name: activityType.name,
+            summary: this.normalizeOptionalString(activityType.summary),
+            icon: this.normalizeOptionalString(activityType.icon),
+            defaultNote: this.normalizeOptionalString(activityType.default_note),
         };
     }
 
@@ -610,4 +698,12 @@ interface OdooFormattedActivity {
     state?: string;
     can_write?: boolean;
     user_id?: OdooRelationValue;
+}
+
+interface OdooActivityTypeRecord {
+    id: number;
+    name: string;
+    summary?: string | false;
+    icon?: string | false;
+    default_note?: string | false;
 }

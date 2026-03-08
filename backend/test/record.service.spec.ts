@@ -45,6 +45,7 @@ describe('RecordService chatter', () => {
             followersCount: 0,
             selfFollower: undefined,
             activities: [],
+            availableActivityTypes: [],
         };
         const adapter = { getChatterDetails: jest.fn().mockResolvedValue(details) };
         const adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
@@ -61,6 +62,7 @@ describe('RecordService chatter', () => {
             followersCount: 0,
             selfFollower: undefined,
             activities: [],
+            availableActivityTypes: [],
         };
         const adapter = {
             followRecord: jest.fn().mockResolvedValue(details),
@@ -83,6 +85,7 @@ describe('RecordService chatter', () => {
             followersCount: 0,
             selfFollower: undefined,
             activities: [],
+            availableActivityTypes: [],
         };
         const adapter = { completeChatterActivity: jest.fn().mockResolvedValue(details) };
         const adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
@@ -91,6 +94,34 @@ describe('RecordService chatter', () => {
 
         await expect(service.completeChatterActivity(odooFixtures.tokenPayload as never, 'res.partner', 3, 44, { feedback: 'Done' })).resolves.toEqual(details);
         expect(adapter.completeChatterActivity).toHaveBeenCalledWith({ cookieHeader: 'session_id=abc123' }, 'res.partner', 3, 44, 'Done');
+    });
+
+    it('delegates chatter activity scheduling to the resolved adapter', async () => {
+        const details: ChatterDetailsResult = {
+            followers: [],
+            followersCount: 0,
+            selfFollower: undefined,
+            activities: [],
+            availableActivityTypes: [],
+        };
+        const adapter = { scheduleChatterActivity: jest.fn().mockResolvedValue(details) };
+        const adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
+        const sessionStore = { getOrThrow: jest.fn().mockResolvedValue({ cookieHeader: 'session_id=abc123' }) };
+        const service = new RecordService(adapterFactory as never, sessionStore as never);
+
+        await expect(service.scheduleChatterActivity(odooFixtures.tokenPayload as never, 'res.partner', 3, {
+            activityTypeId: 5,
+            summary: 'Call customer',
+            note: 'Ask for update',
+            dateDeadline: '2026-03-12',
+        })).resolves.toEqual(details);
+        expect(adapter.scheduleChatterActivity).toHaveBeenCalledWith(
+            { cookieHeader: 'session_id=abc123' },
+            'res.partner',
+            3,
+            5,
+            { summary: 'Call customer', note: 'Ask for update', dateDeadline: '2026-03-12' },
+        );
     });
 
     it('delegates onchange requests to the resolved adapter', async () => {

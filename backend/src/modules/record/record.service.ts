@@ -22,6 +22,7 @@ import { RecordActionDto } from './dto/record-action.dto';
 import { ChatterQueryDto } from './dto/chatter-query.dto';
 import { CompleteChatterActivityDto } from './dto/complete-chatter-activity.dto';
 import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
+import { ScheduleChatterActivityDto } from './dto/schedule-chatter-activity.dto';
 import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordOnchangeDto } from './dto/record-onchange.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
@@ -131,6 +132,20 @@ export class RecordService {
     ): Promise<ChatterDetailsResult> {
         const { session, adapter } = await this.resolveContext(currentUser);
         return adapter.completeChatterActivity(session, model, id, activityId, body.feedback);
+    }
+
+    async scheduleChatterActivity(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+        body: ScheduleChatterActivityDto,
+    ): Promise<ChatterDetailsResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.scheduleChatterActivity(session, model, id, body.activityTypeId, {
+            summary: body.summary,
+            note: body.note,
+            dateDeadline: body.dateDeadline,
+        });
     }
 
     async createRecord(

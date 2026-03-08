@@ -33,6 +33,7 @@ import { RecordActionDto } from './dto/record-action.dto';
 import { RecordOnchangeDto } from './dto/record-onchange.dto';
 import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
+import { ScheduleChatterActivityDto } from './dto/schedule-chatter-activity.dto';
 import { RecordService } from './record.service';
 
 @UseGuards(JwtAuthGuard)
@@ -86,6 +87,16 @@ export class RecordController {
         @Body() body: PostChatterNoteDto,
     ): Promise<ChatterMessage> {
         return this.recordService.postChatterNote(currentUser, model, id, body);
+    }
+
+    @Post(':model/:id/chatter/activities')
+    scheduleChatterActivity(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: ScheduleChatterActivityDto,
+    ): Promise<ChatterDetailsResult> {
+        return this.recordService.scheduleChatterActivity(currentUser, model, id, body);
     }
 
     @Post(':model/:id/chatter/follow')

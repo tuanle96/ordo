@@ -12,10 +12,12 @@ final class RecordChatterViewModel {
     private(set) var followersCount = 0
     private(set) var selfFollower: ChatterFollower?
     private(set) var activities: [ChatterActivity] = []
+    private(set) var availableActivityTypes: [ChatterActivityTypeOption] = []
     private(set) var errorMessage: String?
     private(set) var isLoading = false
     private(set) var isPosting = false
     private(set) var isUpdatingFollow = false
+    private(set) var isSchedulingActivity = false
     private(set) var hasLoaded = false
     private(set) var hasMore = false
     private(set) var nextBefore: Int?
@@ -187,6 +189,53 @@ final class RecordChatterViewModel {
         }
     }
 
+    func scheduleActivity(
+        activityTypeId: Int,
+        summary: String,
+        note: String,
+        dateDeadline: Date?,
+        using appState: AppState
+    ) async -> Bool {
+        guard appState.session?.accessToken != nil else {
+            errorMessage = "Sign in again to schedule activities."
+            return false
+        }
+
+        isSchedulingActivity = true
+        errorMessage = nil
+        defer { isSchedulingActivity = false }
+
+        let trimmedSummary = trimmedOrNil(summary)
+        let trimmedNote = trimmedOrNil(note)
+        let formattedDeadline = dateDeadline.map { Self.deadlineFormatter.string(from: $0) }
+
+        do {
+            let result = try await appState.withAuthenticatedToken { token in
+                try await appState.apiClient.scheduleChatterActivity(
+                    model: self.model,
+                    id: self.recordID,
+                    activityTypeId: activityTypeId,
+                    summary: trimmedSummary,
+                    note: trimmedNote,
+                    dateDeadline: formattedDeadline,
+                    token: token
+                )
+            }
+
+            apply(details: result)
+            hasLoaded = true
+            return true
+        } catch {
+            Self.logger.error("Failed to schedule chatter activity for \(self.model, privacy: .public)#\(self.recordID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            if case APIClientError.unauthorized = error {
+                appState.signOut()
+            } else {
+                errorMessage = error.localizedDescription
+            }
+            return false
+        }
+    }
+
     private func apply(thread: ChatterThreadResult, details: ChatterDetailsResult) {
         messages = thread.messages
         hasMore = thread.hasMore
@@ -199,5 +248,20 @@ final class RecordChatterViewModel {
         followersCount = details.followersCount
         selfFollower = details.selfFollower
         activities = details.activities
+        availableActivityTypes = details.availableActivityTypes
     }
+
+    private func trimmedOrNil(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static let deadlineFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }

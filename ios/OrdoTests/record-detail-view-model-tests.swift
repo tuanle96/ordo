@@ -23,7 +23,7 @@ struct RecordDetailViewModelTests {
 
         let appState = try await makeRestoredAppState()
         try await appState.cacheStore.saveSchema(partnerSchema, for: "res.partner", scope: try #require(appState.cacheScope))
-        try await appState.cacheStore.saveRecord(partnerRecord, for: "res.partner", id: 1, scope: try #require(appState.cacheScope))
+        try await appState.cacheStore.saveRecord(detailPartnerRecord, for: "res.partner", id: 1, scope: try #require(appState.cacheScope))
 
         let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
         await viewModel.load(using: appState)
@@ -50,12 +50,12 @@ struct RecordDetailViewModelTests {
             }
 
             if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
-                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerRecord)))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecord)))
             }
 
             if path.contains("/records/res.partner/1") && request.httpMethod == "PATCH" {
                 patchRequestCount += 1
-                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 1, record: partnerRecord))))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 1, record: detailPartnerRecord))))
             }
 
             throw URLError(.unsupportedURL)
@@ -92,7 +92,7 @@ struct RecordDetailViewModelTests {
 
             if path.hasSuffix("/records/res.partner") && request.httpMethod == "POST" {
                 createRequestCount += 1
-                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 99, record: createdPartnerRecord))))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 99, record: detailCreatedPartnerRecord))))
             }
 
             throw URLError(.unsupportedURL)
@@ -131,7 +131,7 @@ struct RecordDetailViewModelTests {
             }
 
             if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
-                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerRecord)))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecord)))
             }
 
             if path.hasSuffix("/records/res.partner/onchange") && request.httpMethod == "POST" {
@@ -154,7 +154,7 @@ struct RecordDetailViewModelTests {
         let nameField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "name" }))
 
         viewModel.applyFieldEdit(.string("Acme"), for: nameField, draft: draft, using: appState)
-        try await Task.sleep(for: .milliseconds(1200))
+        await viewModel.waitForOnchangeToSettle()
 
         #expect(capturedRequest?.triggerField == "name")
         #expect(capturedRequest?.recordId == 1)
@@ -179,7 +179,7 @@ struct RecordDetailViewModelTests {
             }
 
             if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
-                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerRecord)))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecord)))
             }
 
             if path.hasSuffix("/records/res.partner/onchange") && request.httpMethod == "POST" {
@@ -215,13 +215,131 @@ struct RecordDetailViewModelTests {
         let nameField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "name" }))
 
         viewModel.applyFieldEdit(.string("Ac"), for: nameField, draft: draft, using: appState)
-        try await Task.sleep(for: .milliseconds(350))
+        try await Task.sleep(for: .milliseconds(500))
         viewModel.applyFieldEdit(.string("Ace"), for: nameField, draft: draft, using: appState)
-        try await Task.sleep(for: .milliseconds(1200))
+        await viewModel.waitForOnchangeToSettle()
 
         #expect(requestOrder.last == "Ace")
         #expect(draft.value(for: "name", fallback: nil) == .string("Ace"))
         #expect(draft.value(for: "nickname", fallback: nil) == .string("Fresh Nick"))
+    }
+
+    @Test
+    func createModeOnchangeOmitsRecordIdentifier() async throws {
+        var capturedRequest: OnchangeRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithOnchange)))
+            }
+
+            if path.hasSuffix("/records/res.partner/onchange") && request.httpMethod == "POST" {
+                capturedRequest = try JSONDecoder().decode(OnchangeRequest.self, from: try #require(request.httpBody))
+                return (201, try JSONEncoder().encode(DetailEnvelope(data: OnchangeResult(
+                    values: ["nickname": .string("Draft Nick")],
+                    warnings: nil,
+                    domains: nil
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: nil)
+        await viewModel.load(using: appState)
+
+        let draft = FormDraft(record: [:])
+        let nameField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "name" }))
+
+        viewModel.applyFieldEdit(.string("Prospect"), for: nameField, draft: draft, using: appState)
+        await viewModel.waitForOnchangeToSettle()
+
+        #expect(capturedRequest?.recordId == nil)
+        #expect(capturedRequest?.values["name"] == .string("Prospect"))
+        #expect(draft.value(for: "nickname", fallback: nil) == .string("Draft Nick"))
+    }
+
+    @Test
+    func visibleWorkflowActionsRespectCurrentRecordState() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/sale.order") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: saleOrderSchemaWithAction)))
+            }
+
+            if path.contains("/records/sale.order/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailDraftSaleOrderRecord)))
+            }
+
+            if path.contains("/records/sale.order/2") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailConfirmedSaleOrderRecord)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+
+        let draftViewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "sale.order" })), recordID: 1)
+        await draftViewModel.load(using: appState)
+        #expect(draftViewModel.visibleWorkflowActions.map(\.name) == ["action_confirm"])
+
+        let confirmedViewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "sale.order" })), recordID: 2)
+        await confirmedViewModel.load(using: appState)
+        #expect(confirmedViewModel.visibleWorkflowActions.isEmpty)
+    }
+
+    @Test
+    func runWorkflowActionPostsRequestAndUpdatesVisibleState() async throws {
+        var capturedActionRequest: RecordActionRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/sale.order") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: saleOrderSchemaWithAction)))
+            }
+
+            if path.contains("/records/sale.order/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailDraftSaleOrderRecord)))
+            }
+
+            if path.hasSuffix("/records/sale.order/1/actions/action_confirm") && request.httpMethod == "POST" {
+                capturedActionRequest = try JSONDecoder().decode(RecordActionRequest.self, from: try #require(request.httpBody))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordActionResult(id: 1, changed: true, record: detailConfirmedSaleOrderRecord))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "sale.order" })), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let action = try #require(viewModel.visibleWorkflowActions.first)
+        let didRun = await viewModel.runWorkflowAction(action, using: appState)
+
+        #expect(didRun == true)
+        #expect(capturedActionRequest?.fields?.contains("state") == true)
+        #expect(viewModel.record?["state"]?.stringValue == "sale")
+        #expect(viewModel.saveMessage == "Confirm completed.")
+        #expect(viewModel.visibleWorkflowActions.isEmpty)
     }
 
     private func makeRestoredAppState() async throws -> AppState {
@@ -240,6 +358,7 @@ struct RecordDetailViewModelTests {
         await appState.restoreSession()
         return appState
     }
+
 }
 
 private let partnerSchema = MobileFormSchema(
@@ -266,18 +385,62 @@ private let partnerSchemaWithOnchange = MobileFormSchema(
     hasChatter: false
 )
 
-private let partnerRecord: RecordData = [
+private let detailPartnerRecord: RecordData = [
     "id": .number(1),
     "display_name": .string("Azure Interior"),
     "name": .string("Azure Interior"),
     "nickname": .string("VIP 1"),
 ]
 
-private let createdPartnerRecord: RecordData = [
+private let detailCreatedPartnerRecord: RecordData = [
     "id": .number(99),
     "display_name": .string("New Customer"),
     "name": .string("New Customer"),
     "nickname": .null,
+]
+
+private let saleOrderSchemaWithAction = MobileFormSchema(
+    model: "sale.order",
+    title: "Sales Order",
+    header: FormHeader(statusbar: .init(field: "state", visibleStates: nil), actions: [
+        ActionButton(
+            name: "action_confirm",
+            label: "Confirm",
+            type: "object",
+            style: "primary",
+            modifiers: FieldModifiers(
+                invisible: ModifierRule(
+                    type: "condition",
+                    condition: Condition(field: "state", op: "==", value: .string("sale"), values: nil),
+                    rules: nil,
+                    constant: nil
+                ),
+                readonly: nil,
+                required: nil
+            ),
+            confirm: "Confirm this quotation?"
+        ),
+    ]),
+    sections: [FormSection(label: "Order", fields: [
+        FieldSchema(name: "name", type: .char, label: "Order", required: true, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "state", type: .selection, label: "Status", required: nil, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: [["draft", "Quotation"], ["sale", "Sales Order"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: "statusbar"),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
+private let detailDraftSaleOrderRecord: RecordData = [
+    "id": .number(1),
+    "display_name": .string("S00045"),
+    "name": .string("S00045"),
+    "state": .string("draft"),
+]
+
+private let detailConfirmedSaleOrderRecord: RecordData = [
+    "id": .number(1),
+    "display_name": .string("S00045"),
+    "name": .string("S00045"),
+    "state": .string("sale"),
 ]
 
 private final class DetailViewModelTestURLProtocol: URLProtocol {
@@ -288,7 +451,8 @@ private final class DetailViewModelTestURLProtocol: URLProtocol {
     override func startLoading() {
         guard let client, let url = request.url, let requestHandler = Self.requestHandler else { return }
         do {
-            let (statusCode, data) = try requestHandler(request)
+            let normalizedRequest = request.withMaterializedHTTPBody()
+            let (statusCode, data) = try requestHandler(normalizedRequest)
             let response = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
             client.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client.urlProtocol(self, didLoad: data)
@@ -296,6 +460,43 @@ private final class DetailViewModelTestURLProtocol: URLProtocol {
         } catch {
             client.urlProtocol(self, didFailWithError: error)
         }
+    }
+}
+
+private extension URLRequest {
+    func withMaterializedHTTPBody() -> URLRequest {
+        guard httpBody == nil, let httpBodyStream else { return self }
+
+        let data = Data(reading: httpBodyStream)
+        var request = self
+        request.httpBody = data.isEmpty ? nil : data
+        return request
+    }
+}
+
+private extension Data {
+    init(reading stream: InputStream) {
+        stream.open()
+        defer { stream.close() }
+
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        var data = Data()
+
+        while true {
+            let readCount = stream.read(&buffer, maxLength: buffer.count)
+
+            if readCount < 0 {
+                break
+            }
+
+            if readCount == 0 {
+                break
+            }
+
+            data.append(buffer, count: readCount)
+        }
+
+        self = data
     }
 }
 

@@ -100,6 +100,26 @@ final class APIClient {
         return try await perform(route: "records/\(model)/\(id)/chatter/activities/\(activityId)/done", method: "POST", token: token, body: payload)
     }
 
+    func scheduleChatterActivity(
+        model: String,
+        id: Int,
+        activityTypeId: Int,
+        summary: String? = nil,
+        note: String? = nil,
+        dateDeadline: String? = nil,
+        token: String
+    ) async throws -> ChatterDetailsResult {
+        let payload = try JSONEncoder().encode(
+            ScheduleChatterActivityRequest(
+                activityTypeId: activityTypeId,
+                summary: summary,
+                note: note,
+                dateDeadline: dateDeadline
+            )
+        )
+        return try await perform(route: "records/\(model)/\(id)/chatter/activities", method: "POST", token: token, body: payload)
+    }
+
     func updateRecord(
         model: String,
         id: Int,
@@ -119,6 +139,22 @@ final class APIClient {
     ) async throws -> RecordMutationResult {
         let body = try JSONEncoder().encode(RecordMutationRequest(values: values, fields: fields))
         return try await perform(route: "records/\(model)", method: "POST", token: token, body: body)
+    }
+
+    func runRecordAction(
+        model: String,
+        id: Int,
+        actionName: String,
+        fields: [String],
+        token: String
+    ) async throws -> RecordActionResult {
+        let body = try JSONEncoder().encode(RecordActionRequest(fields: fields))
+        return try await perform(
+            route: "records/\(model)/\(id)/actions/\(actionName)",
+            method: "POST",
+            token: token,
+            body: body
+        )
     }
 
     func onchange(

@@ -26,6 +26,10 @@ struct RecordMutationRequest: Codable {
     let fields: [String]?
 }
 
+struct RecordActionRequest: Codable {
+    let fields: [String]?
+}
+
 struct RecordMutationResult: Codable {
     let id: Int
     let record: RecordData

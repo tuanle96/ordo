@@ -17,6 +17,7 @@ final class RecordDetailViewModel {
     private(set) var onchangeDomains: [String: JSONValue] = [:]
     private(set) var isLoading = false
     private(set) var isSaving = false
+    private(set) var runningActionName: String?
     private(set) var validationErrors: [String: String] = [:]
 
     let descriptor: ModelDescriptor
@@ -31,6 +32,19 @@ final class RecordDetailViewModel {
 
     var isCreating: Bool {
         recordID == nil
+    }
+
+    var isRunningWorkflowAction: Bool {
+        runningActionName != nil
+    }
+
+    var visibleWorkflowActions: [ActionButton] {
+        guard let schema, let record, !isCreating else { return [] }
+        return schema.header.actions.filter { !$0.isInvisible(in: record) }
+    }
+
+    func isRunningAction(_ action: ActionButton) -> Bool {
+        runningActionName == action.name
     }
 
     func load(using appState: AppState) async {
@@ -144,6 +158,10 @@ final class RecordDetailViewModel {
         scheduleOnchange(for: field, draft: draft, using: appState)
     }
 
+    func waitForOnchangeToSettle() async {
+        await onchangeTask?.value
+    }
+
     func save(draft: FormDraft, using appState: AppState) async -> Bool {
         guard let schema, let record else { return false }
         cancelPendingOnchange()
@@ -208,6 +226,54 @@ final class RecordDetailViewModel {
         } catch {
             let targetRecordID = self.recordID ?? 0
             Self.logger.error("❌ Failed to save \(self.descriptor.model, privacy: .public)#\(targetRecordID, privacy: .public): \(String(describing: error), privacy: .public)")
+            if case APIClientError.unauthorized = error {
+                appState.signOut()
+            } else {
+                errorMessage = error.localizedDescription
+            }
+
+            return false
+        }
+    }
+
+    func runWorkflowAction(_ action: ActionButton, using appState: AppState) async -> Bool {
+        guard let schema, let recordID else { return false }
+        guard runningActionName == nil else { return false }
+
+        runningActionName = action.name
+        errorMessage = nil
+        saveMessage = nil
+        defer { runningActionName = nil }
+
+        do {
+            let result = try await appState.withAuthenticatedToken { [self] token in
+                try await appState.apiClient.runRecordAction(
+                    model: self.descriptor.model,
+                    id: recordID,
+                    actionName: action.name,
+                    fields: schema.requestedFieldNames,
+                    token: token
+                )
+            }
+
+            let refreshedRecord = try await resolvedActionRecord(from: result, schema: schema, using: appState)
+            record = refreshedRecord
+            cacheMessage = nil
+            errorMessage = nil
+            validationErrors = [:]
+            saveMessage = result.changed ? "\(action.label) completed." : "No changes from \(action.label.lowercased())."
+
+            if let cacheScope = appState.cacheScope {
+                do {
+                    try await appState.cacheStore.saveRecord(refreshedRecord, for: descriptor.model, id: recordID, scope: cacheScope)
+                } catch {
+                    Self.logger.error("Failed to save record cache after workflow action for \(self.descriptor.model, privacy: .public)#\(recordID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                }
+            }
+
+            return true
+        } catch {
+            Self.logger.error("❌ Failed to run action \(action.name, privacy: .public) for \(self.descriptor.model, privacy: .public)#\(recordID, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {
                 appState.signOut()
             } else {
@@ -316,6 +382,25 @@ final class RecordDetailViewModel {
         onchangeTask?.cancel()
         onchangeTask = nil
         onchangeGeneration += 1
+    }
+
+    private func resolvedActionRecord(
+        from result: RecordActionResult,
+        schema: MobileFormSchema,
+        using appState: AppState
+    ) async throws -> RecordData {
+        if let record = result.record {
+            return record
+        }
+
+        return try await appState.withAuthenticatedToken { [self] token in
+            try await appState.apiClient.record(
+                model: self.descriptor.model,
+                id: result.id,
+                fields: schema.requestedFieldNames,
+                token: token
+            )
+        }
     }
 
     private func resetOnchangeFeedback() {

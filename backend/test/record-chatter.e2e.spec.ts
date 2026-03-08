@@ -61,6 +61,15 @@ describe('Record chatter endpoints', () => {
                 assignedUser: { id: 2, name: 'Administrator' },
             },
         ],
+        availableActivityTypes: [
+            {
+                id: 3,
+                name: 'To Do',
+                summary: 'Follow up',
+                icon: 'fa-tasks',
+                defaultNote: '<p>Default note</p>',
+            },
+        ],
     };
 
     const recordServiceMock = {
@@ -77,6 +86,24 @@ describe('Record chatter endpoints', () => {
         followRecord: jest.fn().mockResolvedValue(chatterDetails),
         unfollowRecord: jest.fn().mockResolvedValue({ ...chatterDetails, followers: [], followersCount: 0, selfFollower: undefined }),
         completeChatterActivity: jest.fn().mockResolvedValue({ ...chatterDetails, activities: [] }),
+        scheduleChatterActivity: jest.fn().mockResolvedValue({
+            ...chatterDetails,
+            activities: [
+                ...chatterDetails.activities,
+                {
+                    id: 45,
+                    typeId: 3,
+                    typeName: 'To Do',
+                    summary: 'Call customer',
+                    note: '<p>Ask for update</p>',
+                    plainNote: 'Ask for update',
+                    dateDeadline: '2026-03-12',
+                    state: 'planned',
+                    canWrite: true,
+                    assignedUser: { id: 2, name: 'Administrator' },
+                },
+            ],
+        }),
     };
 
     beforeAll(async () => {
@@ -117,6 +144,32 @@ describe('Record chatter endpoints', () => {
             expect.objectContaining({ body: 'Internal note' }),
         );
         expect(response.body.data).toEqual(chatterThread.messages[0]);
+    });
+
+    it('schedules an activity and returns refreshed chatter details', async () => {
+        const response = await request(app.getHttpServer())
+            .post('/api/v1/mobile/records/res.partner/3/chatter/activities')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({
+                activityTypeId: 3,
+                summary: 'Call customer',
+                note: 'Ask for update',
+                dateDeadline: '2026-03-12',
+            })
+            .expect(201);
+
+        expect(recordServiceMock.scheduleChatterActivity).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            3,
+            expect.objectContaining({
+                activityTypeId: 3,
+                summary: 'Call customer',
+                note: 'Ask for update',
+                dateDeadline: '2026-03-12',
+            }),
+        );
+        expect(response.body.data.activities).toHaveLength(2);
     });
 
     it('returns chatter details envelope', async () => {

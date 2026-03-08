@@ -29,6 +29,14 @@ export interface ChatterActivityAssignee {
     name: string;
 }
 
+export interface ChatterActivityTypeOption {
+    id: number;
+    name: string;
+    summary?: string;
+    icon?: string;
+    defaultNote?: string;
+}
+
 export interface ChatterActivity {
     id: number;
     typeId?: number;
@@ -54,6 +62,7 @@ export interface ChatterDetailsResult {
     followersCount: number;
     selfFollower?: ChatterFollower;
     activities: ChatterActivity[];
+    availableActivityTypes: ChatterActivityTypeOption[];
 }
 
 export interface PostChatterNoteRequest {
@@ -62,4 +71,11 @@ export interface PostChatterNoteRequest {
 
 export interface CompleteChatterActivityRequest {
     feedback?: string;
+}
+
+export interface ScheduleChatterActivityRequest {
+    activityTypeId: number;
+    summary?: string;
+    note?: string;
+    dateDeadline?: string;
 }

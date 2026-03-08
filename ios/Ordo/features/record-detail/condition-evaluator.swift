@@ -153,6 +153,17 @@ extension FieldSchema {
     }
 }
 
+extension ActionButton {
+    func isInvisible(in values: RecordData) -> Bool {
+        if let rule = modifiers?.invisible {
+            return ConditionEvaluator.matches(rule, values: values)
+        }
+
+        guard let invisible else { return false }
+        return ConditionEvaluator.matches(invisible, values: values)
+    }
+}
+
 private extension Array where Element == String {
     func uniqued() -> [String] {
         Array(Set(self))

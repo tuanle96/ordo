@@ -1,5 +1,56 @@
 # Project Changelog
 
+## 2026-03-08 (Odoo Onchange Phase 03 — iOS Draft Merge & Validation)
+
+### Added
+
+- **iOS onchange transport + orchestration** in `APIClient` / `RecordDetailViewModel` for server-backed form recompute requests
+- **Draft edit-version tracking and safe merge helpers** so returned onchange values do not overwrite newer local edits
+- **Inline onchange warning support** in the record detail editing flow
+- **Focused regression coverage** for debounced onchange requests, stale-response suppression, create-mode onchange payloads, and workflow-action payload assertions
+
+### Changed
+
+- Editable schema-driven controls now route through one centralized view-model edit path instead of applying ad-hoc mutations with no shared onchange lifecycle
+- The iOS test transport harness now materializes streamed request bodies before assertions, fixing false-negative payload failures in unit coverage for POST-based flows
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,id=956F5A4C-B494-44A7-A026-2438AFB73275' -only-testing:OrdoTests/RecordDetailViewModelTests test` — targeted onchange/detail suite passes
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,id=956F5A4C-B494-44A7-A026-2438AFB73275' -only-testing:OrdoTests test` — broader iOS unit target passes after the onchange Phase 03 slice
+
+### Notes
+
+- Returned domains are captured in view-model state but not yet broadly applied across relation editors; that remains explicit Phase 04 follow-up work
+- Overall full-onchange plan remains in progress until rollout hardening and deferred semantics are documented in Phase 04
+
+## 2026-03-08 (Chatter Followers & Activities Slice)
+
+### Added
+
+- **Shared chatter detail contracts** for followers, activities, follow state, and activity completion requests/results
+- **Backend chatter detail endpoints** at `GET /api/v1/mobile/records/:model/:id/chatter/details`, `POST /api/v1/mobile/records/:model/:id/chatter/follow`, `DELETE /api/v1/mobile/records/:model/:id/chatter/follow`, and `POST /api/v1/mobile/records/:model/:id/chatter/activities/:activityId/done`
+- **Odoo adapter support** for follower reads, current-user subscribe/unsubscribe actions, active activity reads, and marking activities done with optional feedback
+- **iOS chatter UI/state** for follower chips/state, active activity list, and complete-activity actions alongside the existing thread + note flow
+- **Regression coverage** for backend service delegation, chatter route E2E paths, chatter viewmodel follow toggling, and activity completion refreshes
+
+### Changed
+
+- The chatter section now surfaces a usable second layer beyond thread-only MVP: users can see who follows a record, follow/unfollow themselves, review active activities, and mark supported activities done
+- Chatter detail loading stays lazy and record-scoped so form load is still not blocked by heavier chatter payloads
+
+### Verified
+
+- `npm run build` — shared + backend builds cleanly after the chatter detail contract expansion
+- `npm test` — shared/backend test suites pass (13 suites / 48 tests)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly for the chatter followers/activities UI
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordChatterViewModelTests test` — chatter follower/activity unit tests pass
+
+### Notes
+
+- This slice intentionally stops at **read followers + self follow/unfollow + read active activities + mark done**
+- Scheduling new activities, richer follower management, attachments, and broader mail parity remain deferred follow-up work
+
 ## 2026-03-08 (iOS Create Flow & Primitive Editor Expansion)
 
 ### Added

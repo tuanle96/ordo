@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatterSectionView: View {
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: RecordChatterViewModel
+    @State private var isShowingScheduleSheet = false
 
     var body: some View {
         Section("Chatter") {
@@ -15,11 +16,20 @@ struct ChatterSectionView: View {
                     .accessibilityIdentifier("chatter-note-editor")
 
                 HStack {
-                    if viewModel.isPosting || viewModel.isUpdatingFollow {
+                    if viewModel.isPosting || viewModel.isUpdatingFollow || viewModel.isSchedulingActivity {
                         ProgressView()
                     }
 
                     Spacer()
+
+                    if !viewModel.availableActivityTypes.isEmpty {
+                        Button("Schedule Activity") {
+                            isShowingScheduleSheet = true
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(viewModel.isSchedulingActivity)
+                        .accessibilityIdentifier("chatter-schedule-button")
+                    }
 
                     Button(viewModel.isFollowing ? "Unfollow" : "Follow") {
                         Task {
@@ -73,6 +83,117 @@ struct ChatterSectionView: View {
                 }
             }
             .padding(.vertical, OrdoSpacing.xs)
+        }
+        .sheet(isPresented: $isShowingScheduleSheet) {
+            ScheduleActivitySheet(viewModel: viewModel, isPresented: $isShowingScheduleSheet)
+                .environment(appState)
+        }
+    }
+}
+
+private struct ScheduleActivitySheet: View {
+    @Environment(AppState.self) private var appState
+    @Bindable var viewModel: RecordChatterViewModel
+    @Binding var isPresented: Bool
+
+    @State private var selectedActivityTypeID: Int?
+    @State private var summary = ""
+    @State private var note = ""
+    @State private var includesDeadline = false
+    @State private var deadline = Date()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Type") {
+                    Picker("Activity Type", selection: selectedTypeBinding) {
+                        ForEach(viewModel.availableActivityTypes) { activityType in
+                            Text(activityType.name)
+                                .tag(Optional(activityType.id))
+                        }
+                    }
+
+                    Text("Assigned to you")
+                        .font(.footnote)
+                        .foregroundStyle(OrdoColors.textSecondary)
+                }
+
+                Section("Details") {
+                    TextField("Summary", text: $summary)
+                        .accessibilityIdentifier("chatter-schedule-summary")
+
+                    TextField("Note", text: $note, axis: .vertical)
+                        .lineLimit(3...6)
+                        .accessibilityIdentifier("chatter-schedule-note")
+                }
+
+                Section("Deadline") {
+                    Toggle("Set deadline", isOn: $includesDeadline)
+
+                    if includesDeadline {
+                        DatePicker(
+                            "Deadline",
+                            selection: $deadline,
+                            displayedComponents: .date
+                        )
+                    }
+                }
+            }
+            .navigationTitle("Schedule Activity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task {
+                            await submit()
+                        }
+                    }
+                    .disabled(selectedActivityTypeID == nil || viewModel.isSchedulingActivity)
+                }
+            }
+            .onAppear {
+                if selectedActivityTypeID == nil {
+                    selectedActivityTypeID = viewModel.availableActivityTypes.first?.id
+                }
+            }
+        }
+    }
+
+    private var selectedTypeBinding: Binding<Int?> {
+        Binding(
+            get: { selectedActivityTypeID },
+            set: { newValue in
+                selectedActivityTypeID = newValue
+                guard let selectedType = viewModel.availableActivityTypes.first(where: { $0.id == newValue }) else { return }
+                if summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    summary = selectedType.summary ?? ""
+                }
+                if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    note = selectedType.defaultNote ?? ""
+                }
+            }
+        )
+    }
+
+    private func submit() async {
+        guard let activityTypeID = selectedActivityTypeID else { return }
+
+        let didSchedule = await viewModel.scheduleActivity(
+            activityTypeId: activityTypeID,
+            summary: summary,
+            note: note,
+            dateDeadline: includesDeadline ? deadline : nil,
+            using: appState
+        )
+
+        if didSchedule {
+            isPresented = false
         }
     }
 }

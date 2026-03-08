@@ -8,6 +8,7 @@ struct RecordDetailView: View {
     @State private var isEditing = false
     @State private var draft: FormDraft?
     @State private var showDiscardConfirmation = false
+    @State private var pendingWorkflowAction: ActionButton?
 
     init(descriptor: ModelDescriptor, recordID: Int? = nil) {
         _viewModel = State(initialValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
@@ -98,6 +99,33 @@ struct RecordDetailView: View {
                         )
                     }
 
+                    if !isEditing, !viewModel.visibleWorkflowActions.isEmpty {
+                        Section("Actions") {
+                            VStack(alignment: .leading, spacing: OrdoSpacing.sm) {
+                                ForEach(viewModel.visibleWorkflowActions, id: \.name) { action in
+                                    Button {
+                                        handleWorkflowActionTap(action)
+                                    } label: {
+                                        HStack(spacing: OrdoSpacing.sm) {
+                                            if viewModel.isRunningAction(action) {
+                                                ProgressView()
+                                                    .controlSize(.small)
+                                            }
+
+                                            Text(action.label)
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(workflowActionTint(for: action))
+                                    .disabled(viewModel.isRunningWorkflowAction)
+                                    .accessibilityIdentifier("detail-action-\(action.name)")
+                                }
+                            }
+                        }
+                    }
+
                     SchemaRendererView(
                         schema: schema,
                         record: record,
@@ -162,6 +190,7 @@ struct RecordDetailView: View {
                             draft = viewModel.startEditing()
                             isEditing = draft != nil
                         }
+                        .disabled(viewModel.isRunningWorkflowAction)
                         .accessibilityIdentifier("detail-edit-button")
                     }
                 }
@@ -174,6 +203,27 @@ struct RecordDetailView: View {
             }
         } message: {
             Text("Your unsaved changes will be lost.")
+        }
+        .alert(
+            pendingWorkflowAction?.label ?? "Run Action",
+            isPresented: workflowActionConfirmationBinding
+        ) {
+            Button("Cancel", role: .cancel) {
+                pendingWorkflowAction = nil
+            }
+
+            Button(
+                pendingWorkflowAction?.label ?? "Run",
+                role: pendingWorkflowAction?.style == "danger" ? .destructive : nil
+            ) {
+                guard let action = pendingWorkflowAction else { return }
+                pendingWorkflowAction = nil
+                Task {
+                    await executeWorkflowAction(action)
+                }
+            }
+        } message: {
+            Text(pendingWorkflowAction?.confirm ?? "")
         }
         .task {
             await viewModel.load(using: appState)
@@ -220,6 +270,55 @@ struct RecordDetailView: View {
             chatterViewModel = RecordChatterViewModel(model: viewModel.descriptor.model, recordID: recordID)
             let displayName = savedRecord["display_name"]?.displayText ?? savedRecord["name"]?.displayText ?? "Record"
             recentItems.add(model: viewModel.descriptor.model, recordID: recordID, displayName: displayName)
+        }
+    }
+
+    private var workflowActionConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingWorkflowAction != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingWorkflowAction = nil
+                }
+            }
+        )
+    }
+
+    private func workflowActionTint(for action: ActionButton) -> Color {
+        switch action.style {
+        case "danger":
+            return OrdoColors.danger
+        case "secondary":
+            return .secondary
+        default:
+            return OrdoColors.accent
+        }
+    }
+
+    private func handleWorkflowActionTap(_ action: ActionButton) {
+        guard !viewModel.isRunningWorkflowAction else { return }
+
+        if let confirm = action.confirm, !confirm.isEmpty {
+            pendingWorkflowAction = action
+            return
+        }
+
+        Task {
+            await executeWorkflowAction(action)
+        }
+    }
+
+    private func executeWorkflowAction(_ action: ActionButton) async {
+        let didRun = await viewModel.runWorkflowAction(action, using: appState)
+        guard didRun, let updatedRecord = viewModel.record, let recordID = viewModel.recordID else { return }
+
+        draft = FormDraft(record: updatedRecord)
+        let displayName = updatedRecord["display_name"]?.displayText ?? updatedRecord["name"]?.displayText ?? "Record"
+        recentItems.add(model: viewModel.descriptor.model, recordID: recordID, displayName: displayName)
+
+        if viewModel.schema?.hasChatter == true {
+            chatterViewModel = RecordChatterViewModel(model: viewModel.descriptor.model, recordID: recordID)
+            await chatterViewModel.refresh(using: appState)
         }
     }
 }

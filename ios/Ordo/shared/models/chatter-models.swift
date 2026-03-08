@@ -55,6 +55,14 @@ struct ChatterActivityAssignee: Codable, Hashable {
     let name: String
 }
 
+struct ChatterActivityTypeOption: Codable, Hashable, Identifiable {
+    let id: Int
+    let name: String
+    let summary: String?
+    let icon: String?
+    let defaultNote: String?
+}
+
 struct ChatterActivity: Codable, Hashable, Identifiable {
     let id: Int
     let typeId: Int?
@@ -112,6 +120,7 @@ struct ChatterDetailsResult: Codable, Hashable {
     let followersCount: Int
     let selfFollower: ChatterFollower?
     let activities: [ChatterActivity]
+    let availableActivityTypes: [ChatterActivityTypeOption]
 }
 
 struct PostChatterNoteRequest: Codable {
@@ -120,4 +129,11 @@ struct PostChatterNoteRequest: Codable {
 
 struct CompleteChatterActivityRequest: Codable {
     let feedback: String?
+}
+
+struct ScheduleChatterActivityRequest: Codable {
+    let activityTypeId: Int
+    let summary: String?
+    let note: String?
+    let dateDeadline: String?
 }

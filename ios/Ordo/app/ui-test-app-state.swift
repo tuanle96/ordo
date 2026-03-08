@@ -43,6 +43,8 @@ enum UITestAppStateFactory {
 }
 
 private final class UITestURLProtocol: URLProtocol {
+    private static var mutableRecords: [String: [Int: RecordData]] = [:]
+
     override class func canInit(with request: URLRequest) -> Bool {
         true
     }
@@ -55,7 +57,8 @@ private final class UITestURLProtocol: URLProtocol {
         guard let client, let url = request.url else { return }
 
         do {
-            let (statusCode, data) = try Self.response(for: request)
+            let normalizedRequest = request.withMaterializedHTTPBody()
+            let (statusCode, data) = try Self.response(for: normalizedRequest)
             let response = HTTPURLResponse(
                 url: url,
                 statusCode: statusCode,
@@ -71,6 +74,11 @@ private final class UITestURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+
+    override init(request: URLRequest, cachedResponse: CachedURLResponse?, client: URLProtocolClient?) {
+        Self.bootstrapMutableRecordsIfNeeded()
+        super.init(request: request, cachedResponse: cachedResponse, client: client)
+    }
 
     private static func response(for request: URLRequest) throws -> (Int, Data) {
         let encoder = JSONEncoder()
@@ -99,6 +107,25 @@ private final class UITestURLProtocol: URLProtocol {
                 return (200, try encoder.encode(UITestEnvelope(data: result, meta: meta)))
             }
 
+            if components.count == 4, components[2] == "actions", request.httpMethod == "POST" {
+                let model = components[0]
+                let recordID = Int(components[1]) ?? 1
+                let actionName = components[3]
+                let body = request.httpBody ?? Data()
+                let actionRequest = try JSONDecoder().decode(RecordActionRequest.self, from: body)
+
+                guard let result = applyWorkflowAction(
+                    model: model,
+                    id: recordID,
+                    actionName: actionName,
+                    requestedFields: actionRequest.fields ?? []
+                ) else {
+                    return notFound(encoder: encoder)
+                }
+
+                return (200, try encoder.encode(UITestEnvelope(data: result, meta: nil)))
+            }
+
             if components.count == 2 {
                 let model = components[0]
                 let recordID = Int(components[1]) ?? 1
@@ -125,7 +152,7 @@ private final class UITestURLProtocol: URLProtocol {
                     return (200, try encoder.encode(UITestEnvelope(data: result, meta: nil)))
                 }
 
-                guard let record = UITestFixtures.record(model: model, id: recordID) else {
+                guard let record = record(model: model, id: recordID) else {
                     return notFound(encoder: encoder)
                 }
                 return (200, try encoder.encode(UITestEnvelope(data: record, meta: nil)))
@@ -171,6 +198,59 @@ private final class UITestURLProtocol: URLProtocol {
         URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.reduce(into: [:]) { result, item in
             result[item.name] = item.value
         }
+    }
+
+    private static func bootstrapMutableRecordsIfNeeded() {
+        guard mutableRecords.isEmpty else { return }
+
+        mutableRecords = [
+            "res.partner": [1, 2, 3].reduce(into: [:]) { records, id in
+                records[id] = UITestFixtures.record(model: "res.partner", id: id)
+            },
+            "crm.lead": [1, 2].reduce(into: [:]) { records, id in
+                records[id] = UITestFixtures.record(model: "crm.lead", id: id)
+            },
+            "sale.order": [1, 2].reduce(into: [:]) { records, id in
+                records[id] = UITestFixtures.record(model: "sale.order", id: id)
+            },
+        ]
+    }
+
+    private static func record(model: String, id: Int) -> RecordData? {
+        mutableRecords[model]?[id] ?? UITestFixtures.record(model: model, id: id)
+    }
+
+    private static func applyWorkflowAction(
+        model: String,
+        id: Int,
+        actionName: String,
+        requestedFields: [String]
+    ) -> RecordActionResult? {
+        guard var record = record(model: model, id: id) else { return nil }
+
+        switch (model, actionName) {
+        case ("sale.order", "action_confirm"):
+            record["state"] = .string("sale")
+        default:
+            return nil
+        }
+
+        mutableRecords[model, default: [:]][id] = record
+        let filteredRecord = filter(record: record, to: requestedFields)
+        return RecordActionResult(id: id, changed: true, record: filteredRecord)
+    }
+
+    private static func filter(record: RecordData, to fields: [String]) -> RecordData {
+        guard !fields.isEmpty else { return record }
+
+        var filtered: RecordData = [:]
+        for field in fields {
+            if let value = record[field] {
+                filtered[field] = value
+            }
+        }
+
+        return filtered.isEmpty ? record : filtered
     }
 }
 
@@ -352,7 +432,25 @@ private enum UITestFixtures {
     private static let saleOrderSchema = MobileFormSchema(
         model: "sale.order",
         title: "Sales Order",
-        header: FormHeader(statusbar: .init(field: "state", visibleStates: nil), actions: []),
+        header: FormHeader(statusbar: .init(field: "state", visibleStates: nil), actions: [
+            ActionButton(
+                name: "action_confirm",
+                label: "Confirm",
+                type: "object",
+                style: "primary",
+                modifiers: FieldModifiers(
+                    invisible: ModifierRule(
+                        type: "condition",
+                        condition: Condition(field: "state", op: "==", value: .string("sale"), values: nil),
+                        rules: nil,
+                        constant: nil
+                    ),
+                    readonly: nil,
+                    required: nil
+                ),
+                confirm: "Confirm this quotation?"
+            ),
+        ]),
         sections: [FormSection(label: "Order", fields: [
             FieldSchema(name: "name", type: .char, label: "Order", required: true, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "partner_id", type: .many2one, label: "Customer", required: true, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
@@ -364,7 +462,7 @@ private enum UITestFixtures {
         hasChatter: false
     )
 
-    private static func partnerRecord(id: Int) -> RecordData {
+    fileprivate static func partnerRecord(id: Int) -> RecordData {
         let names = ["Azure Interior", "Deco Addict", "Gemini Furniture"]
         let emails = ["azure@example.com", "deco@example.com", "gemini@example.com"]
         let phones = ["+1 555-0101", "+1 555-0102", "+1 555-0103"]
@@ -393,7 +491,7 @@ private enum UITestFixtures {
         ]
     }
 
-    private static func leadRecord(id: Int) -> RecordData {
+    fileprivate static func leadRecord(id: Int) -> RecordData {
         let names = ["Website redesign", "Warehouse expansion"]
         let customers = ["Azure Interior", "Gemini Furniture"]
         let emails = ["buyer@azure.example.com", "ops@gemini.example.com"]
@@ -412,7 +510,7 @@ private enum UITestFixtures {
         ]
     }
 
-    private static func saleOrderRecord(id: Int) -> RecordData {
+    fileprivate static func saleOrderRecord(id: Int) -> RecordData {
         let names = ["S00045", "S00046"]
         let partners: [JSONValue] = [.relation(id: 1, label: "Azure Interior"), .relation(id: 3, label: "Gemini Furniture")]
         let users: [JSONValue] = [.relation(id: 7, label: "Mitchell Admin"), .relation(id: 9, label: "Marc Demo")]
@@ -522,6 +620,43 @@ private enum UITestFixtures {
         } catch {
             return .array([])
         }
+    }
+}
+
+private extension URLRequest {
+    func withMaterializedHTTPBody() -> URLRequest {
+        guard httpBody == nil, let httpBodyStream else { return self }
+
+        let data = Data(reading: httpBodyStream)
+        var request = self
+        request.httpBody = data.isEmpty ? nil : data
+        return request
+    }
+}
+
+private extension Data {
+    init(reading stream: InputStream) {
+        stream.open()
+        defer { stream.close() }
+
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        var data = Data()
+
+        while true {
+            let readCount = stream.read(&buffer, maxLength: buffer.count)
+
+            if readCount < 0 {
+                break
+            }
+
+            if readCount == 0 {
+                break
+            }
+
+            data.append(buffer, count: readCount)
+        }
+
+        self = data
     }
 }
 

@@ -274,6 +274,31 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testWorkflowActionConfirmUpdatesStatusAndHidesButton() throws {
+        let app = makeApp(resetStorage: true)
+        app.launch()
+
+        signIn(app)
+        tapBrowseTab(app)
+        XCTAssertTrue(app.buttons["browse-model-sale-order"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-model-sale-order"].tap()
+        openFirstRecordDetail(app)
+
+        let actionButton = app.buttons["detail-action-action_confirm"]
+        XCTAssertTrue(actionButton.waitForExistence(timeout: standardTimeout))
+        actionButton.tap()
+
+        let confirmButton = app.alerts.buttons["Confirm"]
+        XCTAssertTrue(confirmButton.waitForExistence(timeout: standardTimeout))
+        confirmButton.tap()
+
+        let statusValue = app.staticTexts["field-value-state"]
+        XCTAssertTrue(statusValue.waitForExistence(timeout: standardTimeout))
+        XCTAssertEqual(statusValue.label, "Sales Order")
+        XCTAssertFalse(actionButton.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testHomeShowsRecentlyViewedRecordAfterRelaunch() throws {
         let firstLaunch = makeApp(resetStorage: true)
         firstLaunch.launch()

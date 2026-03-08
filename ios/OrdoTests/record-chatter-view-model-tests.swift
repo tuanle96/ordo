@@ -139,6 +139,55 @@ struct RecordChatterViewModelTests {
         #expect(viewModel.errorMessage == nil)
     }
 
+    @Test
+    func scheduleActivityRefreshesActivities() async throws {
+        var capturedRequest: ScheduleChatterActivityRequest?
+
+        ChatterViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter/details") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: detailsResult)))
+            }
+
+            if path.contains("/records/res.partner/1/chatter") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: threadResult)))
+            }
+
+            if path.hasSuffix("/records/res.partner/1/chatter/activities") && request.httpMethod == "POST" {
+                capturedRequest = try JSONDecoder().decode(ScheduleChatterActivityRequest.self, from: try #require(request.httpBody))
+                return (200, try JSONEncoder().encode(ChatterEnvelope(data: scheduledActivityDetailsResult)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeAppState()
+        let viewModel = RecordChatterViewModel(model: "res.partner", recordID: 1)
+        await viewModel.refresh(using: appState)
+
+        let deadline = Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 3, day: 12))
+        let didSchedule = await viewModel.scheduleActivity(
+            activityTypeId: 3,
+            summary: "Call customer",
+            note: "Ask for update",
+            dateDeadline: deadline,
+            using: appState
+        )
+
+        #expect(didSchedule == true)
+        #expect(capturedRequest?.activityTypeId == 3)
+        #expect(capturedRequest?.summary == "Call customer")
+        #expect(capturedRequest?.note == "Ask for update")
+        #expect(capturedRequest?.dateDeadline == "2026-03-12")
+        #expect(viewModel.activities.count == 2)
+        #expect(viewModel.availableActivityTypes.count == 1)
+    }
+
     private func makeAppState() async throws -> AppState {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ChatterViewModelTestURLProtocol.self]
@@ -177,21 +226,45 @@ private let detailsResult = ChatterDetailsResult(
     followers: [ChatterFollower(id: 15, partnerId: 7, name: "Administrator", email: "admin@example.com", isActive: true, isSelf: true)],
     followersCount: 1,
     selfFollower: ChatterFollower(id: 15, partnerId: 7, name: "Administrator", email: "admin@example.com", isActive: true, isSelf: true),
-    activities: [ChatterActivity(id: 44, typeId: 3, typeName: "To Do", summary: "Follow up", note: "<p>Call back tomorrow</p>", plainNote: "Call back tomorrow", dateDeadline: "2026-03-10", state: "planned", canWrite: true, assignedUser: ChatterActivityAssignee(id: 2, name: "Administrator"))]
+    activities: [ChatterActivity(id: 44, typeId: 3, typeName: "To Do", summary: "Follow up", note: "<p>Call back tomorrow</p>", plainNote: "Call back tomorrow", dateDeadline: "2026-03-10", state: "planned", canWrite: true, assignedUser: ChatterActivityAssignee(id: 2, name: "Administrator"))],
+    availableActivityTypes: [ChatterActivityTypeOption(id: 3, name: "To Do", summary: "Follow up", icon: "fa-tasks", defaultNote: "<p>Default note</p>")]
 )
 
 private let unfollowedDetailsResult = ChatterDetailsResult(
     followers: [],
     followersCount: 0,
     selfFollower: nil,
-    activities: detailsResult.activities
+    activities: detailsResult.activities,
+    availableActivityTypes: detailsResult.availableActivityTypes
 )
 
 private let completedActivityDetailsResult = ChatterDetailsResult(
     followers: detailsResult.followers,
     followersCount: detailsResult.followersCount,
     selfFollower: detailsResult.selfFollower,
-    activities: []
+    activities: [],
+    availableActivityTypes: detailsResult.availableActivityTypes
+)
+
+private let scheduledActivityDetailsResult = ChatterDetailsResult(
+    followers: detailsResult.followers,
+    followersCount: detailsResult.followersCount,
+    selfFollower: detailsResult.selfFollower,
+    activities: detailsResult.activities + [
+        ChatterActivity(
+            id: 45,
+            typeId: 3,
+            typeName: "To Do",
+            summary: "Call customer",
+            note: "<p>Ask for update</p>",
+            plainNote: "Ask for update",
+            dateDeadline: "2026-03-12",
+            state: "planned",
+            canWrite: true,
+            assignedUser: ChatterActivityAssignee(id: 2, name: "Administrator")
+        )
+    ],
+    availableActivityTypes: detailsResult.availableActivityTypes
 )
 
 private final class ChatterViewModelTestURLProtocol: URLProtocol {

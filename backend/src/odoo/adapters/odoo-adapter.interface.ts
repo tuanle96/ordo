@@ -1,4 +1,5 @@
 import type {
+    ChatterActivityTypeOption,
     ChatterDetailsResult,
     ChatterMessage,
     ChatterThreadResult,
@@ -95,5 +96,16 @@ export interface OdooAdapter {
         id: number,
         activityId: number,
         feedback?: string,
+    ): Promise<ChatterDetailsResult>;
+    scheduleChatterActivity(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        activityTypeId: number,
+        values?: {
+            summary?: string;
+            note?: string;
+            dateDeadline?: string;
+        },
     ): Promise<ChatterDetailsResult>;
 }
