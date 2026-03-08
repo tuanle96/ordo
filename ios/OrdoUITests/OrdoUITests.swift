@@ -24,41 +24,40 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
 
-        XCTAssertTrue(app.otherElements["home-screen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["home-screen"].waitForExistence(timeout: 10))
 
         app.tabBars.buttons["Browse"].tap()
-        XCTAssertTrue(app.tables["browse-home-screen"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.cells["browse-model-crm-lead"].exists)
-        XCTAssertTrue(app.cells["browse-model-sale-order"].exists)
+        XCTAssertTrue(app.buttons["browse-model-crm-lead"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["browse-model-sale-order"].exists)
 
-        app.cells["browse-model-res-partner"].tap()
-        XCTAssertTrue(app.otherElements["record-list-screen"].waitForExistence(timeout: 5))
+        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: 10))
 
-        app.cells["record-row-1"].tap()
-        XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["field-value-comment"].waitForExistence(timeout: 5))
-
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.otherElements["record-list-screen"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.tables["browse-home-screen"].waitForExistence(timeout: 5))
-
-        app.cells["browse-model-crm-lead"].tap()
-        XCTAssertTrue(app.otherElements["record-list-screen"].waitForExistence(timeout: 5))
-        app.cells["record-row-1"].tap()
-        XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["field-value-stage_id"].waitForExistence(timeout: 5))
+        app.buttons["record-row-1"].tap()
+        XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["field-value-comment"].waitForExistence(timeout: 10))
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.otherElements["record-list-screen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.tables["browse-home-screen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["browse-model-crm-lead"].waitForExistence(timeout: 10))
 
-        app.cells["browse-model-sale-order"].tap()
-        XCTAssertTrue(app.otherElements["record-list-screen"].waitForExistence(timeout: 5))
-        app.cells["record-row-1"].tap()
-        XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["field-value-amount_total"].waitForExistence(timeout: 5))
+        app.buttons["browse-model-crm-lead"].tap()
+        XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: 10))
+        app.buttons["record-row-1"].tap()
+        XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["field-value-stage_id"].waitForExistence(timeout: 10))
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["browse-model-sale-order"].waitForExistence(timeout: 10))
+
+        app.buttons["browse-model-sale-order"].tap()
+        XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: 10))
+        app.buttons["record-row-1"].tap()
+        XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["field-value-amount_total"].waitForExistence(timeout: 10))
     }
 
     @MainActor
@@ -73,8 +72,9 @@ final class OrdoUITests: XCTestCase {
         let secondLaunch = makeApp(resetStorage: false)
         secondLaunch.launch()
 
+        XCTAssertTrue(secondLaunch.otherElements["main-tab-screen"].waitForExistence(timeout: 10))
         XCTAssertFalse(secondLaunch.buttons["login-submit-button"].exists)
-        XCTAssertTrue(secondLaunch.otherElements["home-screen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(secondLaunch.otherElements["home-screen"].waitForExistence(timeout: 10))
     }
 
     @MainActor

@@ -33,11 +33,11 @@ enum EditableFieldFactory {
 }
 
 struct EditableFieldRow: View {
-    @EnvironmentObject private var appState: AppState
+    @Environment(AppState.self) private var appState
 
     let field: FieldSchema
     let model: EditableFieldRowModel
-    @ObservedObject var draft: FormDraft
+    let draft: FormDraft
     let fallbackValue: JSONValue?
     let validationMessage: String?
 
@@ -131,7 +131,7 @@ struct EditableFieldRow: View {
                         draft.setValue(selection, for: field.name)
                     }
                 )
-                .environmentObject(appState)
+                .environment(appState)
             }
         }
     }
@@ -185,7 +185,7 @@ struct EditableFieldRow: View {
 
 private struct Many2OnePickerSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var appState: AppState
+    @Environment(AppState.self) private var appState
 
     let field: FieldSchema
     let comodel: String

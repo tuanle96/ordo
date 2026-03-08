@@ -1,11 +1,11 @@
 import SwiftUI
 
 struct RecordListView: View {
-    @EnvironmentObject private var appState: AppState
-    @StateObject private var viewModel: RecordListViewModel
+    @Environment(AppState.self) private var appState
+    @State private var viewModel: RecordListViewModel
 
     init(descriptor: ModelDescriptor) {
-        _viewModel = StateObject(wrappedValue: RecordListViewModel(descriptor: descriptor))
+        _viewModel = State(initialValue: RecordListViewModel(descriptor: descriptor))
     }
 
     var body: some View {
@@ -79,7 +79,13 @@ struct RecordListView: View {
             }
         }
         .navigationTitle(viewModel.descriptor.title)
-        .searchable(text: $viewModel.query, prompt: "Search \(viewModel.descriptor.title.lowercased())")
+        .searchable(
+            text: Binding(
+                get: { viewModel.query },
+                set: { viewModel.query = $0 }
+            ),
+            prompt: "Search \(viewModel.descriptor.title.lowercased())"
+        )
         .task {
             await viewModel.loadIfNeeded(using: appState)
         }
@@ -92,6 +98,6 @@ struct RecordListView: View {
 #Preview {
     NavigationStack {
         RecordListView(descriptor: ModelRegistry.supported[0])
-            .environmentObject(AppState.preview)
+            .environment(AppState.preview)
     }
 }

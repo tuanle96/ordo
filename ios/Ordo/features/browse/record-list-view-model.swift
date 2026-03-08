@@ -1,19 +1,20 @@
-import Combine
 import Foundation
+import Observation
 import OSLog
 
 @MainActor
-final class RecordListViewModel: ObservableObject {
+@Observable
+final class RecordListViewModel {
     private static let logger = Logger(subsystem: "com.ordo.app", category: "record-list")
 
-    @Published private(set) var items: [RecordData] = []
-    @Published private(set) var searchResults: [NameSearchResult] = []
-    @Published private(set) var errorMessage: String?
-    @Published private(set) var cacheMessage: String?
-    @Published private(set) var isLoading = false
-    @Published private(set) var isLoadingMore = false
-    @Published private(set) var canLoadMore = true
-    @Published var query = ""
+    private(set) var items: [RecordData] = []
+    private(set) var searchResults: [NameSearchResult] = []
+    private(set) var errorMessage: String?
+    private(set) var cacheMessage: String?
+    private(set) var isLoading = false
+    private(set) var isLoadingMore = false
+    private(set) var canLoadMore = true
+    var query = ""
 
     let descriptor: ModelDescriptor
 
@@ -25,10 +26,6 @@ final class RecordListViewModel: ObservableObject {
 
     init(descriptor: ModelDescriptor) {
         self.descriptor = descriptor
-    }
-
-    deinit {
-        searchTask?.cancel()
     }
 
     func load(using appState: AppState) async {

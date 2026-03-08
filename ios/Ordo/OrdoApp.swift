@@ -9,11 +9,11 @@ import SwiftUI
 
 @main
 struct OrdoApp: App {
-    @StateObject private var appState: AppState
+    @State private var appState: AppState
     @State private var recentItems: RecentItemsStore
 
     init() {
-        _appState = StateObject(wrappedValue: UITestAppStateFactory.make() ?? AppState.live())
+        _appState = State(initialValue: UITestAppStateFactory.make() ?? AppState.live())
 
         let environment = ProcessInfo.processInfo.environment
         let recentItemsDefaults = environment["ORDO_UI_TEST_MODE"] == "smoke"
@@ -26,7 +26,7 @@ struct OrdoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(appState)
+                .environment(appState)
                 .environment(recentItems)
         }
     }

@@ -1,9 +1,10 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class FormDraft: ObservableObject {
-    @Published private var storage: RecordData
+@Observable
+final class FormDraft {
+    private var storage: RecordData
 
     init(record: RecordData) {
         storage = record

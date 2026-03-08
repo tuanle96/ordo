@@ -1,15 +1,15 @@
 import SwiftUI
 
 struct RecordDetailView: View {
-    @EnvironmentObject private var appState: AppState
+    @Environment(AppState.self) private var appState
     @Environment(RecentItemsStore.self) private var recentItems
-    @StateObject private var viewModel: RecordDetailViewModel
+    @State private var viewModel: RecordDetailViewModel
     @State private var isEditing = false
     @State private var draft: FormDraft?
     @State private var showDiscardConfirmation = false
 
     init(descriptor: ModelDescriptor, recordID: Int) {
-        _viewModel = StateObject(wrappedValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
+        _viewModel = State(initialValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
     }
 
     var body: some View {
@@ -179,7 +179,7 @@ struct RecordDetailView: View {
 #Preview {
     NavigationStack {
         RecordDetailView(descriptor: ModelRegistry.supported[0], recordID: 1)
-            .environmentObject(AppState.preview)
+            .environment(AppState.preview)
             .environment(RecentItemsStore())
     }
 }

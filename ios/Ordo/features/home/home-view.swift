@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @EnvironmentObject private var appState: AppState
+    @Environment(AppState.self) private var appState
     @Environment(RecentItemsStore.self) private var recentItems
 
     private var greeting: String {
@@ -188,7 +188,7 @@ struct HomeView: View {
 #Preview {
     NavigationStack {
         HomeView()
-            .environmentObject(AppState.preview)
+            .environment(AppState.preview)
             .environment(RecentItemsStore())
     }
 }

@@ -9,7 +9,7 @@ struct LoginView: View {
         case password
     }
 
-    @EnvironmentObject private var appState: AppState
+    @Environment(AppState.self) private var appState
     @FocusState private var focusedField: Field?
     @State private var draft = LoginDraft(
         backendBaseURL: "",
@@ -194,5 +194,5 @@ struct LoginView: View {
 
 #Preview {
     LoginView()
-        .environmentObject(AppState.preview)
+    .environment(AppState.preview)
 }

@@ -1,18 +1,19 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class AppState: ObservableObject {
+@Observable
+final class AppState {
     enum Phase {
         case launching
         case login
         case authenticated
     }
 
-    @Published private(set) var phase: Phase = .launching
-    @Published private(set) var session: StoredSession?
-    @Published private(set) var currentPrincipal: AuthenticatedPrincipal?
-    @Published var statusMessage: String?
+    private(set) var phase: Phase = .launching
+    private(set) var session: StoredSession?
+    private(set) var currentPrincipal: AuthenticatedPrincipal?
+    var statusMessage: String?
 
     let config: AppConfig
     let sessionStore: SessionStoring

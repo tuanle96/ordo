@@ -1,19 +1,20 @@
-import Combine
 import Foundation
+import Observation
 import OSLog
 
 @MainActor
-final class RecordDetailViewModel: ObservableObject {
+@Observable
+final class RecordDetailViewModel {
     private static let logger = Logger(subsystem: "com.ordo.app", category: "record-detail")
 
-    @Published private(set) var schema: MobileFormSchema?
-    @Published private(set) var record: RecordData?
-    @Published private(set) var errorMessage: String?
-    @Published private(set) var cacheMessage: String?
-    @Published private(set) var saveMessage: String?
-    @Published private(set) var isLoading = false
-    @Published private(set) var isSaving = false
-    @Published private(set) var validationErrors: [String: String] = [:]
+    private(set) var schema: MobileFormSchema?
+    private(set) var record: RecordData?
+    private(set) var errorMessage: String?
+    private(set) var cacheMessage: String?
+    private(set) var saveMessage: String?
+    private(set) var isLoading = false
+    private(set) var isSaving = false
+    private(set) var validationErrors: [String: String] = [:]
 
     let descriptor: ModelDescriptor
     let recordID: Int

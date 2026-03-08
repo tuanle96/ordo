@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject private var appState: AppState
+    @Environment(AppState.self) private var appState
     @State private var cacheMessage: String?
 
     var body: some View {
@@ -200,6 +200,6 @@ struct SettingsView: View {
 #Preview {
     NavigationStack {
         SettingsView()
-            .environmentObject(AppState.preview)
+            .environment(AppState.preview)
     }
 }
