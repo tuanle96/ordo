@@ -76,7 +76,7 @@ Broader nested relation editors (`one2many`, `many2many`), deeper field type cov
 | Layer            | Technology                              |
 | ---------------- | --------------------------------------- |
 | iOS UI           | SwiftUI (iOS 17+)                       |
-| iOS Architecture | MVVM + `ObservableObject`               |
+| iOS Architecture | MVVM + `@Observable` pilot (`RecentItemsStore`), `ObservableObject` retained for `AppState` until Phase 07 |
 | iOS Networking   | URLSession + async/await + Codable      |
 | iOS Storage      | Keychain Services + file-based cache    |
 | Backend          | NestJS 11 + TypeScript 5.x              |
@@ -318,9 +318,9 @@ The **Version Adapter** pattern normalizes API differences. Adding support for a
 - [x] Rate limiting on auth endpoints
 - [x] CORS configuration
 - [x] Structured logging (Pino)
-- [x] iOS test hardening (unit-green milestone reached; recent-items relaunch UI path documented as a known simulator boundary for the next iOS phase)
-- [ ] Phase 06A — isolate recent-items relaunch determinism before any observation refactor
-- [ ] Phase 06B — run a narrow `RecentItemsStore` `@Observable` pilot
+- [x] iOS test hardening (unit-green milestone established the baseline later used to close the recent-items relaunch seam in Phase 06A/06B)
+- [x] Phase 06A — isolate recent-items relaunch determinism before any observation refactor
+- [x] Phase 06B — run a narrow `RecentItemsStore` `@Observable` pilot
 - [ ] Phase 07 — widen `@Observable` migration to `AppState`, feature view models, and `FormDraft` only after the pilot is green
 
 ### Phase 3 — Inventory & Offline

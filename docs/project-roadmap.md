@@ -17,10 +17,10 @@
 | Phase 2 — Production hardening (Phase 02) | In Progress | Redis-backed `GET /schema/:model` cache landed with conservative tenant/user/lang/version/model keys, 1h TTL, and fail-open fallback when Redis is unavailable |
 | Phase 2 — Production hardening (Phase 03) | In Progress | Auth perimeter now has route-scoped throttling for `login`/`refresh` plus explicit env-driven CORS allowlisting with fail-closed preflight behavior |
 | Phase 2 — Production hardening (Phase 04) | In Progress | Pino-based structured logging landed with central redaction, request IDs, JSON app logs outside test mode, and deterministic Jest output |
-| Phase 2 — Production hardening (Phase 05) | ✅ Complete | iOS unit coverage broadened around refresh, cache fallback, browse/detail state, and recents persistence; three Swift Testing suites now run serialized and green, while the recent-items relaunch UI test remains a documented simulator boundary for the next iOS phase |
-| Phase 2 — Next iOS slice (Phase 06A) | Pending | Isolate the recent-items relaunch UI determinism boundary before any `@Observable` refactor touches the same root-state and persistence seams |
-| Phase 2 — Next iOS slice (Phase 06B) | Pending | Run a narrow `RecentItemsStore` `@Observable` pilot only if the Phase 06A boundary is understood well enough not to blur failures |
-| Phase 2 — Next iOS slice (Phase 07) | Deferred | Widen the `@Observable` migration to `AppState`, feature view models, and `FormDraft` only after the pilot slice is green |
+| Phase 2 — Production hardening (Phase 05) | ✅ Complete | iOS unit coverage broadened around refresh, cache fallback, browse/detail state, and recents persistence; three Swift Testing suites now run serialized and green, establishing the baseline that Phase 06A/06B later used to close the relaunch seam |
+| Phase 2 — Next iOS slice (Phase 06A) | ✅ Complete | Recent-items relaunch determinism seam isolated and verified with the targeted relaunch UI test green before observation changes landed |
+| Phase 2 — Next iOS slice (Phase 06B) | ✅ Complete | `RecentItemsStore` migrated to `@Observable`; `OrdoApp` root ownership plus `HomeView` and `RecordDetailView` consumer patterns validated with green unit and targeted UI coverage |
+| Phase 2 — Next iOS slice (Phase 07) | ⏭️ Next | Widen the `@Observable` migration to `AppState`, feature view models, and `FormDraft` now that the recent-items pilot pattern is proven |
 
 ## Scope reminders
 

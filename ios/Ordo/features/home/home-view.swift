@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var recentItems: RecentItemsStore
+    @Environment(RecentItemsStore.self) private var recentItems
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -189,6 +189,6 @@ struct HomeView: View {
     NavigationStack {
         HomeView()
             .environmentObject(AppState.preview)
-            .environmentObject(RecentItemsStore())
+            .environment(RecentItemsStore())
     }
 }

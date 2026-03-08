@@ -159,6 +159,15 @@ Phase 2 Phase 05 widens regression confidence without changing the shipped runti
 - **Recent-items UI instrumentation** adds the targeted accessibility seams needed to exercise the relaunch flow without broadening the whole UI matrix
 - **Explicit known-boundary handling** keeps the remaining recent-items relaunch UI nondeterminism documented for the next iOS phase rather than forcing the later `@Observable` refactor to absorb test instability that predates it
 
+## Phase 2 architecture scope (Phase 06A/06B)
+
+Phase 2 Phase 06A/06B closes the recent-items relaunch seam first, then pilots Swift Observation on the smallest shared-state holder:
+
+- **Deterministic relaunch seam** uses the isolated `com.ordo.app.ui-tests` defaults suite plus targeted app-shell/login/detail accessibility hooks so recent-items persistence can be validated across relaunch without cross-run pollution
+- **`RecentItemsStore` observation pilot** replaces `ObservableObject` / `@Published` with `@MainActor` + `@Observable` while keeping ordering, persistence, and clear behavior unchanged
+- **Validated root injection pattern** keeps `AppState` on the legacy `EnvironmentObject` path for now, but moves recent-items ownership to `@State` in `OrdoApp` with typed `.environment(...)` consumption in `HomeView` and `RecordDetailView`
+- **Explicit widening gate** means Phase 07 can now focus on `AppState`, feature view models, and `FormDraft` using a proven observation pattern instead of re-solving the recent-items seam
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:

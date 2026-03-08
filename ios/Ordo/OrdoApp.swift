@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct OrdoApp: App {
     @StateObject private var appState: AppState
-    @StateObject private var recentItems: RecentItemsStore
+    @State private var recentItems: RecentItemsStore
 
     init() {
         _appState = StateObject(wrappedValue: UITestAppStateFactory.make() ?? AppState.live())
@@ -20,14 +20,14 @@ struct OrdoApp: App {
             ? (UserDefaults(suiteName: "com.ordo.app.ui-tests") ?? .standard)
             : .standard
 
-        _recentItems = StateObject(wrappedValue: RecentItemsStore(defaults: recentItemsDefaults))
+        _recentItems = State(initialValue: RecentItemsStore(defaults: recentItemsDefaults))
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .environmentObject(recentItems)
+                .environment(recentItems)
         }
     }
 }

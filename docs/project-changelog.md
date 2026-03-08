@@ -1,5 +1,26 @@
 # Project Changelog
 
+## 2026-03-08 (Production Hardening — Phase 2 Phase 06A/06B iOS Recent-Items Determinism + Observable Pilot)
+
+### Added
+
+- **Recent-items relaunch determinism preflight** using the isolated `com.ordo.app.ui-tests` defaults suite plus targeted root/accessibility seams so relaunch assertions no longer depend on cross-run shared state
+- **`RecentItemsStore` `@Observable` pilot** with `@MainActor` isolation, `@State` root ownership in `OrdoApp`, and typed environment injection into recent-items consumers
+
+### Changed
+
+- `RecentItemsStore` now uses Swift Observation instead of `ObservableObject` / `@Published` while preserving ordering, persistence, and clear semantics
+- Recent-items relaunch validation moved from a known simulator boundary to a green targeted UI seam that can serve as the baseline for the broader Phase 07 migration
+
+### Verified
+
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — full iOS unit target passes after the `@Observable` pilot
+- `xcodebuild -project /Volumes/DATA/Developments/Odoo/Ordo/ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/OrdoUITests/testHomeShowsRecentlyViewedRecordAfterRelaunch test` — targeted relaunch UI regression passes with xcresult status `Success`
+
+### Notes
+
+- Phase 07 remains the first slice allowed to widen `@Observable` into `AppState`, feature view models, and `FormDraft`; 06A/06B intentionally stopped at the narrow recent-items seam
+
 ## 2026-03-07 (Production Hardening — Phase 2 Phase 05 iOS Test Hardening)
 
 ### Added

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RecordDetailView: View {
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var recentItems: RecentItemsStore
+    @Environment(RecentItemsStore.self) private var recentItems
     @StateObject private var viewModel: RecordDetailViewModel
     @State private var isEditing = false
     @State private var draft: FormDraft?
@@ -180,5 +180,6 @@ struct RecordDetailView: View {
     NavigationStack {
         RecordDetailView(descriptor: ModelRegistry.supported[0], recordID: 1)
             .environmentObject(AppState.preview)
+            .environment(RecentItemsStore())
     }
 }

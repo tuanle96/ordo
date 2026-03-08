@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 
 struct RecentItem: Codable, Identifiable, Hashable {
     let model: String
@@ -10,7 +10,9 @@ struct RecentItem: Codable, Identifiable, Hashable {
     var id: String { "\(model)-\(recordID)" }
 }
 
-final class RecentItemsStore: ObservableObject {
+@MainActor
+@Observable
+final class RecentItemsStore {
     private static let defaultStorageKey = "ordo.recentItems"
     private static let defaultMaxItems = 10
 
@@ -19,7 +21,7 @@ final class RecentItemsStore: ObservableObject {
     private let maxItems: Int
     private let dateProvider: () -> Date
 
-    @Published private(set) var items: [RecentItem] = []
+    private(set) var items: [RecentItem] = []
 
     init(
         defaults: UserDefaults = .standard,
