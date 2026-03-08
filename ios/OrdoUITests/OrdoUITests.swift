@@ -323,32 +323,34 @@ final class OrdoUITests: XCTestCase {
 
     private func signIn(_ app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars["Sign In"].waitForExistence(timeout: standardTimeout))
+        let loginForm = app.tables.firstMatch
+        XCTAssertTrue(loginForm.waitForExistence(timeout: standardTimeout))
 
         let odooField = app.textFields["login-odoo-url-field"]
         XCTAssertTrue(odooField.waitForExistence(timeout: standardTimeout))
         odooField.replaceTextIfNeeded(odooURL)
 
         let databaseField = app.textFields["login-database-field"]
-        XCTAssertTrue(databaseField.waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(reveal(databaseField, in: loginForm, timeout: standardTimeout))
         databaseField.replaceTextIfNeeded(database)
 
         let usernameField = app.textFields["login-username-field"]
-        XCTAssertTrue(usernameField.waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(reveal(usernameField, in: loginForm, timeout: standardTimeout))
         usernameField.replaceTextIfNeeded(username)
 
         let advancedSettingsButton = app.buttons["Advanced Settings"]
-        XCTAssertTrue(advancedSettingsButton.waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(reveal(advancedSettingsButton, in: loginForm, timeout: standardTimeout))
 
         if !app.textFields["login-backend-url-field"].exists {
             advancedSettingsButton.tap()
         }
 
         let backendField = app.textFields["login-backend-url-field"]
-        XCTAssertTrue(backendField.waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(reveal(backendField, in: loginForm, timeout: standardTimeout))
         backendField.replaceTextIfNeeded(backendURL)
 
         let passwordField = app.secureTextFields["login-password-field"]
-        XCTAssertTrue(passwordField.waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(reveal(passwordField, in: loginForm, timeout: standardTimeout))
         passwordField.tap()
         passwordField.typeText("admin")
 
@@ -406,6 +408,27 @@ final class OrdoUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: extendedTimeout))
         XCTAssertTrue(app.buttons["detail-edit-button"].waitForExistence(timeout: standardTimeout))
         XCTAssertTrue(app.otherElements["field-row-name"].waitForExistence(timeout: standardTimeout))
+    }
+
+    private func reveal(
+        _ element: XCUIElement,
+        in container: XCUIElement,
+        timeout: TimeInterval,
+        maxSwipes: Int = 6
+    ) -> Bool {
+        if element.waitForExistence(timeout: min(timeout, 2)) {
+            return true
+        }
+
+        for _ in 0..<maxSwipes {
+            container.swipeUp()
+
+            if element.waitForExistence(timeout: 1.5) {
+                return true
+            }
+        }
+
+        return element.exists
     }
 }
 

@@ -1,4 +1,6 @@
 import type {
+    ChatterMessage,
+    ChatterThreadResult,
     MobileFormSchema,
     NameSearchResult,
     RecordData,
@@ -51,4 +53,17 @@ export interface OdooAdapter {
         domain?: unknown[],
         limit?: number,
     ): Promise<NameSearchResult[]>;
+    listChatter(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        limit?: number,
+        before?: number,
+    ): Promise<ChatterThreadResult>;
+    postChatterNote(
+        session: OdooSessionContext,
+        model: string,
+        id: number,
+        body: string,
+    ): Promise<ChatterMessage>;
 }

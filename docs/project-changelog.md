@@ -1,5 +1,35 @@
 # Project Changelog
 
+## 2026-03-08 (Chatter MVP — Read Thread + Post Note)
+
+### Added
+
+- **Shared chatter contracts** (`ChatterMessage`, `ChatterAuthor`, `ChatterThreadResult`, `PostChatterNoteRequest`) for cross-platform typed communication
+- **Backend chatter endpoints** at `GET /api/v1/mobile/records/:model/:id/chatter` (paginated thread read) and `POST /api/v1/mobile/records/:model/:id/chatter/note` (post internal note)
+- **Odoo adapter delegation** with V17 `listChatter` and `postChatterNote` methods supporting pagination via `before` cursor and `limit` parameter
+- **iOS chatter section** with lazy-loaded thread display, @Observable viewmodel, and send-note UX below the record form
+- **Comprehensive test coverage** including backend E2E routes, backend service delegation, and iOS unit/UI validation
+
+### Changed
+
+- Records with `hasChatter == true` now surface a usable thread section instead of an unimplemented placeholder
+- `hasChatter` field detection already existed in schema; this phase activates the transport layer
+
+### Verified
+
+- `npm run build` — shared + backend builds cleanly
+- `npm test` — backend test suite passes (all chatter DTOs, route guards, adapter calls)
+- `xcodebuild ... build` — iOS app builds without errors
+- `xcodebuild ... -only-testing:OrdoTests test` — iOS chatter viewmodel tests pass (lazy load, send-note, thread refresh)
+- Code review: production-ready for approved scope; security relies on JWT auth + Odoo's html_sanitize layer
+- Tester validation: no blocking issues; medium-priority improvements (rate limiting, sanitization docs) deferred to Phase 2 hardening
+
+### Notes
+
+- MVP scope is deliberately narrow: read thread + post internal log note only
+- Followers, activities, attachment-heavy chatter, and rich message types remain deferred to future phases
+- All validation reports stored in `plans/reports/`: code-reviewer and tester summaries confirm clean merge-ready state
+
 ## 2026-03-08 (Dynamic Form Modifier Hardening & Odoo Error Specificity)
 
 ### Added

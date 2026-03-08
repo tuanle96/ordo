@@ -4,12 +4,14 @@ struct RecordDetailView: View {
     @Environment(AppState.self) private var appState
     @Environment(RecentItemsStore.self) private var recentItems
     @State private var viewModel: RecordDetailViewModel
+    @State private var chatterViewModel: RecordChatterViewModel
     @State private var isEditing = false
     @State private var draft: FormDraft?
     @State private var showDiscardConfirmation = false
 
     init(descriptor: ModelDescriptor, recordID: Int) {
         _viewModel = State(initialValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
+        _chatterViewModel = State(initialValue: RecordChatterViewModel(model: descriptor.model, recordID: recordID))
     }
 
     var body: some View {
@@ -80,12 +82,19 @@ struct RecordDetailView: View {
                         validationErrors: viewModel.validationErrors
                     )
                     .id("schema-\(viewModel.recordID)-\(isEditing ? "editing" : "readonly")")
+
+                    if schema.hasChatter {
+                        ChatterSectionView(viewModel: chatterViewModel)
+                    }
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {
                     await viewModel.load(using: appState)
                     if let record = viewModel.record, !isEditing {
                         draft = FormDraft(record: record)
+                    }
+                    if viewModel.schema?.hasChatter == true {
+                        await chatterViewModel.refresh(using: appState)
                     }
                 }
             } else {
@@ -143,6 +152,9 @@ struct RecordDetailView: View {
                 draft = FormDraft(record: record)
                 let displayName = record["display_name"]?.displayText ?? record["name"]?.displayText ?? "Record"
                 recentItems.add(model: viewModel.descriptor.model, recordID: viewModel.recordID, displayName: displayName)
+            }
+            if viewModel.schema?.hasChatter == true {
+                await chatterViewModel.loadIfNeeded(using: appState)
             }
         }
     }

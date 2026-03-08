@@ -42,12 +42,13 @@ The middleware handles version differences, authentication, and schema introspec
 | **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list with table/grid view modes, sortable columns, pull-to-refresh for `res.partner`, `crm.lead`, and narrow `sale.order` |
 | **Search**               | `GET /search/:model` (name_search)                          | Debounced search with 300ms delay, plus relation search for supported `many2one` editors |
 | **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action) | Edit mode for `char`, `text`, `boolean`, `selection`, `many2one`, `many2many` tags; save/discard UX; dirty tracking; required-field validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` |
+| **Chatter**              | `GET /records/:model/:id/chatter` (paginated thread read), `POST /records/:model/:id/chatter/note` (post internal note) | Lazy-loaded chatter section below record form with thread display, author info, timestamps, and send-note UX |
 | **Offline Cache**        | —                                                           | File-based cache with actor isolation, stale-data banners |
 | **Health Check**         | `GET /health` (unprefixed)                                  | —                                                         |
 
 ### 🚧 Planned
 
-Nested `one2many` editors, kanban/grouping views, file upload, chatter threads, offline mutation queue, deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
+Nested `one2many` editors, kanban/grouping views, file upload, chatter followers/activities, offline mutation queue, deeper field type coverage, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
 
 ---
 
@@ -76,7 +77,7 @@ Nested `one2many` editors, kanban/grouping views, file upload, chatter threads, 
 | Layer            | Technology                              |
 | ---------------- | --------------------------------------- |
 | iOS UI           | SwiftUI (iOS 17+)                       |
-| iOS Architecture | MVVM + `@Observable` pilot (`RecentItemsStore`), `ObservableObject` retained for `AppState` until Phase 07 |
+| iOS Architecture | MVVM + `@Observable` with `@MainActor` isolation for app state and stores, `@State` root ownership in `OrdoApp`, typed environment injection |
 | iOS Networking   | URLSession + async/await + Codable      |
 | iOS Storage      | Keychain Services + file-based cache    |
 | Backend          | NestJS 11 + TypeScript 5.x              |

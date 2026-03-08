@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 
 import type {
+    ChatterMessage,
+    ChatterThreadResult,
     DeleteRecordResult,
     RecordActionResult,
     RecordData,
@@ -22,6 +24,8 @@ import type {
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { ChatterQueryDto } from './dto/chatter-query.dto';
+import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
 import { RecordActionDto } from './dto/record-action.dto';
 import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
@@ -49,6 +53,26 @@ export class RecordController {
         @Query() query: RecordQueryDto,
     ): Promise<RecordData> {
         return this.recordService.getRecord(currentUser, model, id, query);
+    }
+
+    @Get(':model/:id/chatter')
+    listChatter(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+        @Query() query: ChatterQueryDto,
+    ): Promise<ChatterThreadResult> {
+        return this.recordService.listChatter(currentUser, model, id, query);
+    }
+
+    @Post(':model/:id/chatter/note')
+    postChatterNote(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: PostChatterNoteDto,
+    ): Promise<ChatterMessage> {
+        return this.recordService.postChatterNote(currentUser, model, id, body);
     }
 
     @Post(':model')

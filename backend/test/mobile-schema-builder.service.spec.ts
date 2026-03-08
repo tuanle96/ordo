@@ -66,16 +66,16 @@ describe('MobileSchemaBuilderService', () => {
                 label: 'Archive',
                 type: 'object',
                 style: 'primary',
-            invisible: undefined,
-            modifiers: {
-              invisible: {
-                type: 'or',
-                rules: [
-                  { type: 'condition', condition: { field: 'state', op: '==', value: 'done' } },
-                  { type: 'condition', condition: { field: 'state', op: 'not in', values: ['draft', 'confirm'] } },
-                ],
-              },
-            },
+                invisible: undefined,
+                modifiers: {
+                    invisible: {
+                        type: 'or',
+                        rules: [
+                            { type: 'condition', condition: { field: 'state', op: '==', value: 'done' } },
+                            { type: 'condition', condition: { field: 'state', op: 'not in', values: ['draft', 'confirm'] } },
+                        ],
+                    },
+                },
                 confirm: undefined,
             },
         ]);
@@ -83,36 +83,36 @@ describe('MobileSchemaBuilderService', () => {
             {
                 label: 'Main',
                 fields: [
-              expect.objectContaining({
-                name: 'name',
-                type: 'char',
-                label: 'Name',
-                required: true,
-                modifiers: {
-                  invisible: {
-                    type: 'condition',
-                    condition: { field: 'company_type', op: '==', value: 'private' },
-                  },
-                  required: { type: 'constant', constant: true },
-                },
-              }),
-              expect.objectContaining({
-                name: 'email',
-                type: 'char',
-                label: 'Email',
-                widget: 'email',
-                readonly: undefined,
-                modifiers: {
-                  invisible: {
-                    type: 'condition',
-                    condition: { field: 'company_type', op: '==', value: 'private' },
-                  },
-                  readonly: {
-                    type: 'condition',
-                    condition: { field: 'state', op: '==', value: 'done' },
-                  },
-                },
-              }),
+                    expect.objectContaining({
+                        name: 'name',
+                        type: 'char',
+                        label: 'Name',
+                        required: true,
+                        modifiers: {
+                            invisible: {
+                                type: 'condition',
+                                condition: { field: 'company_type', op: '==', value: 'private' },
+                            },
+                            required: { type: 'constant', constant: true },
+                        },
+                    }),
+                    expect.objectContaining({
+                        name: 'email',
+                        type: 'char',
+                        label: 'Email',
+                        widget: 'email',
+                        readonly: undefined,
+                        modifiers: {
+                            invisible: {
+                                type: 'condition',
+                                condition: { field: 'company_type', op: '==', value: 'private' },
+                            },
+                            readonly: {
+                                type: 'condition',
+                                condition: { field: 'state', op: '==', value: 'done' },
+                            },
+                        },
+                    }),
                 ],
             },
         ]);

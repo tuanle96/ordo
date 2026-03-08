@@ -68,6 +68,21 @@ final class APIClient {
         return try await perform(route: "records/\(model)/\(id)", queryItems: queryItems, token: token)
     }
 
+    func chatter(model: String, id: Int, before: Int? = nil, token: String) async throws -> ChatterThreadResult {
+        var queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: "20")]
+
+        if let before {
+            queryItems.append(URLQueryItem(name: "before", value: String(before)))
+        }
+
+        return try await perform(route: "records/\(model)/\(id)/chatter", queryItems: queryItems, token: token)
+    }
+
+    func postChatterNote(model: String, id: Int, body: String, token: String) async throws -> ChatterMessage {
+        let payload = try JSONEncoder().encode(PostChatterNoteRequest(body: body))
+        return try await perform(route: "records/\(model)/\(id)/chatter/note", method: "POST", token: token, body: payload)
+    }
+
     func updateRecord(
         model: String,
         id: Int,

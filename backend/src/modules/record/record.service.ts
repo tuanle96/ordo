@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import type {
+    ChatterMessage,
+    ChatterThreadResult,
     DeleteRecordResult,
     NameSearchResult,
     RecordActionResult,
@@ -15,6 +17,8 @@ import type { OdooAdapter } from '../../odoo/adapters/odoo-adapter.interface';
 import type { OdooSessionContext } from '../../odoo/session/odoo-session.types';
 import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';
 import { RecordActionDto } from './dto/record-action.dto';
+import { ChatterQueryDto } from './dto/chatter-query.dto';
+import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
 import { RecordMutationDto } from './dto/record-mutation.dto';
 import { RecordQueryDto } from './dto/record-query.dto';
 import { SearchQueryDto } from './dto/search-query.dto';
@@ -65,6 +69,26 @@ export class RecordService {
     ): Promise<NameSearchResult[]> {
         const { session, adapter } = await this.resolveContext(currentUser);
         return adapter.nameSearch(session, model, query.query ?? '', query.domain, query.limit);
+    }
+
+    async listChatter(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+        query: ChatterQueryDto,
+    ): Promise<ChatterThreadResult> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.listChatter(session, model, id, query.limit, query.before);
+    }
+
+    async postChatterNote(
+        currentUser: TokenPayload,
+        model: string,
+        id: number,
+        body: PostChatterNoteDto,
+    ): Promise<ChatterMessage> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.postChatterNote(session, model, id, body.body);
     }
 
     async createRecord(
