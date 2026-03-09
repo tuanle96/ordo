@@ -1,4 +1,5 @@
 import Testing
+import UIKit
 @testable import Ordo
 
 struct FieldRowFactoryTests {
@@ -141,6 +142,14 @@ struct FieldRowFactoryTests {
 
         #expect(model?.value == "Pay now")
         #expect(model?.style == .multiline)
+    }
+
+    @Test
+    func one2ManyEditorSupportKeepsHtmlAndMonetaryOnGenericPath() {
+        #expect(One2ManyFieldEditorSupport.isEditable(.html) == true)
+        #expect(One2ManyFieldEditorSupport.isEditable(.monetary) == true)
+        #expect(One2ManyFieldEditorSupport.usesMultilineInput(.html) == true)
+        #expect(One2ManyFieldEditorSupport.keyboardType(for: .monetary) == .decimalPad)
     }
 
     @Test

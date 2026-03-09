@@ -58,6 +58,24 @@ struct FormDraftTests {
     }
 
     @Test
+    func requiredValidationFlagsBlankHtml() {
+        let draft = FormDraft(record: [
+            "bio": .string("<p>Hello</p>"),
+        ])
+        let fields = [
+            FieldSchema(name: "bio", type: .html, label: "Biography", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(nil, for: "bio")
+
+        #expect(draft.validationErrors(for: fields)["bio"] == "Biography is required.")
+
+        draft.setValue(.string("<p>Filled</p>"), for: "bio")
+
+        #expect(draft.validationErrors(for: fields)["bio"] == nil)
+    }
+
+    @Test
     func many2oneChangedValuesNormalizeToRelationID() {
         let baseline: RecordData = [
             "country_id": .relation(id: 233, label: "United States"),
@@ -325,6 +343,43 @@ struct FormDraftTests {
         ]), for: "order_line")
 
         #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+    }
+
+    @Test
+    func one2manyHtmlAndMonetarySubfieldsNormalizeWithinCommands() {
+        let baseline: RecordData = [:]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "price_unit", type: .monetary, label: "Unit Price", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "notes", type: .html, label: "Notes", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "name": .string("Consulting"),
+                "price_unit": .string("125.50"),
+                "notes": .string("<p>Bill weekly</p>"),
+            ]),
+        ]), for: "order_line")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "order_line": .array([
+                .array([
+                    .number(0),
+                    .number(0),
+                    .object([
+                        "name": .string("Consulting"),
+                        "price_unit": .number(125.5),
+                        "notes": .string("<p>Bill weekly</p>"),
+                    ]),
+                ]),
+            ]),
+        ])
     }
 
     @Test

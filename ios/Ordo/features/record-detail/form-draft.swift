@@ -143,7 +143,7 @@ final class FormDraft {
             guard field.isRequired(in: storage) else { return }
 
             switch field.type {
-            case .char, .text, .selection:
+            case .char, .text, .html, .selection:
                 let trimmed = value(for: field.name, fallback: nil)?.stringValue?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed?.isEmpty != false {

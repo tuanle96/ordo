@@ -1,5 +1,36 @@
 import SwiftUI
 
+enum One2ManyFieldEditorSupport {
+    static func isEditable(_ type: FieldType) -> Bool {
+        switch type {
+        case .char, .text, .html, .integer, .float, .monetary, .boolean, .selection, .date, .datetime:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func usesMultilineInput(_ type: FieldType) -> Bool {
+        switch type {
+        case .text, .html:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func keyboardType(for type: FieldType) -> UIKeyboardType {
+        switch type {
+        case .integer:
+            return .numberPad
+        case .float, .monetary:
+            return .decimalPad
+        default:
+            return .default
+        }
+    }
+}
+
 struct One2ManyFieldEditor: View {
     let field: FieldSchema
     let subfields: [FieldSchema]
@@ -9,14 +40,7 @@ struct One2ManyFieldEditor: View {
     let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
 
     private var editableSubfields: [FieldSchema] {
-        subfields.filter {
-            switch $0.type {
-            case .char, .text, .integer, .float, .boolean, .selection, .date, .datetime:
-                return true
-            default:
-                return false
-            }
-        }
+        subfields.filter { One2ManyFieldEditorSupport.isEditable($0.type) }
     }
 
     private var lines: [JSONValue] {
@@ -138,10 +162,10 @@ struct One2ManyFieldEditor: View {
                         let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
                         updateLine(at: lineIndex, fieldName: subfield.name, value: trimmed.isEmpty ? nil : .string(trimmed))
                     }
-                ), axis: subfield.type == .text ? .vertical : .horizontal)
-                    .lineLimit(subfield.type == .text ? 5 : 1)
+                ), axis: One2ManyFieldEditorSupport.usesMultilineInput(subfield.type) ? .vertical : .horizontal)
+                    .lineLimit(One2ManyFieldEditorSupport.usesMultilineInput(subfield.type) ? 5 : 1)
                     .textFieldStyle(.roundedBorder)
-                    .keyboardType(keyboardType(for: subfield))
+                    .keyboardType(One2ManyFieldEditorSupport.keyboardType(for: subfield.type))
                     .accessibilityIdentifier("one2many-field-\(field.name)-\(lineIndex)-\(subfield.name)")
             }
         }
@@ -157,17 +181,6 @@ struct One2ManyFieldEditor: View {
             return ""
         default:
             return value?.displayText ?? ""
-        }
-    }
-
-    private func keyboardType(for subfield: FieldSchema) -> UIKeyboardType {
-        switch subfield.type {
-        case .integer:
-            return .numberPad
-        case .float:
-            return .decimalPad
-        default:
-            return .default
         }
     }
 
