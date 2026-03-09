@@ -190,7 +190,7 @@ struct RecordDetailView: View {
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {
-                    await viewModel.load(using: appState)
+                    await viewModel.load(using: appState, forceRefresh: true)
                     if let record = viewModel.record, !isEditing {
                         draft = FormDraft(record: record)
                     }

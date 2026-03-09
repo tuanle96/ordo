@@ -202,12 +202,45 @@ export class MobileSchemaBuilderService {
     }
 
     private deduplicateFields(fields: FieldSchema[]): FieldSchema[] {
-        const seen = new Set<string>();
-        return fields.filter((field) => {
-            if (seen.has(field.name)) return false;
-            seen.add(field.name);
-            return true;
-        });
+        const merged = new Map<string, FieldSchema>();
+        for (const field of fields) {
+            const existing = merged.get(field.name);
+            if (!existing) {
+                merged.set(field.name, field);
+                continue;
+            }
+
+            // When a field appears multiple times (e.g. res.partner "name" with
+            // mutually exclusive invisible conditions), merge the instances:
+            //   - invisible: AND (field is hidden only when ALL instances are hidden)
+            //   - readonly:  prefer editable (false) if either instance is editable
+            //   - required:  prefer required (true) if either instance requires it
+            const mergedInvisible = this.mergeRules('and', existing.modifiers?.invisible, field.modifiers?.invisible);
+            const mergedReadonly = this.mergeModifierBoolean(existing.readonly, field.readonly, false);
+            const mergedRequired = this.mergeModifierBoolean(existing.required, field.required, true);
+
+            const mergedModifiers: FieldModifiers = {
+                invisible: mergedInvisible,
+                readonly: existing.modifiers?.readonly ?? field.modifiers?.readonly,
+                required: existing.modifiers?.required ?? field.modifiers?.required,
+            };
+
+            merged.set(field.name, {
+                ...existing,
+                readonly: mergedReadonly,
+                required: mergedRequired,
+                invisible: this.extractSingleCondition(mergedInvisible),
+                modifiers: this.compactModifiers(mergedModifiers),
+            });
+        }
+
+        return Array.from(merged.values());
+    }
+
+    /** Merge two boolean modifier values: pick the "dominant" value when they differ. */
+    private mergeModifierBoolean(a?: boolean, b?: boolean, dominant: boolean = false): boolean | undefined {
+        if (a === dominant || b === dominant) return dominant;
+        return a ?? b;
     }
 
     private childContainers(container: XmlNode | undefined): XmlNode[] {

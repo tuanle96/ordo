@@ -13,6 +13,7 @@ final class AppState {
     private(set) var phase: Phase = .launching
     private(set) var session: StoredSession?
     private(set) var currentPrincipal: AuthenticatedPrincipal?
+    private(set) var installedModuleNames: Set<String> = []
     var statusMessage: String?
 
     let config: AppConfig
@@ -41,6 +42,12 @@ final class AppState {
 
     var displayVersion: String? {
         currentPrincipal?.version
+    }
+
+    var availableModels: [ModelDescriptor] {
+        installedModuleNames.isEmpty
+            ? ModelRegistry.supported
+            : ModelRegistry.available(installedModules: installedModuleNames)
     }
 
     var cacheScope: CacheScope? {
@@ -90,6 +97,7 @@ final class AppState {
             currentPrincipal = try await withAuthenticatedToken { [self] token in
                 try await self.apiClient.me(token: token)
             }
+            await fetchInstalledModules()
             phase = .authenticated
             statusMessage = nil
         } catch {
@@ -129,6 +137,7 @@ final class AppState {
 
         session = storedSession
         currentPrincipal = principal
+        await fetchInstalledModules()
         statusMessage = nil
         phase = .authenticated
     }
@@ -183,6 +192,7 @@ final class AppState {
         try? sessionStore.clear()
         session = nil
         currentPrincipal = nil
+        installedModuleNames = []
         phase = .login
         statusMessage = nil
         refreshTask = nil
@@ -212,6 +222,18 @@ final class AppState {
 
     func clearCache() async throws {
         try await cacheStore.clear(scope: cacheScope)
+    }
+
+    private func fetchInstalledModules() async {
+        do {
+            let response = try await withAuthenticatedToken { [self] token in
+                try await self.apiClient.installedModules(token: token)
+            }
+            installedModuleNames = Set(response.modules.map(\.name))
+        } catch {
+            // Graceful degradation: show all models if module check fails
+            installedModuleNames = []
+        }
     }
 
     private func ensureFreshSession() async throws {

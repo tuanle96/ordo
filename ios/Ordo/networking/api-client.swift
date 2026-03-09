@@ -33,8 +33,13 @@ final class APIClient {
         try await perform(route: "auth/logout", method: "POST", token: token)
     }
 
-    func schema(model: String, token: String) async throws -> MobileFormSchema {
-        try await perform(route: "schema/\(model)", token: token)
+    func schema(model: String, fresh: Bool = false, token: String) async throws -> MobileFormSchema {
+        let queryItems = fresh ? [URLQueryItem(name: "fresh", value: "true")] : []
+        return try await perform(route: "schema/\(model)", queryItems: queryItems, token: token)
+    }
+
+    func installedModules(token: String) async throws -> InstalledModulesResponse {
+        try await perform(route: "modules/installed", token: token)
     }
 
     func listRecords(

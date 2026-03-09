@@ -14,10 +14,12 @@ export class SchemaService {
         private readonly schemaCache: SchemaCacheService,
     ) { }
 
-    async getFormSchema(currentUser: TokenPayload, model: string): Promise<MobileFormSchema> {
-        const cachedSchema = await this.schemaCache.get(currentUser, model);
-        if (cachedSchema) {
-            return cachedSchema;
+    async getFormSchema(currentUser: TokenPayload, model: string, fresh = false): Promise<MobileFormSchema> {
+        if (!fresh) {
+            const cachedSchema = await this.schemaCache.get(currentUser, model);
+            if (cachedSchema) {
+                return cachedSchema;
+            }
         }
 
         const session = await this.sessionStore.getOrThrow(currentUser.sessionHandle);

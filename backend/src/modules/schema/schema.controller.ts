@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 
 import type { MobileFormSchema, TokenPayload } from '@ordo/shared';
 
@@ -15,7 +15,8 @@ export class SchemaController {
     getFormSchema(
         @CurrentUser() currentUser: TokenPayload,
         @Param('model') model: string,
+        @Query('fresh') fresh?: string,
     ): Promise<MobileFormSchema> {
-        return this.schemaService.getFormSchema(currentUser, model);
+        return this.schemaService.getFormSchema(currentUser, model, fresh === 'true');
     }
 }

@@ -16,6 +16,8 @@ import type {
     RecordListResult,
 } from '@ordo/shared';
 
+import type { InstalledModuleInfo } from '../../modules/module/module.types';
+
 import { OdooAdapter } from './odoo-adapter.interface';
 import { OdooRpcService } from '../rpc/odoo-rpc.service';
 import { MobileSchemaBuilderService } from '../schema/mobile-schema-builder.service';
@@ -509,6 +511,31 @@ export class OdooV17Adapter implements OdooAdapter {
         });
 
         return this.getChatterDetails(session, model, id);
+    }
+
+    async getInstalledModules(
+        session: OdooSessionContext,
+        technicalNames: string[],
+    ): Promise<InstalledModuleInfo[]> {
+        const records = await this.odooRpcService.callKwWithSession<
+            Array<{ name: string; shortdesc: string }>
+        >({
+            session,
+            model: 'ir.module.module',
+            method: 'search_read',
+            kwargs: {
+                domain: [
+                    ['name', 'in', technicalNames],
+                    ['state', '=', 'installed'],
+                ],
+                fields: ['name', 'shortdesc'],
+            },
+        });
+
+        return records.map((record) => ({
+            name: record.name,
+            displayName: record.shortdesc,
+        }));
     }
 
     private mapChatterMessage(message: OdooFormattedMessage): ChatterMessage {

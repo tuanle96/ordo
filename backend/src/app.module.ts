@@ -8,6 +8,7 @@ import { PinoLoggerService } from './common/logging/pino-logger.service';
 import { RedisModule } from './common/redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
+import { ModuleModule } from './modules/module/module.module';
 import { RecordModule } from './modules/record/record.module';
 import { SchemaModule } from './modules/schema/schema.module';
 import { OdooModule } from './odoo/odoo.module';
@@ -28,6 +29,7 @@ import { OdooModule } from './odoo/odoo.module';
         RedisModule,
         AuthModule,
         HealthModule,
+        ModuleModule,
         SchemaModule,
         RecordModule,
         OdooModule,

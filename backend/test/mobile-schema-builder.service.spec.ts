@@ -308,8 +308,17 @@ describe('MobileSchemaBuilderService', () => {
                     type: 'char',
                     modifiers: expect.objectContaining({
                         invisible: {
-                            type: 'not',
+                            type: 'and',
                             rules: [
+                                {
+                                    type: 'not',
+                                    rules: [
+                                        {
+                                            type: 'condition',
+                                            condition: { field: 'is_company', op: '==', value: true },
+                                        },
+                                    ],
+                                },
                                 {
                                     type: 'condition',
                                     condition: { field: 'is_company', op: '==', value: true },

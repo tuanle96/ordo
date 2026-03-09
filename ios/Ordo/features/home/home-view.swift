@@ -45,7 +45,7 @@ struct HomeView: View {
 
                     OrdoCard {
                         VStack(spacing: 0) {
-                            ForEach(Array(ModelRegistry.supported.enumerated()), id: \.element.id) { index, descriptor in
+                            ForEach(Array(appState.availableModels.enumerated()), id: \.element.id) { index, descriptor in
                                 NavigationLink {
                                     RecordListView(descriptor: descriptor)
                                 } label: {
@@ -69,7 +69,7 @@ struct HomeView: View {
                                     .padding(.vertical, OrdoSpacing.md)
                                 }
 
-                                if index < ModelRegistry.supported.count - 1 {
+                                if index < appState.availableModels.count - 1 {
                                     Divider()
                                 }
                             }
@@ -89,7 +89,7 @@ struct HomeView: View {
                         OrdoCard {
                             VStack(spacing: 0) {
                                 ForEach(Array(recentItems.items.prefix(5).enumerated()), id: \.element.id) { index, item in
-                                    if let descriptor = ModelRegistry.supported.first(where: { $0.model == item.model }) {
+                                    if let descriptor = appState.availableModels.first(where: { $0.model == item.model }) {
                                         NavigationLink {
                                             RecordDetailView(descriptor: descriptor, recordID: item.recordID)
                                         } label: {

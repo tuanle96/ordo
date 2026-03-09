@@ -107,7 +107,7 @@ final class RecordDetailViewModel {
         runningActionName == action.name
     }
 
-    func load(using appState: AppState) async {
+    func load(using appState: AppState, forceRefresh: Bool = false) async {
         guard appState.session?.accessToken != nil else {
             errorMessage = "Sign in again to load this record."
             return
@@ -120,7 +120,7 @@ final class RecordDetailViewModel {
         resetOnchangeState()
 
         if isCreating {
-            await loadCreateSchema(using: appState)
+            await loadCreateSchema(using: appState, forceRefresh: forceRefresh)
             return
         }
 
@@ -143,7 +143,7 @@ final class RecordDetailViewModel {
 
         do {
             let schema = try await appState.withAuthenticatedToken { [self] token in
-                try await appState.apiClient.schema(model: self.descriptor.model, token: token)
+                try await appState.apiClient.schema(model: self.descriptor.model, fresh: forceRefresh, token: token)
             }
 
             let record = try await appState.withAuthenticatedToken { [self] token in
@@ -507,10 +507,10 @@ final class RecordDetailViewModel {
         resetOnchangeFeedback()
     }
 
-    private func loadCreateSchema(using appState: AppState) async {
+    private func loadCreateSchema(using appState: AppState, forceRefresh: Bool = false) async {
         do {
             let schema = try await appState.withAuthenticatedToken { [self] token in
-                try await appState.apiClient.schema(model: self.descriptor.model, token: token)
+                try await appState.apiClient.schema(model: self.descriptor.model, fresh: forceRefresh, token: token)
             }
 
             self.schema = schema

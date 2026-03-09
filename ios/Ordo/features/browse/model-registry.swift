@@ -9,6 +9,7 @@ struct ModelDescriptor: Identifiable, Hashable {
     let titleFields: [String]
     let subtitleFields: [String]
     let footnoteFields: [String]
+    let requiredModule: String?
 
     var id: String { model }
 
@@ -58,7 +59,8 @@ enum ModelRegistry {
             listFields: ["id", "display_name", "name", "email", "phone", "city", "country_id"],
             titleFields: ["display_name", "name"],
             subtitleFields: ["email", "phone"],
-            footnoteFields: ["city", "country_id"]
+            footnoteFields: ["city", "country_id"],
+            requiredModule: nil
         ),
         ModelDescriptor(
             model: "crm.lead",
@@ -68,7 +70,8 @@ enum ModelRegistry {
             listFields: ["id", "display_name", "name", "partner_name", "email_from", "phone", "stage_id", "user_id"],
             titleFields: ["name", "display_name"],
             subtitleFields: ["partner_name", "email_from", "phone"],
-            footnoteFields: ["stage_id", "user_id"]
+            footnoteFields: ["stage_id", "user_id"],
+            requiredModule: "crm"
         ),
         ModelDescriptor(
             model: "sale.order",
@@ -78,7 +81,16 @@ enum ModelRegistry {
             listFields: ["id", "display_name", "name", "partner_id", "user_id", "state", "amount_total"],
             titleFields: ["name", "display_name"],
             subtitleFields: ["partner_id", "user_id"],
-            footnoteFields: ["state", "amount_total"]
+            footnoteFields: ["state", "amount_total"],
+            requiredModule: "sale"
         ),
     ]
+
+    static func available(installedModules: Set<String>) -> [ModelDescriptor] {
+        supported.filter { descriptor in
+            guard let required = descriptor.requiredModule else { return true }
+            return installedModules.contains(required)
+        }
+    }
 }
+

@@ -8,7 +8,7 @@ import { RedisService } from '../../common/redis/redis.service';
 @Injectable()
 export class SchemaCacheService {
     private readonly logger = new Logger(SchemaCacheService.name);
-    private readonly ttlSeconds = 3600;
+    private readonly ttlSeconds = 300;
     private readonly redisKeyPrefix: string;
     private readonly shouldLog: boolean;
 

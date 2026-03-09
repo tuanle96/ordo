@@ -1,12 +1,14 @@
 import SwiftUI
 
 struct BrowseHomeView: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
         ScrollView {
             VStack(spacing: OrdoSpacing.lg) {
                 OrdoCard {
                     VStack(spacing: 0) {
-                        ForEach(Array(ModelRegistry.supported.enumerated()), id: \.element.id) { index, descriptor in
+                        ForEach(Array(appState.availableModels.enumerated()), id: \.element.id) { index, descriptor in
                             NavigationLink {
                                 RecordListView(descriptor: descriptor)
                             } label: {
@@ -36,7 +38,7 @@ struct BrowseHomeView: View {
                             }
                             .accessibilityIdentifier("browse-model-\(descriptor.model.replacingOccurrences(of: ".", with: "-"))")
 
-                            if index < ModelRegistry.supported.count - 1 {
+                            if index < appState.availableModels.count - 1 {
                                 Divider()
                             }
                         }
@@ -55,5 +57,7 @@ struct BrowseHomeView: View {
 #Preview {
     NavigationStack {
         BrowseHomeView()
+            .environment(AppState.preview)
     }
 }
+

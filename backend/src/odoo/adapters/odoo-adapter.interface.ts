@@ -12,6 +12,8 @@ import type {
     RecordListResult,
 } from '@ordo/shared';
 
+import type { InstalledModuleInfo } from '../../modules/module/module.types';
+
 import type { OdooSessionContext } from '../session/odoo-session.types';
 
 export interface OdooAdapter {
@@ -113,4 +115,8 @@ export interface OdooAdapter {
             dateDeadline?: string;
         },
     ): Promise<ChatterDetailsResult>;
+    getInstalledModules(
+        session: OdooSessionContext,
+        technicalNames: string[],
+    ): Promise<InstalledModuleInfo[]>;
 }
