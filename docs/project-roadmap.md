@@ -24,6 +24,7 @@
 | Phase 08 — iOS create flow & primitive editor expansion | In Progress | Record detail now supports create-mode navigation from browse lists plus editable `integer`, `float`, `date`, and `datetime` fields backed by draft normalization, validation, and canonical POST readback; deterministic create-flow UI/E2E coverage remains pending |
 | Phase 09 — Odoo onchange foundation | ✅ Complete | Shared contracts, backend transport, iOS debounce/merge/warnings, backend fail-closed hardening, and live Odoo 17 `res.partner` validation are complete; broad returned-domain application and deeper x2many parity remain deferred |
 | Phase 10 — iOS workflow action buttons | In Progress | Record detail now renders visible schema header actions for persisted read-mode records, supports confirm dialogs plus single-flight execution, updates cached record state after action completion, and ships focused unit validation plus mutable UI-test fixtures; broader simulator UI stabilization remains pending |
+| Phase 11 — Explicit auth logout | ✅ Complete | Guarded `POST /auth/logout` now revokes the Redis-backed `sessionHandle`, best-effort destroys the upstream Odoo session cookie bridge, and powers a remote-first Settings sign-out flow with focused backend + iOS regression coverage |
 
 ## Scope reminders
 

@@ -150,4 +150,87 @@ describe('AuthService', () => {
             },
         });
     });
+
+    it('revokes the stored session handle and destroys the upstream Odoo session on logout', async () => {
+        const sessionStore = {
+            get: jest.fn().mockResolvedValue({
+                handle: 'session-handle-123',
+                odooUrl: 'http://127.0.0.1:38421',
+                db: 'odoo17',
+                uid: 2,
+                version: '17',
+                lang: 'en_US',
+                cookieHeader: 'session_id=abc123',
+                expiresAt: 123456,
+            }),
+            revoke: jest.fn().mockResolvedValue(undefined),
+        };
+        const odooRpcService = {
+            destroySession: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const service = new AuthService(
+            {} as never,
+            {} as never,
+            odooRpcService as never,
+            {} as never,
+            sessionStore as never,
+        );
+
+        const response = await service.logout({
+            uid: 2,
+            db: 'odoo17',
+            odooUrl: 'http://127.0.0.1:38421',
+            version: '17',
+            lang: 'en_US',
+            groups: [1, 2],
+            name: 'Administrator',
+            email: undefined,
+            tz: undefined,
+            sessionHandle: 'session-handle-123',
+        });
+
+        expect(sessionStore.get).toHaveBeenCalledWith('session-handle-123');
+        expect(sessionStore.revoke).toHaveBeenCalledWith('session-handle-123');
+        expect(odooRpcService.destroySession).toHaveBeenCalledWith({
+            odooUrl: 'http://127.0.0.1:38421',
+            cookieHeader: 'session_id=abc123',
+        });
+        expect(response).toEqual({ success: true });
+    });
+
+    it('returns success when the stored session is already gone during logout', async () => {
+        const sessionStore = {
+            get: jest.fn().mockResolvedValue(null),
+            revoke: jest.fn().mockResolvedValue(undefined),
+        };
+        const odooRpcService = {
+            destroySession: jest.fn(),
+        };
+
+        const service = new AuthService(
+            {} as never,
+            {} as never,
+            odooRpcService as never,
+            {} as never,
+            sessionStore as never,
+        );
+
+        const response = await service.logout({
+            uid: 2,
+            db: 'odoo17',
+            odooUrl: 'http://127.0.0.1:38421',
+            version: '17',
+            lang: 'en_US',
+            groups: [1],
+            name: 'Administrator',
+            email: undefined,
+            tz: undefined,
+            sessionHandle: 'missing-session-handle',
+        });
+
+        expect(sessionStore.revoke).toHaveBeenCalledWith('missing-session-handle');
+        expect(odooRpcService.destroySession).not.toHaveBeenCalled();
+        expect(response).toEqual({ success: true });
+    });
 });

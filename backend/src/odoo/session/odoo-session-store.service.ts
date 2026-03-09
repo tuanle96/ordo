@@ -73,6 +73,10 @@ export class OdooSessionStoreService {
         return session;
     }
 
+    async revoke(handle: string): Promise<void> {
+        await this.redisService.delete(this.toKey(handle));
+    }
+
     private computeExpiry(): number {
         return Date.now() + this.getTtlSeconds() * 1000;
     }

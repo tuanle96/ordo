@@ -1,7 +1,12 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
-import type { AuthenticatedPrincipal, TokenPayload, TokenResponse } from '@ordo/shared';
+import type {
+    AuthenticatedPrincipal,
+    LogoutResponse,
+    TokenPayload,
+    TokenResponse,
+} from '@ordo/shared';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
@@ -35,6 +40,12 @@ export class AuthController {
     @Post('refresh')
     refresh(@Body() refreshTokenDto: RefreshTokenDto): Promise<TokenResponse> {
         return this.authService.refresh(refreshTokenDto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('logout')
+    logout(@CurrentUser() currentUser: TokenPayload): Promise<LogoutResponse> {
+        return this.authService.logout(currentUser);
     }
 
     @UseGuards(JwtAuthGuard)

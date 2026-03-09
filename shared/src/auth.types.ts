@@ -41,3 +41,7 @@ export interface TokenResponse {
     expiresIn: number;
     user: AuthUser;
 }
+
+export interface LogoutResponse {
+    success: true;
+}

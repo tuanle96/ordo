@@ -22,6 +22,7 @@ describe('Auth endpoints', () => {
     const authServiceMock = {
         login: jest.fn().mockResolvedValue(odooFixtures.tokenResponse),
         refresh: jest.fn().mockResolvedValue(odooFixtures.tokenResponse),
+        logout: jest.fn().mockResolvedValue({ success: true }),
         getAuthenticatedPrincipal: jest.fn().mockReturnValue(odooFixtures.authenticatedPrincipal),
     };
 
@@ -101,6 +102,18 @@ describe('Auth endpoints', () => {
             expect.objectContaining({ uid: 2, sessionHandle: 'session-handle-123' }),
         );
         expect(response.body.data).toEqual(odooFixtures.authenticatedPrincipal);
+    });
+
+    it('returns success from /auth/logout', async () => {
+        const response = await request(protectedApp.getHttpServer())
+            .post('/api/v1/mobile/auth/logout')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(201);
+
+        expect(authServiceMock.logout).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2, sessionHandle: 'session-handle-123' }),
+        );
+        expect(response.body.data).toEqual({ success: true });
     });
 
     it('throttles repeated login attempts on /auth/login', async () => {

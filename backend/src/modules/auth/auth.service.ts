@@ -1,6 +1,7 @@
 import {
     BadGatewayException,
     Injectable,
+    Logger,
     UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -9,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import type {
     AuthUser,
     AuthenticatedPrincipal,
+    LogoutResponse,
     RefreshTokenRequest,
     TokenPayload,
     TokenResponse,
@@ -21,6 +23,8 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         private readonly configService: ConfigService,
         private readonly jwtService: JwtService,
@@ -93,6 +97,29 @@ export class AuthService {
         });
 
         return this.issueTokens(refreshedPayload, this.toAuthUserFromPayload(refreshedPayload));
+    }
+
+    async logout(payload: TokenPayload): Promise<LogoutResponse> {
+        const session = await this.sessionStore.get(payload.sessionHandle);
+
+        await this.sessionStore.revoke(payload.sessionHandle);
+
+        if (session) {
+            try {
+                await this.odooRpcService.destroySession({
+                    odooUrl: session.odooUrl,
+                    cookieHeader: session.cookieHeader,
+                });
+            } catch (error) {
+                this.logger.warn({
+                    event: 'odoo_session_destroy_failed',
+                    sessionHandle: payload.sessionHandle,
+                    message: error instanceof Error ? error.message : 'unknown error',
+                });
+            }
+        }
+
+        return { success: true };
     }
 
     getAuthenticatedPrincipal(payload: TokenPayload): AuthenticatedPrincipal {

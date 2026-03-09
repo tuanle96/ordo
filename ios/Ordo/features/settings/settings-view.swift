@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @State private var cacheMessage: String?
+    @State private var isSigningOut = false
 
     var body: some View {
         ScrollView {
@@ -136,7 +137,12 @@ struct SettingsView: View {
                 // MARK: - Sign Out
                 OrdoCard {
                     Button {
-                        appState.signOut()
+                        isSigningOut = true
+
+                        Task {
+                            defer { isSigningOut = false }
+                            await appState.logout()
+                        }
                     } label: {
                         HStack(spacing: OrdoSpacing.md) {
                             Image(systemName: "rectangle.portrait.and.arrow.right.fill")
@@ -150,8 +156,14 @@ struct SettingsView: View {
                                 .foregroundStyle(OrdoColors.danger)
 
                             Spacer()
+
+                            if isSigningOut {
+                                ProgressView()
+                                    .tint(OrdoColors.danger)
+                            }
                         }
                     }
+                    .disabled(isSigningOut)
                 }
             }
             .padding(.horizontal, OrdoSpacing.lg)

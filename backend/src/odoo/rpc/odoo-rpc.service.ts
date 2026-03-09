@@ -194,6 +194,17 @@ export class OdooRpcService {
         });
     }
 
+    async destroySession(
+        session: Pick<OdooCallKwRequest['session'], 'odooUrl' | 'cookieHeader'>,
+    ): Promise<void> {
+        await this.postJsonRoute<unknown>(
+            this.normalizeBaseUrl(session.odooUrl),
+            '/web/session/destroy',
+            {},
+            session.cookieHeader,
+        );
+    }
+
     private async callKwByPathWithSession<T>(request: OdooCallKwRequest): Promise<T> {
         return this.postJsonRoute<T>(
             this.normalizeBaseUrl(request.session.odooUrl),

@@ -35,6 +35,10 @@ struct TokenResponse: Codable {
     let user: AuthUser
 }
 
+struct LogoutResponse: Codable {
+    let success: Bool
+}
+
 struct AuthenticatedPrincipal: Codable, Hashable {
     let uid: Int
     let db: String

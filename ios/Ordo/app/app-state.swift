@@ -188,6 +188,28 @@ final class AppState {
         refreshTask = nil
     }
 
+    func logout() async {
+        guard session != nil else {
+            signOut()
+            return
+        }
+
+        do {
+            _ = try await withAuthenticatedToken { [self] token in
+                try await self.apiClient.logout(token: token)
+            }
+            signOut()
+        } catch {
+            if case APIClientError.unauthorized = error {
+                signOut()
+                return
+            }
+
+            signOut()
+            self.statusMessage = "Signed out locally, but the server logout could not be confirmed."
+        }
+    }
+
     func clearCache() async throws {
         try await cacheStore.clear(scope: cacheScope)
     }

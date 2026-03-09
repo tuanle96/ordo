@@ -36,7 +36,7 @@ The middleware handles version differences, authentication, and schema introspec
 
 | Area                     | Backend                                                     | iOS                                                       |
 | ------------------------ | ----------------------------------------------------------- | --------------------------------------------------------- |
-| **Authentication**       | `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me`, JWT with session bridge | Login screen, Keychain persistence, session restore       |
+| **Authentication**       | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, JWT with session bridge plus Redis-backed session-handle revocation | Login screen, Keychain persistence, session restore, and explicit Settings sign-out that logs out remotely before clearing local state |
 | **Version Detection**    | Auto-detect Odoo 17/18/19 via `/web/webclient/version_info` | —                                                         |
 | **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema        | —                                                         |
 | **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`            | Paginated list with table/grid view modes, sortable columns, pull-to-refresh for `res.partner`, `crm.lead`, and narrow `sale.order` |
@@ -244,6 +244,7 @@ All endpoints are prefixed with `/api/v1/mobile` (configurable via `API_PREFIX` 
 | `GET`  | `/health`             | No     | Health check (unprefixed)          |
 | `POST` | `/auth/login`         | No     | Authenticate via Odoo, returns JWT |
 | `POST` | `/auth/refresh`       | No     | Exchange refresh token for a fresh access token |
+| `POST` | `/auth/logout`        | Bearer | Revoke the current Redis-backed Odoo session bridge and best-effort destroy the upstream Odoo session |
 | `GET`  | `/auth/me`            | Bearer | Get current user principal         |
 | `GET`  | `/schema/:model`      | Bearer | Get mobile form schema for model   |
 | `GET`  | `/records/:model`     | Bearer | List records with pagination       |
@@ -326,6 +327,7 @@ The **Version Adapter** pattern normalizes API differences. Adding support for a
 - [x] Rate limiting on auth endpoints
 - [x] CORS configuration
 - [x] Structured logging (Pino)
+- [x] Explicit logout backend + iOS settings integration (`POST /auth/logout`)
 - [x] iOS test hardening (unit-green milestone established the baseline later used to close the recent-items relaunch seam in Phase 06A/06B)
 - [x] Phase 06A — isolate recent-items relaunch determinism before any observation refactor
 - [x] Phase 06B — run a narrow `RecentItemsStore` `@Observable` pilot

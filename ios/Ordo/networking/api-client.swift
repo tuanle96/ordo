@@ -29,6 +29,10 @@ final class APIClient {
         try await perform(route: "auth/me", token: token)
     }
 
+    func logout(token: String) async throws -> LogoutResponse {
+        try await perform(route: "auth/logout", method: "POST", token: token)
+    }
+
     func schema(model: String, token: String) async throws -> MobileFormSchema {
         try await perform(route: "schema/\(model)", token: token)
     }

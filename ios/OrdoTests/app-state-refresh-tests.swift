@@ -108,6 +108,184 @@ struct AppStateRefreshTests {
         #expect(appState.currentPrincipal == nil)
         #expect(appState.statusMessage == "Your saved session could not be restored. Please sign in again.")
     }
+
+    @Test
+    func logoutPostsToBackendThenClearsLocalSession() async throws {
+        let defaults = UserDefaults(suiteName: "com.ordo.app.tests.logout") ?? .standard
+        let sessionStore = UserDefaultsSessionStore(defaults: defaults, key: "logout-session")
+        try? sessionStore.clear()
+
+        let storedSession = StoredSession(
+            backendBaseURL: URL(string: AppConfig.fallbackBaseURL)!,
+            odooURL: "http://127.0.0.1:38421",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "valid-access",
+            refreshToken: "refresh-token",
+            expiresAt: .now.addingTimeInterval(600),
+            user: AuthUser(id: 1, name: "Demo Admin", email: "admin@example.com", lang: "en_US", tz: "UTC", avatarUrl: nil)
+        )
+        try sessionStore.save(storedSession)
+
+        RefreshTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/logout") {
+                #expect(request.httpMethod == "POST")
+                #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer valid-access")
+                return (200, try JSONEncoder().encode(TestEnvelope(data: LogoutResponse(success: true))))
+            }
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal(
+                    uid: 1,
+                    db: "odoo17",
+                    odooUrl: "http://127.0.0.1:38421",
+                    version: "17",
+                    lang: "en_US",
+                    groups: [1],
+                    name: "Demo Admin",
+                    email: "admin@example.com",
+                    tz: "UTC"
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RefreshTestURLProtocol.self]
+        let apiClient = APIClient(baseURL: URL(string: AppConfig.fallbackBaseURL)!, session: URLSession(configuration: configuration))
+        let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let appState = AppState(config: .preview, sessionStore: sessionStore, apiClient: apiClient, cacheStore: cacheStore)
+
+        await appState.restoreSession()
+        await appState.logout()
+
+        #expect(appState.phase == .login)
+        #expect(appState.session == nil)
+        #expect(appState.currentPrincipal == nil)
+        #expect(try sessionStore.load() == nil)
+    }
+
+    @Test
+    func logoutFallsBackToLocalSignOutWhenBackendReturnsUnauthorized() async throws {
+        let defaults = UserDefaults(suiteName: "com.ordo.app.tests.logout.unauthorized") ?? .standard
+        let sessionStore = UserDefaultsSessionStore(defaults: defaults, key: "logout-session-unauthorized")
+        try? sessionStore.clear()
+
+        let storedSession = StoredSession(
+            backendBaseURL: URL(string: AppConfig.fallbackBaseURL)!,
+            odooURL: "http://127.0.0.1:38421",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "expired-access",
+            refreshToken: "bad-refresh-token",
+            expiresAt: .now.addingTimeInterval(600),
+            user: AuthUser(id: 1, name: "Demo Admin", email: "admin@example.com", lang: "en_US", tz: "UTC", avatarUrl: nil)
+        )
+        try sessionStore.save(storedSession)
+
+        RefreshTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/logout") {
+                return (401, Data())
+            }
+
+            if path.hasSuffix("/auth/refresh") {
+                return (401, Data())
+            }
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal(
+                    uid: 1,
+                    db: "odoo17",
+                    odooUrl: "http://127.0.0.1:38421",
+                    version: "17",
+                    lang: "en_US",
+                    groups: [1],
+                    name: "Demo Admin",
+                    email: "admin@example.com",
+                    tz: "UTC"
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RefreshTestURLProtocol.self]
+        let apiClient = APIClient(baseURL: URL(string: AppConfig.fallbackBaseURL)!, session: URLSession(configuration: configuration))
+        let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let appState = AppState(config: .preview, sessionStore: sessionStore, apiClient: apiClient, cacheStore: cacheStore)
+
+        await appState.restoreSession()
+        await appState.logout()
+
+        #expect(appState.phase == .login)
+        #expect(appState.session == nil)
+        #expect(appState.currentPrincipal == nil)
+        #expect(try sessionStore.load() == nil)
+    }
+
+    @Test
+    func logoutStillClearsLocalSessionWhenBackendIsUnavailable() async throws {
+        let defaults = UserDefaults(suiteName: "com.ordo.app.tests.logout.unavailable") ?? .standard
+        let sessionStore = UserDefaultsSessionStore(defaults: defaults, key: "logout-session-unavailable")
+        try? sessionStore.clear()
+
+        let storedSession = StoredSession(
+            backendBaseURL: URL(string: AppConfig.fallbackBaseURL)!,
+            odooURL: "http://127.0.0.1:38421",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "valid-access",
+            refreshToken: "refresh-token",
+            expiresAt: .now.addingTimeInterval(600),
+            user: AuthUser(id: 1, name: "Demo Admin", email: "admin@example.com", lang: "en_US", tz: "UTC", avatarUrl: nil)
+        )
+        try sessionStore.save(storedSession)
+
+        RefreshTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/logout") {
+                throw URLError(.cannotConnectToHost)
+            }
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal(
+                    uid: 1,
+                    db: "odoo17",
+                    odooUrl: "http://127.0.0.1:38421",
+                    version: "17",
+                    lang: "en_US",
+                    groups: [1],
+                    name: "Demo Admin",
+                    email: "admin@example.com",
+                    tz: "UTC"
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RefreshTestURLProtocol.self]
+        let apiClient = APIClient(baseURL: URL(string: AppConfig.fallbackBaseURL)!, session: URLSession(configuration: configuration))
+        let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let appState = AppState(config: .preview, sessionStore: sessionStore, apiClient: apiClient, cacheStore: cacheStore)
+
+        await appState.restoreSession()
+        await appState.logout()
+
+        #expect(appState.phase == .login)
+        #expect(appState.session == nil)
+        #expect(appState.currentPrincipal == nil)
+        #expect(appState.statusMessage == "Signed out locally, but the server logout could not be confirmed.")
+        #expect(try sessionStore.load() == nil)
+    }
 }
 
 private final class RefreshTestURLProtocol: URLProtocol {

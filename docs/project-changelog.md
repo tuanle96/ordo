@@ -1,5 +1,31 @@
 # Project Changelog
 
+## 2026-03-09 (Explicit Auth Logout)
+
+### Added
+
+- **Shared logout transport** via `LogoutResponse` for both NestJS and Swift clients
+- **Guarded backend logout endpoint** at `POST /api/v1/mobile/auth/logout`
+- **Server-side session revocation flow** that deletes the Redis-backed `sessionHandle` and best-effort calls Odoo `/web/session/destroy`
+- **iOS explicit logout path** in `AppState` / `APIClient` and Settings UI loading state for user-initiated sign-out
+- **Focused regression coverage** for backend logout semantics and iOS success / unauthorized / backend-unavailable logout outcomes
+
+### Changed
+
+- User-initiated sign-out now attempts remote logout first instead of only clearing local state
+- Implicit auth-failure cleanup still uses the existing local-only `signOut()` path, so unauthorized recovery behavior stays unchanged
+
+### Verified
+
+- `npm run build --workspace shared && npm run build --workspace backend && npm run test --workspace backend` — shared + backend build cleanly and backend Jest suite passes (13 suites / 58 tests)
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -derivedDataPath /Volumes/DATA/Developments/Odoo/Ordo/ios/.derived-data/logout-slice -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after logout integration
+- `xcodebuild -project Ordo.xcodeproj -scheme Ordo -derivedDataPath /Volumes/DATA/Developments/Odoo/Ordo/ios/.derived-data/logout-slice -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/AppStateRefreshTests test` — focused auth-state suite passes, including new explicit logout regressions
+
+### Notes
+
+- This slice intentionally does **not** add JWT blacklisting; already-issued bearer tokens are not actively revoked beyond the Redis-backed Odoo session bridge
+- Backend-unavailable explicit logout now still signs the user out locally and surfaces a follow-up status message on the login screen
+
 ## 2026-03-09 (Chatter Activity Scheduling MVP)
 
 ### Added
