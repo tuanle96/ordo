@@ -93,6 +93,27 @@ struct FormDraftTests {
     }
 
     @Test
+    func many2oneObjectPayloadNormalizesToRelationID() {
+        let baseline: RecordData = [
+            "country_id": .relation(id: 233, label: "United States"),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.object([
+            "id": .number(124),
+            "display_name": .string("Canada"),
+        ]), for: "country_id")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == ["country_id": .number(124)])
+        #expect(draft.validationErrors(for: fields)["country_id"] == nil)
+    }
+
+    @Test
     func requiredValidationFlagsMissingMany2One() {
         let draft = FormDraft(record: [:])
         let fields = [
@@ -167,6 +188,43 @@ struct FormDraftTests {
                 ]),
             ]),
         ])
+    }
+
+    @Test
+    func many2manyObjectPayloadNormalizesToReplaceCommand() {
+        let baseline: RecordData = [
+            "category_id": .array([
+                .relation(id: 8, label: "VIP"),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "id": .number(8),
+                "display_name": .string("VIP"),
+            ]),
+            .object([
+                "id": .number(11),
+                "name": .string("Wholesale"),
+            ]),
+        ]), for: "category_id")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "category_id": .array([
+                .array([
+                    .number(6),
+                    .number(0),
+                    .array([.number(8), .number(11)]),
+                ]),
+            ]),
+        ])
+        #expect(draft.validationErrors(for: fields)["category_id"] == nil)
     }
 
     @Test
@@ -461,6 +519,47 @@ struct FormDraftTests {
     }
 
     @Test
+    func onchangeValuesNormalizeObjectBasedRelations() {
+        let baseline: RecordData = [
+            "country_id": .relation(id: 233, label: "United States"),
+            "category_id": .array([
+                .relation(id: 8, label: "VIP"),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.object([
+            "id": .number(124),
+            "display_name": .string("Canada"),
+        ]), for: "country_id")
+        draft.setValue(.array([
+            .object([
+                "id": .number(8),
+                "display_name": .string("VIP"),
+            ]),
+            .object([
+                "id": .number(11),
+                "name": .string("Wholesale"),
+            ]),
+        ]), for: "category_id")
+
+        let onchangeValues = draft.onchangeValues(comparedTo: baseline, fields: fields)
+
+        #expect(onchangeValues["country_id"] == .number(124))
+        #expect(onchangeValues["category_id"] == .array([
+            .array([
+                .number(6),
+                .number(0),
+                .array([.number(8), .number(11)]),
+            ]),
+        ]))
+    }
+
+    @Test
     func mergeOnchangeValuesSkipsFieldsEditedAfterRequestStarted() {
         let draft = FormDraft(record: [
             "name": .string("Azure Interior"),
@@ -487,5 +586,47 @@ struct FormDraftTests {
         #expect(draft.value(for: "name", fallback: nil) == .string("Ace"))
         #expect(draft.value(for: "nickname", fallback: nil) == .string("Server Nick"))
         #expect(mergedFields == ["nickname"])
+    }
+
+    @Test
+    func mergeOnchangeValuesNormalizesObjectBasedRelations() {
+        let draft = FormDraft(record: [
+            "country_id": .relation(id: 233, label: "United States"),
+            "category_id": .array([
+                .relation(id: 8, label: "VIP"),
+            ]),
+        ])
+        let fieldsByName = [
+            "country_id": FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "country_id", source: "view", dependencies: nil, mergeReturnedValue: true), domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            "category_id": FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "category_id", source: "view", dependencies: nil, mergeReturnedValue: true), domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        let mergedFields = draft.mergeOnchangeValues(
+            [
+                "country_id": .object([
+                    "id": .number(124),
+                    "display_name": .string("Canada"),
+                ]),
+                "category_id": .array([
+                    .object([
+                        "id": .number(8),
+                        "display_name": .string("VIP"),
+                    ]),
+                    .object([
+                        "id": .number(11),
+                        "name": .string("Wholesale"),
+                    ]),
+                ]),
+            ],
+            fieldsByName: fieldsByName,
+            protectingEditsAfter: [:]
+        )
+
+        #expect(draft.value(for: "country_id", fallback: nil) == .relation(id: 124, label: "Canada"))
+        #expect(draft.value(for: "category_id", fallback: nil) == .array([
+            .relation(id: 8, label: "VIP"),
+            .relation(id: 11, label: "Wholesale"),
+        ]))
+        #expect(mergedFields == ["category_id", "country_id"])
     }
 }

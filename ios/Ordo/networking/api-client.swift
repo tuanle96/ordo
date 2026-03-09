@@ -226,7 +226,10 @@ final class APIClient {
             guard httpResponse.statusCode < 400 else {
                 throw APIClientError.server(statusCode: httpResponse.statusCode, errors: envelope.errors)
             }
-            return envelope.data
+            guard let payload = envelope.data else {
+                throw APIClientError.decodingFailed("Server returned success but data was null")
+            }
+            return payload
         } catch {
             // Log the raw response body for debugging
             let bodyPreview = String(data: data.prefix(2000), encoding: .utf8) ?? "<non-UTF8 data>"

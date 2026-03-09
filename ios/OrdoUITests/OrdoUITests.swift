@@ -8,7 +8,7 @@
 import XCTest
 
 final class OrdoUITests: XCTestCase {
-    private let backendURL = "http://localhost:3000/api/v1/mobile"
+    private let backendURL = "http://localhost:38424/api/v1/mobile"
     private let odooURL = "http://127.0.0.1:38421"
     private let database = "odoo17"
     private let username = "admin"

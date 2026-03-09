@@ -32,7 +32,17 @@ export class OdooRpcService {
     constructor(private readonly configService: ConfigService) { }
 
     normalizeBaseUrl(odooUrl: string): string {
-        return new URL(odooUrl).toString().replace(/\/$/, '');
+        let normalized = new URL(odooUrl).toString().replace(/\/$/, '');
+
+        // Inside Docker, localhost/127.0.0.1 refers to the container itself.
+        // Rewrite to host.docker.internal so we can reach host-mapped ports.
+        if (this.configService.get<string>('RUNNING_IN_DOCKER', '') === '1') {
+            normalized = normalized
+                .replace(/\/\/localhost([:/])/, '//host.docker.internal$1')
+                .replace(/\/\/127\.0\.0\.1([:/])/, '//host.docker.internal$1');
+        }
+
+        return normalized;
     }
 
     async detectVersion(odooUrl: string): Promise<DetectedOdooVersion> {

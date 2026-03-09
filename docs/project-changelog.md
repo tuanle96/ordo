@@ -21,10 +21,12 @@
 - HTML fields now use that same debounced onchange path, keeping text-heavy server recompute flows consistent without introducing a special editor path
 - The narrow `one2many` editor now shares the same support assumptions for `html` and `monetary` as the top-level generic form engine instead of lagging behind the outer renderer/editor matrix
 - `FormDraft` now treats required `html` fields like other text-entry fields during client-side validation, so empty rich-text inputs no longer slip past generic save checks
+- `JSONValue` relation helpers and `FormDraft` now tolerate object-shaped relation payloads (`{ id, display_name/name }`) in addition to tuple-style `[id, label]` values, keeping `many2one` / `many2many` change detection, mutation encoding, and onchange merges on the same generic normalization path
 
 ### Verified
 
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused form-engine regression suite passes (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests test` — focused draft normalization suite still passes after adding object-shaped relation payload coverage for `many2one` / `many2many` (`** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordDetailViewModelTests -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused detail/onchange + form-engine suites pass, including monetary onchange debounce regression
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FieldRowFactoryTests test` — focused formatter/editability suite passes, including the new HTML plain-text fallback regression
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after both generic field slices

@@ -1,7 +1,7 @@
 import Foundation
 
 struct AppConfig {
-    static let fallbackBaseURL = "http://localhost:3000/api/v1/mobile"
+    static let fallbackBaseURL = "http://localhost:38424/api/v1/mobile"
 
     let defaultBaseURL: URL
 

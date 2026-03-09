@@ -67,6 +67,8 @@ enum JSONValue: Codable, Hashable {
         case .array(let values):
             guard let first = values.first else { return nil }
             return first.intValue
+        case .object(let values):
+            return values["id"]?.intValue
         case .number(let value):
             return Int(value)
         default:
@@ -79,6 +81,8 @@ enum JSONValue: Codable, Hashable {
         case .array(let values):
             guard values.count >= 2 else { return nil }
             return values[1].stringValue
+        case .object(let values):
+            return values["display_name"]?.stringValue ?? values["name"]?.stringValue
         case .string(let value):
             return value
         default:
@@ -91,6 +95,12 @@ enum JSONValue: Codable, Hashable {
         case .array(let values):
             guard values.count == 2, let id = values[0].intValue else { return nil }
             return RelationValue(id: id, label: values[1].stringValue ?? "Record #\(id)")
+        case .object(let values):
+            guard let id = values["id"]?.intValue else { return nil }
+            let label = values["display_name"]?.stringValue
+                ?? values["name"]?.stringValue
+                ?? "Record #\(id)"
+            return RelationValue(id: id, label: label)
         case .number(let value):
             let id = Int(value)
             return RelationValue(id: id, label: "Record #\(id)")

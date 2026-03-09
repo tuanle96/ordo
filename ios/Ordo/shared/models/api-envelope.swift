@@ -2,7 +2,7 @@ import Foundation
 
 struct APIEnvelope<T: Decodable>: Decodable {
     let success: Bool
-    let data: T
+    let data: T?
     let meta: APIResponseMeta?
     let errors: [APIErrorPayload]
 }
