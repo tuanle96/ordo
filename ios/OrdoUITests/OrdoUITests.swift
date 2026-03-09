@@ -326,6 +326,30 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testStatusbarTapUsesWorkflowActionPath() throws {
+        let app = makeApp(resetStorage: true)
+        app.launch()
+
+        signIn(app)
+        tapBrowseTab(app)
+        XCTAssertTrue(app.buttons["browse-model-sale-order"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-model-sale-order"].tap()
+        openFirstRecordDetail(app)
+
+        let targetChip = app.buttons["record-detail-status-chip-sale"]
+        XCTAssertTrue(targetChip.waitForExistence(timeout: standardTimeout))
+        targetChip.tap()
+
+        let confirmButton = app.alerts.buttons["Confirm"]
+        XCTAssertTrue(confirmButton.waitForExistence(timeout: standardTimeout))
+        confirmButton.tap()
+
+        let statusValue = app.staticTexts["record-detail-status"]
+        XCTAssertTrue(statusValue.waitForExistence(timeout: standardTimeout))
+        XCTAssertEqual(statusValue.label, "Sales Order")
+    }
+
+    @MainActor
     func testHomeShowsRecentlyViewedRecordAfterRelaunch() throws {
         let firstLaunch = makeApp(resetStorage: true)
         firstLaunch.launch()

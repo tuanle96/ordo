@@ -322,16 +322,6 @@ describe('MobileSchemaBuilderService', () => {
                         },
                     }),
                 }),
-                expect.objectContaining({
-                    name: 'name',
-                    type: 'char',
-                    modifiers: expect.objectContaining({
-                        invisible: {
-                            type: 'condition',
-                            condition: { field: 'is_company', op: '==', value: true },
-                        },
-                    }),
-                }),
             ],
         });
         expect(schema.sections[1]).toEqual({

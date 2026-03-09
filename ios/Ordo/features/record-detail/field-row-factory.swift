@@ -1,10 +1,23 @@
 import Foundation
 
+enum InlineAttachmentKind: Equatable {
+    case image
+    case signature
+    case document
+}
+
+struct ReadOnlyFieldRowAttachment: Equatable {
+    let kind: InlineAttachmentKind
+    let data: Data
+    let filename: String
+}
+
 struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     enum Style: Equatable {
         case standard
         case multiline
         case image
+        case signature
         case status
         case phone
         case email
@@ -17,13 +30,22 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     let value: String
     let style: Style
     let previewData: Data?
+    let attachment: ReadOnlyFieldRowAttachment?
 
-    init(id: String, label: String, value: String, style: Style, previewData: Data? = nil) {
+    init(
+        id: String,
+        label: String,
+        value: String,
+        style: Style,
+        previewData: Data? = nil,
+        attachment: ReadOnlyFieldRowAttachment? = nil
+    ) {
         self.id = id
         self.label = label
         self.value = value
         self.style = style
         self.previewData = previewData
+        self.attachment = attachment
     }
 }
 
@@ -46,6 +68,7 @@ enum FieldRowFactory {
         .html,
         .image,
         .priority,
+        .signature,
         .statusbar,
     ]
 
@@ -56,6 +79,8 @@ enum FieldRowFactory {
         if supportedTypes.contains(field.type) {
             if field.type == .image {
                 style = .image
+            } else if field.type == .signature {
+                style = .signature
             } else if field.type == .statusbar {
                 style = .status
             } else if field.name.contains("phone") || field.name.contains("mobile") {
@@ -73,12 +98,15 @@ enum FieldRowFactory {
             style = .unsupported(field.type)
         }
 
+        let attachment = attachment(for: field, rawValue: rawValue, record: record)
+
         return ReadOnlyFieldRowModel(
             id: field.name,
             label: field.label,
             value: formattedValue(for: field, rawValue: rawValue, record: record),
             style: style,
-            previewData: field.type == .image ? rawValue.binaryData : nil
+            previewData: (field.type == .image || field.type == .signature) ? attachment?.data : nil,
+            attachment: attachment
         )
     }
 
@@ -97,6 +125,10 @@ enum FieldRowFactory {
 
         if field.type == .image {
             return rawValue.binaryData == nil ? "Image unavailable" : "Image attached"
+        }
+
+        if field.type == .signature {
+            return rawValue.binaryData == nil ? "Signature unavailable" : "Signature captured"
         }
 
         if field.type == .binary {
@@ -201,5 +233,45 @@ enum FieldRowFactory {
         guard count > 0 else { return "—" }
 
         return count == 1 ? "1 line item" : "\(count) line items"
+    }
+
+    private static func attachment(for field: FieldSchema, rawValue: JSONValue, record: RecordData?) -> ReadOnlyFieldRowAttachment? {
+        guard let data = rawValue.binaryData, !data.isEmpty else { return nil }
+
+        let kind: InlineAttachmentKind
+        let preferredFilename: String?
+        let fallbackExtension: String
+
+        switch field.type {
+        case .image:
+            kind = .image
+            preferredFilename = nil
+            fallbackExtension = InlineFilePayloadSupport.inferredFileExtension(for: data) ?? "jpg"
+        case .signature:
+            kind = .signature
+            preferredFilename = nil
+            fallbackExtension = "png"
+        case .binary:
+            kind = .document
+            if let filenameField = field.filenameField {
+                preferredFilename = record?[filenameField]?.stringValue
+            } else {
+                preferredFilename = nil
+            }
+            fallbackExtension = InlineFilePayloadSupport.inferredFileExtension(for: data) ?? "bin"
+        default:
+            return nil
+        }
+
+        let recordSuffix = record?["id"]?.intValue.map { "-\($0)" } ?? ""
+        let fallbackStem = "\(field.name)\(recordSuffix)"
+        let filename = InlineFilePayloadSupport.resolvedFilename(
+            preferredFilename: preferredFilename,
+            fallbackStem: fallbackStem,
+            data: data,
+            fallbackExtension: fallbackExtension
+        )
+
+        return ReadOnlyFieldRowAttachment(kind: kind, data: data, filename: filename)
     }
 }

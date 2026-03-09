@@ -28,6 +28,9 @@
 | Core-first platform — Phase 01 generic form engine | ✅ Complete | The minimum reusable field matrix is now closed across iOS read/edit/validation paths, including `html`, `monetary`, narrow `one2many`, relation payload normalization, and the last read-only renderer gaps |
 | Core-first platform — Phase 01 closeout foundations | ✅ Complete | Create mode now hydrates Odoo defaults through a narrow `GET /records/:model/defaults` route, persisted records support safe delete parity on iOS, and `priority` ships as a generic star editor with focused backend + iOS validation |
 | Core-first platform — Phase 02A image-first media widget | ✅ Complete | Record detail now supports read-only image preview plus edit-mode choose/replace/clear with inline size validation and focused iOS regression coverage; broader `binary`, `signature`, and statusbar tap-to-change remain deferred |
+| Core-first platform — Phase 02B binary/document upload MVP | ✅ Complete | Record detail now supports generic `binary` fields for small documents (≤1.5 MB) through `UIDocumentPicker`, with honest filename persistence when schema declares a companion field; broader attachment endpoints, offline queue, and preview/download flows remain deferred |
+| Core-first platform — Phase 02D signature capture + inline preview/export | ✅ Complete | Record detail now supports `signature` draw/replace/clear via a narrow `PencilKit` capture surface, bounded read-only preview, and local Preview / Export actions for already-loaded `binary` and `signature` payloads without introducing backend download routes |
+| Core-first platform — Phase 02C statusbar tap-to-change | ✅ Complete | Record detail now supports a narrow action-backed statusbar tap affordance for binary selection flows with exactly one visible workflow action, while unsupported many2one/multi-action statusbars remain read-only |
 
 ## Scope reminders
 

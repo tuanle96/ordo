@@ -206,7 +206,7 @@ The post-matrix closeout slice finishes the small but important CRUD/correctness
 - **iOS create hydration is now server-backed**: `RecordDetailViewModel` loads schema first, derives a defaults field list from visible mobile fields plus optional statusbar state, hydrates the initial record from server defaults, and still falls back to manual entry if defaults loading fails
 - **Delete parity is intentionally guarded**: the record-detail screen only enables destructive delete when a persisted record is idle, confirms intent before dispatch, removes the deleted record from recent-items state, and dismisses only after a successful backend response
 - **`priority` remains a generic scalar field**: the iOS star control is only a view-layer affordance over the existing draft/change/save path, with no widget-specific backend contract or mutation semantics
-- **Scope discipline remains explicit**: broader `binary`/document upload, signature capture, and statusbar tap-to-change are still deferred because they introduce broader transport or business-state concerns than this closeout slice is meant to solve
+- **Scope discipline remains explicit**: signature capture and statusbar tap-to-change are still deferred because they introduce broader transport or business-state concerns than this closeout slice is meant to solve; generic `binary`/document upload was intentionally split into the following Phase 02B slice
 
 ## Core-first image-first media widget slice (2026-03-09)
 
@@ -216,7 +216,37 @@ The first honest media step ships `image` support without pretending Ordo alread
 - **No new backend contract was needed**: image edits travel as the existing `RecordData` string payload, so the current `POST /records/:model` and `PATCH /records/:model/:id` routes remain the only write transport for this slice
 - **Client-side validation is the first guardrail**: `FormDraft` and the image editor reject invalid/oversize inline images before save, with the current MVP capped at **2 MB raw image data** to stay inside the existing request-body envelope while still being usable on-device
 - **Cache and reload pressure stay explicit**: canonical post-save record reload and the 24-hour record cache still store the full returned base64 image payload, so this slice is intentionally limited to small images and record-detail surfaces only
-- **Scope discipline remains explicit**: broader generic `binary` upload, filename/document metadata, signature capture, camera/crop flows, and statusbar tap-to-change remain deferred until there is a dedicated contract or a stronger product need
+- **Scope discipline remains explicit**: signature capture, camera/crop flows, and statusbar tap-to-change remain deferred; the follow-up generic `binary`/document upload slice shipped separately to avoid bloating the image-first MVP
+
+## Core-first binary/document upload slice (2026-03-09)
+
+The follow-up media step extends the generic form engine to small documents without turning Ordo into a general attachment platform:
+
+- **Optional filename metadata is now part of the contract**: `FieldSchema.filenameField` travels from shared types through backend schema normalization into iOS decoding when Odoo form XML declares `filename="..."` on a `binary` field
+- **Document editing stays on the existing mutation path**: iOS record detail now offers choose/replace/clear for generic `binary` fields through `UIDocumentPicker`, encoding the picked file as base64 and reusing the current create/update routes with no new backend endpoints
+- **Honest filename persistence stays narrow**: if schema exposes a companion filename field, `FormDraft` tracks and mutates it alongside the binary payload; otherwise the selected filename is UI-only and read mode falls back to generic attachment text
+- **Client-side safety remains explicit**: generic documents are capped at **1.5 MB raw bytes** before save, which keeps the current JSON body envelope viable after base64 expansion while surfacing clear inline validation errors
+- **Scope discipline remains explicit**: broader attachment APIs, offline upload queueing, richer large-file fetch/export behavior, and chatter/media reuse all remain deferred follow-up work
+
+## Core-first signature capture + inline preview/export slice (2026-03-09)
+
+The next media step closes the honest inline preview/export gap while keeping Ordo far away from a general attachment platform:
+
+- **`signature` remains a first-class generic field type** end to end on iOS record detail, with a narrow `PencilKit` capture sheet for draw / replace / clear and PNG/base64 persistence reused on the existing create/update mutation path
+- **Read-only media rows now carry export metadata** so the renderer can surface bounded signature preview plus Preview / Export actions for already-loaded image, `binary`, and `signature` payloads without inventing a second transport contract
+- **Preview/download stays entirely local** by writing temporary files from inline bytes and handing them to system Quick Look / share/export UI; no backend download/proxy endpoint or remote refetch path was added
+- **Client-side safety remains explicit** with a `500 KB` raw PNG cap for signatures, the previously shipped `1.5 MB` document limit, and clear filename fallback logic when only payload bytes are available
+- **Scope discipline remains explicit**: large-file/on-demand fetch, attachment history/index UI, chatter attachments, offline export queues, and non-signature ink features remain deferred
+
+## Core-first statusbar tap-to-change slice (2026-03-09)
+
+The first statusbar interaction slice increases Odoo parity without pretending the mobile client can infer arbitrary server-legal transitions:
+
+- **Mutation stays action-backed**: tapping the eligible status chip routes into the existing workflow-action execution path, so Odoo server actions remain authoritative for permissions, business rules, and side effects
+- **Eligibility is deliberately strict**: the client only enables statusbar tapping for persisted records whose header statusbar is selection-backed, exposes exactly two visible states, and currently has exactly one visible workflow action
+- **Unsupported flows remain display-only**: many2one stage bars like `crm.lead.stage_id`, multi-action workflows, create mode, edit mode, and broader multi-state transitions do not opt into tap-to-change because the current contract does not prove a safe mapping
+- **Refresh and cache coherence remain centralized**: successful taps reuse the existing confirmation, loading, post-action refresh, cache update, and unauthorized-to-sign-out behavior instead of inventing optimistic local state mutation
+- **UX scope stays conservative**: the original workflow action button remains visible even in the eligible binary case, so the tappable chip is an alternate affordance rather than a replacement action model
 
 ## Deferred architecture
 

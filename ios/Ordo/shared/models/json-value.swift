@@ -5,9 +5,63 @@ enum InlineImageSupport {
     static let limitDescription = "2 MB"
 }
 
+enum InlineSignatureSupport {
+    static let maxBytes = 500_000
+    static let limitDescription = "500 KB"
+}
+
 enum InlineBinaryDocumentSupport {
     static let maxBytes = 1_500_000
     static let limitDescription = "1.5 MB"
+}
+
+enum InlineFilePayloadSupport {
+    static func resolvedFilename(
+        preferredFilename: String?,
+        fallbackStem: String,
+        data: Data,
+        fallbackExtension: String
+    ) -> String {
+        if let preferredFilename {
+            let trimmed = preferredFilename.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+
+        let fileExtension = inferredFileExtension(for: data) ?? fallbackExtension
+        return "\(fallbackStem).\(fileExtension)"
+    }
+
+    static func inferredFileExtension(for data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+
+        let bytes = [UInt8](data.prefix(12))
+
+        if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            return "png"
+        }
+
+        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
+            return "jpg"
+        }
+
+        if bytes.starts(with: [0x25, 0x50, 0x44, 0x46]) {
+            return "pdf"
+        }
+
+        if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) {
+            return "gif"
+        }
+
+        if bytes.count >= 12,
+           bytes[0...3].elementsEqual([0x52, 0x49, 0x46, 0x46]),
+           bytes[8...11].elementsEqual([0x57, 0x45, 0x42, 0x50]) {
+            return "webp"
+        }
+
+        return nil
+    }
 }
 
 struct RelationValue: Hashable, Identifiable {

@@ -102,6 +102,32 @@ struct FormDraftTests {
     }
 
     @Test
+    func requiredValidationFlagsMissingSignature() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "signature", type: .signature, label: "Signature", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        #expect(draft.validationErrors(for: fields)["signature"] == "Signature is required.")
+
+        draft.setValue(.string(Data([0x89, 0x50, 0x4E, 0x47]).base64EncodedString()), for: "signature")
+
+        #expect(draft.validationErrors(for: fields)["signature"] == nil)
+    }
+
+    @Test
+    func signaturePayloadValidationRejectsOversizedInlineSignature() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "signature", type: .signature, label: "Signature", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.string(Data(repeating: 5, count: InlineSignatureSupport.maxBytes + 1).base64EncodedString()), for: "signature")
+
+        #expect(draft.validationErrors(for: fields)["signature"] == "Signature must be \(InlineSignatureSupport.limitDescription) or smaller.")
+    }
+
+    @Test
     func requiredValidationFlagsMissingBinaryDocument() {
         let draft = FormDraft(record: [:])
         let fields = [

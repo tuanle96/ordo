@@ -127,12 +127,14 @@ export class MobileSchemaBuilderService {
         const containerInvisible = this.mergeRules('or', inheritedInvisible, this.nodeInvisibleRule(container));
         const groups = this.asArray(container?.group);
         if (groups.length === 0) {
-            const fields = this.collectFields(container, fieldsMeta, containerInvisible);
+            const fields = this.deduplicateFields(this.collectFields(container, fieldsMeta, containerInvisible));
             return fields.length > 0 ? [{ label: null, fields }] : [];
         }
 
-        const ungroupedFields = this.collectUngroupedFields(container, fieldsMeta, containerInvisible)
-            .filter((field) => this.preGroupFieldTypes.has(field.type));
+        const ungroupedFields = this.deduplicateFields(
+            this.collectUngroupedFields(container, fieldsMeta, containerInvisible)
+                .filter((field) => this.preGroupFieldTypes.has(field.type)),
+        );
 
         const groupedSections = groups
             .map((group) => ({
@@ -196,6 +198,15 @@ export class MobileSchemaBuilderService {
             return excludeGroups
                 ? this.collectUngroupedFields(child, fieldsMeta, childInvisible)
                 : this.collectFields(child, fieldsMeta, childInvisible);
+        });
+    }
+
+    private deduplicateFields(fields: FieldSchema[]): FieldSchema[] {
+        const seen = new Set<string>();
+        return fields.filter((field) => {
+            if (seen.has(field.name)) return false;
+            seen.add(field.name);
+            return true;
         });
     }
 

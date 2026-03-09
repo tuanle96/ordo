@@ -1,4 +1,5 @@
 import SwiftUI
+import PencilKit
 import PhotosUI
 import UniformTypeIdentifiers
 import UIKit
@@ -8,6 +9,7 @@ struct EditableFieldRowModel {
         case text
         case multiline
         case image
+        case signature
         case binary(filenameField: String?)
         case priority
         case integer
@@ -34,6 +36,8 @@ enum EditableFieldFactory {
             return .init(style: .multiline)
         case .image:
             return .init(style: .image)
+        case .signature:
+            return .init(style: .signature)
         case .binary:
             return .init(style: .binary(filenameField: field.filenameField))
         case .priority:
@@ -105,6 +109,15 @@ struct EditableFieldRow: View {
             .accessibilityIdentifier("field-row-\(field.name)")
         case .image:
             ImageFieldEditor(
+                field: field,
+                draft: draft,
+                fallbackValue: fallbackValue,
+                validationMessage: validationMessage,
+                onValueChange: onValueChange
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .signature:
+            SignatureFieldEditor(
                 field: field,
                 draft: draft,
                 fallbackValue: fallbackValue,
@@ -438,6 +451,127 @@ struct EditableFieldRow: View {
     }
 }
 
+private struct SignatureFieldEditor: View {
+    let field: FieldSchema
+    let draft: FormDraft
+    let fallbackValue: JSONValue?
+    let validationMessage: String?
+    let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
+
+    @State private var isShowingCapture = false
+    @State private var captureError: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(field.label)
+                .font(.subheadline.weight(.medium))
+
+            Group {
+                if let signatureImage = currentUIImage {
+                    Image(uiImage: signatureImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxHeight: 160)
+                        .padding(12)
+                        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .accessibilityIdentifier("field-signature-preview-\(field.name)")
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(uiColor: .secondarySystemBackground))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 140)
+                        .overlay {
+                            VStack(spacing: 6) {
+                                Image(systemName: "signature")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                                Text("No signature captured")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityIdentifier("field-signature-placeholder-\(field.name)")
+                }
+            }
+
+            HStack(spacing: 12) {
+                Button(currentSignatureData == nil ? "Draw Signature" : "Replace Signature") {
+                    isShowingCapture = true
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("field-editor-\(field.name)")
+
+                if currentSignatureData != nil {
+                    Button("Clear") {
+                        captureError = nil
+                        applyChange(nil)
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .accessibilityIdentifier("field-clear-\(field.name)")
+                }
+            }
+
+            Text("Small signatures only — PNG up to \(InlineSignatureSupport.limitDescription).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-error-\(field.name)")
+            }
+
+            if let captureError {
+                Text(captureError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-picker-error-\(field.name)")
+            }
+        }
+        .sheet(isPresented: $isShowingCapture) {
+            SignatureCaptureSheet { signatureData in
+                applyCapturedSignature(signatureData)
+            }
+        }
+    }
+
+    private var currentSignatureData: Data? {
+        let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+        return value?.binaryData
+    }
+
+    private var currentUIImage: UIImage? {
+        guard let currentSignatureData else { return nil }
+        return UIImage(data: currentSignatureData)
+    }
+
+    private func applyCapturedSignature(_ signatureData: Data) {
+        guard !signatureData.isEmpty else {
+            captureError = "Couldn’t capture the signature."
+            return
+        }
+
+        guard signatureData.count <= InlineSignatureSupport.maxBytes else {
+            captureError = "\(field.label) must be \(InlineSignatureSupport.limitDescription) or smaller."
+            return
+        }
+
+        captureError = nil
+        applyChange(.string(signatureData.base64EncodedString()))
+        isShowingCapture = false
+    }
+
+    private func applyChange(_ value: JSONValue?) {
+        if let onValueChange {
+            onValueChange(field, value)
+        } else {
+            draft.setValue(value, for: field.name)
+        }
+    }
+}
+
 private struct BinaryDocumentFieldEditor: View {
     let field: FieldSchema
     let draft: FormDraft
@@ -600,6 +734,107 @@ private struct BinaryDocumentFieldEditor: View {
             onValueChange(field, value)
         } else {
             draft.setValue(value, for: field.name)
+        }
+    }
+}
+
+private struct SignatureCaptureSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var drawing = PKDrawing()
+
+    let onSave: (Data) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Draw inside the box, then save when you’re happy with it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                SignatureCanvasView(drawing: $drawing)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 240)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                    )
+
+                Spacer(minLength: 0)
+            }
+            .padding()
+            .navigationTitle("Signature")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Clear") {
+                        drawing = PKDrawing()
+                    }
+                    .disabled(drawing.bounds.isEmpty)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Use") {
+                        guard let imageData = renderedSignatureData else { return }
+                        onSave(imageData)
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(renderedSignatureData == nil)
+                }
+            }
+        }
+    }
+
+    private var renderedSignatureData: Data? {
+        guard !drawing.bounds.isEmpty else { return nil }
+
+        let renderRect = drawing.bounds.insetBy(dx: -12, dy: -12)
+        guard renderRect.width > 0, renderRect.height > 0 else { return nil }
+
+        return drawing.image(from: renderRect, scale: 2).pngData()
+    }
+}
+
+private struct SignatureCanvasView: UIViewRepresentable {
+    @Binding var drawing: PKDrawing
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(drawing: $drawing)
+    }
+
+    func makeUIView(context: Context) -> PKCanvasView {
+        let canvasView = PKCanvasView()
+        canvasView.delegate = context.coordinator
+        canvasView.drawing = drawing
+        canvasView.drawingPolicy = .anyInput
+        canvasView.backgroundColor = .clear
+        canvasView.tool = PKInkingTool(.pen, color: .label, width: 4)
+        canvasView.alwaysBounceVertical = false
+        return canvasView
+    }
+
+    func updateUIView(_ uiView: PKCanvasView, context: Context) {
+        if uiView.drawing != drawing {
+            uiView.drawing = drawing
+        }
+    }
+
+    final class Coordinator: NSObject, PKCanvasViewDelegate {
+        @Binding private var drawing: PKDrawing
+
+        init(drawing: Binding<PKDrawing>) {
+            _drawing = drawing
+        }
+
+        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            drawing = canvasView.drawing
         }
     }
 }

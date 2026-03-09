@@ -162,6 +162,18 @@ final class FormDraft {
                         return
                     }
                 }
+            case .signature:
+                if let rawValue = value(for: field.name, fallback: nil), !rawValue.isVisuallyEmpty {
+                    guard let signatureData = rawValue.binaryData, !signatureData.isEmpty else {
+                        errors[field.name] = "\(field.label) must be a valid signature."
+                        return
+                    }
+
+                    if signatureData.count > InlineSignatureSupport.maxBytes {
+                        errors[field.name] = "\(field.label) must be \(InlineSignatureSupport.limitDescription) or smaller."
+                        return
+                    }
+                }
             case .binary:
                 if let rawValue = value(for: field.name, fallback: nil), !rawValue.isVisuallyEmpty {
                     guard let documentData = rawValue.binaryData, !documentData.isEmpty else {
@@ -196,6 +208,10 @@ final class FormDraft {
                     errors[field.name] = "\(field.label) is required."
                 }
             case .image:
+                if value(for: field.name, fallback: nil)?.binaryData == nil {
+                    errors[field.name] = "\(field.label) is required."
+                }
+            case .signature:
                 if value(for: field.name, fallback: nil)?.binaryData == nil {
                     errors[field.name] = "\(field.label) is required."
                 }

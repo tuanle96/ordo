@@ -320,6 +320,48 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func saveSignatureFieldPostsBase64PayloadAndRefreshesRecord() async throws {
+        var capturedRequest: RecordMutationRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithSignature)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecordWithSignature)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "PATCH" {
+                capturedRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: try #require(request.httpBody))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 1, record: detailPartnerRecordUpdatedWithSignature))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        draft.setValue(.string(sampleSignatureBase64), for: "signature")
+
+        let didSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(didSave == true)
+        #expect(capturedRequest?.values["signature"] == .string(sampleSignatureBase64))
+        #expect(viewModel.record?["signature"] == .string(sampleSignatureBase64))
+        #expect(viewModel.saveMessage == "Changes saved.")
+    }
+
+    @Test
     func applyFieldEditDebouncesOnchangeAndSurfacesWarnings() async throws {
         var capturedRequest: OnchangeRequest?
 
@@ -601,6 +643,92 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func statusbarTapCandidateExposesSingleBinaryWorkflowTarget() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/sale.order") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: saleOrderSchemaWithAction)))
+            }
+
+            if path.contains("/records/sale.order/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailDraftSaleOrderRecord)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "sale.order" })), recordID: 1)
+        await viewModel.load(using: appState)
+
+        #expect(viewModel.statusbarDisplayStates.map(\.value) == ["draft", "sale"])
+        #expect(viewModel.statusbarTapCandidate?.currentValue == "draft")
+        #expect(viewModel.statusbarTapCandidate?.targetValue == "sale")
+        #expect(viewModel.statusbarTapCandidate?.action.name == "action_confirm")
+    }
+
+    @Test
+    func statusbarTapCandidateStaysNilForMany2OneStageStatusbar() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/crm.lead") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: leadSchemaWithStatusbarAction)))
+            }
+
+            if path.contains("/records/crm.lead/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailLeadRecord)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "crm.lead" })), recordID: 1)
+        await viewModel.load(using: appState)
+
+        #expect(viewModel.statusbarDisplayStates.isEmpty)
+        #expect(viewModel.statusbarTapCandidate == nil)
+    }
+
+    @Test
+    func statusbarTapCandidateStaysNilWhenMultipleActionsAreVisible() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/sale.order") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: saleOrderSchemaWithMultipleActions)))
+            }
+
+            if path.contains("/records/sale.order/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailDraftSaleOrderRecord)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "sale.order" })), recordID: 1)
+        await viewModel.load(using: appState)
+
+        #expect(viewModel.visibleWorkflowActions.count == 2)
+        #expect(viewModel.statusbarTapCandidate == nil)
+    }
+
+    @Test
     func runWorkflowActionPostsRequestAndUpdatesVisibleState() async throws {
         var capturedActionRequest: RecordActionRequest?
 
@@ -639,6 +767,7 @@ struct RecordDetailViewModelTests {
         #expect(viewModel.record?["state"]?.stringValue == "sale")
         #expect(viewModel.saveMessage == "Confirm completed.")
         #expect(viewModel.visibleWorkflowActions.isEmpty)
+        #expect(viewModel.statusbarTapCandidate == nil)
     }
 
     private func makeRestoredAppState() async throws -> AppState {
@@ -733,6 +862,18 @@ private let partnerSchemaWithBinaryDocument = MobileFormSchema(
     hasChatter: false
 )
 
+private let partnerSchemaWithSignature = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "signature", type: .signature, label: "Signature", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let detailPartnerRecord: RecordData = [
     "id": .number(1),
     "display_name": .string("Azure Interior"),
@@ -777,8 +918,23 @@ private let detailPartnerRecordUpdatedWithBinaryDocument: RecordData = [
     "attachment_name": .string("quote.pdf"),
 ]
 
+private let detailPartnerRecordWithSignature: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "signature": .null,
+]
+
+private let detailPartnerRecordUpdatedWithSignature: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "signature": .string(sampleSignatureBase64),
+]
+
 private let sampleImageBase64 = Data([0xFF, 0xD8, 0xFF, 0xD9]).base64EncodedString()
 private let sampleDocumentBase64 = Data([0x25, 0x50, 0x44, 0x46, 0x2D]).base64EncodedString()
+private let sampleSignatureBase64 = Data([0x89, 0x50, 0x4E, 0x47, 0x0D]).base64EncodedString()
 
 private let detailCreatedPartnerRecord: RecordData = [
     "id": .number(99),
@@ -835,6 +991,51 @@ private let saleOrderSchemaWithMonetaryOnchange = MobileFormSchema(
     hasChatter: false
 )
 
+private let saleOrderSchemaWithMultipleActions = MobileFormSchema(
+    model: "sale.order",
+    title: "Sales Order",
+    header: FormHeader(statusbar: .init(field: "state", visibleStates: nil), actions: [
+        ActionButton(
+            name: "action_confirm",
+            label: "Confirm",
+            type: "object",
+            style: "primary",
+            modifiers: FieldModifiers(
+                invisible: ModifierRule(
+                    type: "condition",
+                    condition: Condition(field: "state", op: "==", value: .string("sale"), values: nil),
+                    rules: nil,
+                    constant: nil
+                ),
+                readonly: nil,
+                required: nil
+            ),
+            confirm: "Confirm this quotation?"
+        ),
+        ActionButton(name: "action_cancel", label: "Cancel", type: "object", style: "secondary", invisible: nil, modifiers: nil, confirm: nil),
+    ]),
+    sections: [FormSection(label: "Order", fields: [
+        FieldSchema(name: "name", type: .char, label: "Order", required: true, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "state", type: .selection, label: "Status", required: nil, readonly: true, invisible: nil, domain: nil, comodel: nil, selection: [["draft", "Quotation"], ["sale", "Sales Order"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: "statusbar"),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
+private let leadSchemaWithStatusbarAction = MobileFormSchema(
+    model: "crm.lead",
+    title: "Lead",
+    header: FormHeader(statusbar: .init(field: "stage_id", visibleStates: nil), actions: [
+        ActionButton(name: "action_mark_won", label: "Mark Won", type: "object", style: "primary", invisible: nil, modifiers: nil, confirm: nil),
+    ]),
+    sections: [FormSection(label: "Opportunity", fields: [
+        FieldSchema(name: "name", type: .char, label: "Opportunity", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "stage_id", type: .many2one, label: "Stage", required: nil, readonly: true, invisible: nil, domain: nil, comodel: "crm.stage", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: "statusbar"),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let detailDraftSaleOrderRecord: RecordData = [
     "id": .number(1),
     "display_name": .string("S00045"),
@@ -847,6 +1048,13 @@ private let detailConfirmedSaleOrderRecord: RecordData = [
     "display_name": .string("S00045"),
     "name": .string("S00045"),
     "state": .string("sale"),
+]
+
+private let detailLeadRecord: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Website redesign"),
+    "name": .string("Website redesign"),
+    "stage_id": .relation(id: 10, label: "Qualified"),
 ]
 
 private let detailSaleOrderWithMonetaryRecord: RecordData = [

@@ -52,6 +52,20 @@ struct FieldRowFactoryTests {
         #expect(model?.value == "Image attached")
         #expect(model?.style == .image)
         #expect(model?.previewData != nil)
+        #expect(model?.attachment?.kind == .image)
+    }
+
+    @Test
+    func signatureReadOnlyUsesPreviewStyle() {
+        let field = FieldSchema(name: "signature", type: .signature, label: "Signature", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .string(Self.sampleImageBase64), record: ["id": .number(7)])
+
+        #expect(model?.value == "Signature captured")
+        #expect(model?.style == .signature)
+        #expect(model?.previewData != nil)
+        #expect(model?.attachment?.kind == .signature)
+        #expect(model?.attachment?.filename == "signature-7.png")
     }
 
     @Test
@@ -66,6 +80,8 @@ struct FieldRowFactoryTests {
 
         #expect(model?.value == "invoice.pdf")
         #expect(model?.style == .standard)
+        #expect(model?.attachment?.kind == .document)
+        #expect(model?.attachment?.filename == "invoice.pdf")
     }
 
     @Test
@@ -95,6 +111,7 @@ struct FieldRowFactoryTests {
         let html = FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let image = FieldSchema(name: "image_128", type: .image, label: "Photo", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let binary = FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let signature = FieldSchema(name: "signature", type: .signature, label: "Signature", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let priority = FieldSchema(name: "priority", type: .priority, label: "Priority", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
 
         let many2oneModel = EditableFieldFactory.model(for: many2one)
@@ -108,6 +125,7 @@ struct FieldRowFactoryTests {
         let htmlModel = EditableFieldFactory.model(for: html)
         let imageModel = EditableFieldFactory.model(for: image)
         let binaryModel = EditableFieldFactory.model(for: binary)
+        let signatureModel = EditableFieldFactory.model(for: signature)
         let priorityModel = EditableFieldFactory.model(for: priority)
 
         if case .many2one(let comodel)? = many2oneModel?.style {
@@ -174,6 +192,12 @@ struct FieldRowFactoryTests {
             #expect(filenameField == "attachment_name")
         } else {
             Issue.record("Expected binary field to stay editable.")
+        }
+
+        if case .signature? = signatureModel?.style {
+            #expect(signatureModel != nil)
+        } else {
+            Issue.record("Expected signature field to stay editable.")
         }
 
         if case .priority? = priorityModel?.style {

@@ -8,6 +8,18 @@ final class RecordDetailViewModel {
     private static let logger = Logger(subsystem: "com.ordo.app", category: "record-detail")
     private let onchangeDebounce = Duration.milliseconds(300)
 
+    struct StatusbarDisplayState: Equatable {
+        let value: String
+        let label: String
+        let isCurrent: Bool
+    }
+
+    struct StatusbarTapCandidate {
+        let currentValue: String
+        let targetValue: String
+        let action: ActionButton
+    }
+
     private(set) var schema: MobileFormSchema?
     private(set) var record: RecordData?
     private(set) var errorMessage: String?
@@ -46,6 +58,49 @@ final class RecordDetailViewModel {
     var visibleWorkflowActions: [ActionButton] {
         guard let schema, let record, !isCreating else { return [] }
         return schema.header.actions.filter { !$0.isInvisible(in: record) }
+    }
+
+    var statusbarDisplayStates: [StatusbarDisplayState] {
+        guard let schema, let record, let statusbar = schema.header.statusbar,
+              let field = schema.allFields.first(where: { $0.name == statusbar.field }),
+              let currentValue = record[statusbar.field]?.stringValue else {
+            return []
+        }
+
+        guard field.type == .selection || field.type == .statusbar,
+              let selection = field.selection else {
+            return []
+        }
+
+        let visibleStateFilter = Set(statusbar.visibleStates ?? [])
+
+        return selection.compactMap { option in
+            guard option.count >= 2 else { return nil }
+            let value = option[0]
+            let label = option[1]
+
+            if !visibleStateFilter.isEmpty, !visibleStateFilter.contains(value) {
+                return nil
+            }
+
+            return StatusbarDisplayState(value: value, label: label, isCurrent: value == currentValue)
+        }
+    }
+
+    var statusbarTapCandidate: StatusbarTapCandidate? {
+        guard !isCreating,
+              let currentState = statusbarDisplayStates.first(where: \ .isCurrent),
+              statusbarDisplayStates.count == 2,
+              visibleWorkflowActions.count == 1,
+              let targetState = statusbarDisplayStates.first(where: { !$0.isCurrent }) else {
+            return nil
+        }
+
+        return StatusbarTapCandidate(
+            currentValue: currentState.value,
+            targetValue: targetState.value,
+            action: visibleWorkflowActions[0]
+        )
     }
 
     func isRunningAction(_ action: ActionButton) -> Bool {
@@ -387,7 +442,7 @@ final class RecordDetailViewModel {
 
             guard !Task.isCancelled, generation == onchangeGeneration else { return }
 
-            let fieldsByName = Dictionary(uniqueKeysWithValues: schema.allFields.map { ($0.name, $0) })
+            let fieldsByName = Dictionary(schema.allFields.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
             _ = draft.mergeOnchangeValues(
                 result.values,
                 fieldsByName: fieldsByName,

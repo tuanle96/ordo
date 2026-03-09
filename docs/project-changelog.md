@@ -1,5 +1,83 @@
 # Project Changelog
 
+## 2026-03-09 (Core-First Phase 02D — Signature Capture + Inline Preview/Export)
+
+### Added
+
+- **Generic `signature` field support** on iOS record detail with a narrow `PencilKit` draw/replace/clear capture flow and PNG/base64 draft persistence on the existing mutation path
+- **Read-only signature preview** on detail so shipped signature values render as bounded images instead of opaque payload text
+- **Local Preview / Export affordances** for already-loaded inline `binary`, `signature`, and image payloads by materializing temporary files and handing them to system Quick Look / share UI
+- **Focused regression coverage** for signature read rendering, required/oversize signature validation, and end-to-end signature save behavior in the detail view model
+
+### Changed
+
+- `EditableFieldFactory`, `FieldRowFactory`, `ReadOnlyFieldRow`, and `FormDraft` now treat `signature` as a first-class generic field type alongside the previously shipped image and binary/document slices
+- Inline file handling now includes filename fallback/extension inference helpers so exported inline payloads have honest local filenames even when only raw bytes are available
+- The preview/export MVP intentionally stays device-local and only works for payload bytes already returned by record detail; no backend download/proxy route was added
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after the signature + preview/export slice (`** BUILD SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/RecordDetailViewModelTests test` — focused signature/media regression suites pass (`** TEST SUCCEEDED **`)
+
+### Notes
+
+- This slice intentionally stops at inline payloads already loaded on the detail route; large-file fetches, attachment index/history UI, chatter attachments, and offline export queues remain deferred follow-up work
+- Signature capture is intentionally narrow and plain: no camera/scanner path, no annotation toolkit, and no generalized drawing platform
+
+## 2026-03-09 (Core-First Phase 02C — Statusbar Tap-to-Change)
+
+### Added
+
+- **Narrow iOS statusbar tap affordance** for binary, action-backed workflow flows so users can trigger the proven server action by tapping the single non-current status chip instead of only the separate action button
+- **Focused regression coverage** for statusbar tap eligibility guards, many2one/multi-action fallback, and the end-to-end UI path that taps the chip, confirms the action, and observes the refreshed state
+
+### Changed
+
+- `RecordDetailViewModel` now derives a strict `statusbarTapCandidate` only when the current record is persisted, the statusbar is selection-backed, exactly two visible states exist, and exactly one workflow action is visible
+- `RecordHeaderCard` now renders statusbar states as chips and only enables the single eligible target chip; unsupported flows remain read-only and still rely on existing workflow buttons
+- The implementation intentionally reuses the existing workflow-action confirmation, loading, server-authoritative execution, refresh, cache update, and unauthorized handling instead of performing direct field writes to `state` or `stage_id`
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -derivedDataPath /tmp/ordo-statusbar-unit -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordDetailViewModelTests test` — focused unit coverage for statusbar eligibility and workflow refresh passes (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -derivedDataPath /tmp/ordo-statusbar-ui -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoUITests/OrdoUITests/testStatusbarTapUsesWorkflowActionPath test` — targeted UI regression for statusbar chip tap passes (`** TEST SUCCEEDED **`)
+
+### Notes
+
+- This slice is intentionally **not** a generic status transition platform: many2one stage bars such as `crm.lead.stage_id`, multi-action workflows, create mode, and edit mode remain display-only
+- The current UX keeps the original workflow button visible alongside the tappable chip for clarity; broader deduping or button-hiding would need separate UX proof
+
+## 2026-03-09 (Core-First Phase 02B — Generic Binary/Document Upload MVP)
+
+### Added
+
+- **Generic `binary` field support** on iOS record detail for small documents (≤1.5 MB) with choose/replace/clear via `UIDocumentPicker`
+- **Honest filename companion persistence** only when schema declares a `filenameField` metadata companion; local-only display otherwise
+- **Read-only binary rendering** shows filename when available from schema companion, else "Document attached/unavailable"
+- **1.5 MB raw-file validation cap** enforced inline before save with clear user-facing error message
+- **Optional `filenameField` contract seam** added to `FieldSchema` across shared/backend/iOS layers
+- **Backend schema builder extraction** of Odoo form XML `filename="..."` attribute into `FieldSchema.filenameField` metadata
+- **Focused regression coverage** for backend filename extraction, iOS required/oversize validation, companion filename mutation tracking, and E2E binary save flow
+
+### Changed
+
+- `FieldRowFactory`, `EditableFieldFactory`, and `FormDraft` now treat `binary` as a first-class generic field type alongside image/html/monetary
+- The binary MVP intentionally stays on the existing record mutation contract: selected documents are stored as base64-backed `JSONValue.string` in the draft and sent through current create/update routes with no new backend endpoints
+- `InlineBinaryDocumentSupport` constants added to `json-value.swift` (1.5 MB limit) to mirror existing `InlineImageSupport` pattern
+
+### Verified
+
+- Backend schema builder tests pass (5/5) with filename companion extraction validation
+- iOS regression coverage includes: `FormDraftTests` (3 binary tests), `FieldRowFactoryTests` (2 binary tests), `RecordDetailViewModelTests` (1 E2E binary save test)
+- Build stability validated: `npm run build` exit 0, `npm run lint` exit 0, iOS build succeeds
+
+### Notes
+
+- This completes the **binary-first** document upload step only; broader attachment API endpoints, offline upload queue, preview/download UI, signature capture, and statusbar tap-to-change remain intentionally deferred
+- Record detail reload plus 24h cache will store returned base64 document payloads (known acceptable trade-off for small-file MVP)
+- No backend route or body-limit changes were required for this MVP because the existing 3 MB JSON body limit accommodates 1.5 MB raw → ~2 MB base64 expansion cleanly
+
 ## 2026-03-09 (Core-First Phase 02A — Image-First Media Widget MVP)
 
 ### Added

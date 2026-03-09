@@ -92,6 +92,16 @@ struct RecordDetailView: View {
                     }
 
                     Section {
+                        let statusbarTapCandidate = !isEditing && !viewModel.isRunningWorkflowAction ? viewModel.statusbarTapCandidate : nil
+                        let statusChips = viewModel.statusbarDisplayStates.map { state in
+                            RecordHeaderStatusChip(
+                                value: state.value,
+                                label: state.label,
+                                isCurrent: state.isCurrent,
+                                isInteractive: statusbarTapCandidate?.targetValue == state.value
+                            )
+                        }
+
                         RecordHeaderCard(
                             displayName: headerDisplayName(schema: schema, record: record),
                             status: {
@@ -103,9 +113,15 @@ struct RecordDetailView: View {
                                 }
                                 return nil
                             }(),
+                            statusChips: statusChips,
                             isEditing: isEditing,
                             nameText: headerNameBinding(schema: schema, record: record),
-                            namePlaceholder: headerNameField(in: schema, values: currentValues)?.label
+                            namePlaceholder: headerNameField(in: schema, values: currentValues)?.label,
+                            onStatusTap: { chip in
+                                guard let candidate = statusbarTapCandidate,
+                                      candidate.targetValue == chip.value else { return }
+                                handleWorkflowActionTap(candidate.action)
+                            }
                         )
                     }
 
