@@ -1,3 +1,8 @@
+/**
+ * Canonical mobile-safe field matrix shared across backend schema normalization
+ * and iOS rendering/editing. New values here should only be added together with
+ * backend normalization + client support, not as speculative Odoo type mirrors.
+ */
 export type FieldType =
     | 'char'
     | 'text'
@@ -69,6 +74,7 @@ export interface FieldSchema {
     domain?: string;
     comodel?: string;
     selection?: [string, string][];
+    /** Present for monetary fields when the record carries a related currency field. */
     currencyField?: string;
     placeholder?: string;
     digits?: [number, number];

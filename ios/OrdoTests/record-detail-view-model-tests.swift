@@ -267,6 +267,53 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func monetaryFieldEditTriggersDebouncedOnchangeWithNormalizedValue() async throws {
+        var capturedRequest: OnchangeRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/sale.order") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: saleOrderSchemaWithMonetaryOnchange)))
+            }
+
+            if path.contains("/records/sale.order/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailSaleOrderWithMonetaryRecord)))
+            }
+
+            if path.hasSuffix("/records/sale.order/onchange") && request.httpMethod == "POST" {
+                capturedRequest = try JSONDecoder().decode(OnchangeRequest.self, from: try #require(request.httpBody))
+                return (201, try JSONEncoder().encode(DetailEnvelope(data: OnchangeResult(
+                    values: ["amount_total": .number(150.25)],
+                    warnings: [OnchangeWarning(title: "Repriced", message: "Total refreshed.", type: "warning")],
+                    domains: nil
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first(where: { $0.model == "sale.order" })), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        let amountField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "amount_total" }))
+
+        viewModel.applyFieldEdit(.string("150.25"), for: amountField, draft: draft, using: appState)
+        await viewModel.waitForOnchangeToSettle()
+
+        #expect(capturedRequest?.triggerField == "amount_total")
+        #expect(capturedRequest?.recordId == 1)
+        #expect(capturedRequest?.values["amount_total"] == .number(150.25))
+        #expect(viewModel.onchangeWarnings.first?.message == "Total refreshed.")
+    }
+
+    @Test
     func visibleWorkflowActionsRespectCurrentRecordState() async throws {
         DetailViewModelTestURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
@@ -429,6 +476,18 @@ private let saleOrderSchemaWithAction = MobileFormSchema(
     hasChatter: false
 )
 
+private let saleOrderSchemaWithMonetaryOnchange = MobileFormSchema(
+    model: "sale.order",
+    title: "Sales Order",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Pricing", fields: [
+        FieldSchema(name: "currency_id", type: .many2one, label: "Currency", required: true, readonly: true, invisible: nil, domain: nil, comodel: "res.currency", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "amount_total", type: .monetary, label: "Total", required: true, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "amount_total", source: "view", dependencies: ["currency_id"], mergeReturnedValue: true), domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let detailDraftSaleOrderRecord: RecordData = [
     "id": .number(1),
     "display_name": .string("S00045"),
@@ -441,6 +500,13 @@ private let detailConfirmedSaleOrderRecord: RecordData = [
     "display_name": .string("S00045"),
     "name": .string("S00045"),
     "state": .string("sale"),
+]
+
+private let detailSaleOrderWithMonetaryRecord: RecordData = [
+    "id": .number(1),
+    "display_name": .string("S00045"),
+    "currency_id": .relation(id: 3, label: "USD"),
+    "amount_total": .number(100),
 ]
 
 private final class DetailViewModelTestURLProtocol: URLProtocol {

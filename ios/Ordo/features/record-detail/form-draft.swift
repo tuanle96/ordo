@@ -40,6 +40,20 @@ final class FormDraft {
     func changedValues(comparedTo baseline: RecordData, fields: [FieldSchema]) -> RecordData {
         fields.reduce(into: RecordData()) { result, field in
             let currentRawValue = value(for: field.name, fallback: baseline[field.name])
+
+            if field.type == .one2many {
+                let current = comparableValue(for: field, value: currentRawValue)
+                let original = comparableValue(for: field, value: baseline[field.name])
+
+                guard current != original else { return }
+                guard let mutationValue = one2ManyMutationValue(for: field, currentValue: currentRawValue, baselineValue: baseline[field.name]) else {
+                    return
+                }
+
+                result[field.name] = mutationValue
+                return
+            }
+
             let current = comparableValue(for: field, value: currentRawValue)
             let original = comparableValue(for: field, value: baseline[field.name])
 
@@ -101,7 +115,7 @@ final class FormDraft {
                     errors[field.name] = "\(field.label) must be a whole number."
                     return
                 }
-            case .float:
+            case .float, .monetary:
                 if let rawValue = value(for: field.name, fallback: nil),
                    !rawValue.isVisuallyEmpty,
                    normalizedValue == nil {
@@ -135,7 +149,7 @@ final class FormDraft {
                 if trimmed?.isEmpty != false {
                     errors[field.name] = "\(field.label) is required."
                 }
-            case .integer, .float, .date, .datetime:
+            case .integer, .float, .monetary, .date, .datetime:
                 if normalizedValue == nil {
                     errors[field.name] = "\(field.label) is required."
                 }
@@ -145,6 +159,10 @@ final class FormDraft {
                 }
             case .many2many:
                 if manyRelationIDs(from: value(for: field.name, fallback: nil)).isEmpty {
+                    errors[field.name] = "\(field.label) is required."
+                }
+            case .one2many:
+                if normalizedOne2ManyLines(for: field, from: value(for: field.name, fallback: nil)).isEmpty {
                     errors[field.name] = "\(field.label) is required."
                 }
             case .boolean:
@@ -163,7 +181,7 @@ final class FormDraft {
         switch field.type {
         case .integer:
             return normalizedIntegerValue(from: value)
-        case .float:
+        case .float, .monetary:
             return normalizedFloatValue(from: value)
         case .date:
             return normalizedDateValue(from: value)
@@ -172,6 +190,8 @@ final class FormDraft {
         case .many2one:
             guard let relationID = value.relationID else { return nil }
             return .number(Double(relationID))
+        case .one2many:
+            return .array(normalizedOne2ManyLines(for: field, from: value).map(encodeOne2ManyComparableLine))
         case .many2many:
             return .array(manyRelationIDs(from: value).sorted().map { .number(Double($0)) })
         default:
@@ -183,7 +203,7 @@ final class FormDraft {
         switch field.type {
         case .integer:
             return normalizedIntegerValue(from: value)
-        case .float:
+        case .float, .monetary:
             return normalizedFloatValue(from: value)
         case .date:
             return normalizedDateValue(from: value)
@@ -253,6 +273,97 @@ final class FormDraft {
     private func manyRelationIDs(from value: JSONValue?) -> [Int] {
         guard let value else { return [] }
         return Array(Set(value.relationValues.map(\.id))).sorted()
+    }
+
+    private func one2ManyMutationValue(
+        for field: FieldSchema,
+        currentValue: JSONValue?,
+        baselineValue: JSONValue?
+    ) -> JSONValue? {
+        let currentLines = normalizedOne2ManyLines(for: field, from: currentValue)
+        let baselineLines = normalizedOne2ManyLines(for: field, from: baselineValue)
+        var commands: [JSONValue] = []
+
+        let currentIDs = Set(currentLines.compactMap(\.id))
+
+        for line in baselineLines {
+            guard let id = line.id, !currentIDs.contains(id) else { continue }
+            commands.append(.array([.number(2), .number(Double(id)), .bool(false)]))
+        }
+
+        let baselineByID = Dictionary(uniqueKeysWithValues: baselineLines.compactMap { line in
+            line.id.map { ($0, line.values) }
+        })
+
+        for line in currentLines {
+            if let id = line.id {
+                let baselineValues = baselineByID[id] ?? [:]
+                guard line.values != baselineValues else { continue }
+                commands.append(.array([.number(1), .number(Double(id)), .object(line.values)]))
+                continue
+            }
+
+            guard !line.values.isEmpty else { continue }
+            commands.append(.array([.number(0), .number(0), .object(line.values)]))
+        }
+
+        return commands.isEmpty ? nil : .array(commands)
+    }
+
+    private func normalizedOne2ManyLines(for field: FieldSchema, from value: JSONValue?) -> [One2ManyComparableLine] {
+        guard case .array(let rawLines)? = value else { return [] }
+
+        return rawLines.compactMap { rawLine in
+            switch rawLine {
+            case .number(let id):
+                return One2ManyComparableLine(id: Int(id), values: [:])
+            case .array(let relation) where relation.count == 2:
+                return relation.first?.intValue.map { One2ManyComparableLine(id: $0, values: [:]) }
+            case .object(let rawValues):
+                var mutableValues = rawValues
+                let id = mutableValues.removeValue(forKey: "id")?.intValue
+                let normalizedValues = normalizedOne2ManyLineValues(subfields: field.subfields ?? [], rawValues: mutableValues)
+
+                if id == nil && normalizedValues.isEmpty {
+                    return nil
+                }
+
+                return One2ManyComparableLine(id: id, values: normalizedValues)
+            default:
+                return nil
+            }
+        }
+    }
+
+    private func normalizedOne2ManyLineValues(subfields: [FieldSchema], rawValues: RecordData) -> RecordData {
+        subfields.reduce(into: RecordData()) { result, subfield in
+            let hasExplicitValue = rawValues.keys.contains(subfield.name)
+            let normalizedValue = mutationValue(for: subfield, value: rawValues[subfield.name])
+
+            if let normalizedValue {
+                result[subfield.name] = normalizedValue
+            } else if hasExplicitValue {
+                result[subfield.name] = .null
+            }
+        }
+    }
+
+    private func encodeOne2ManyComparableLine(_ line: One2ManyComparableLine) -> JSONValue {
+        if let id = line.id, line.values.isEmpty {
+            return .number(Double(id))
+        }
+
+        var object = line.values
+        if let id = line.id {
+            object["id"] = .number(Double(id))
+        }
+
+        return .object(object)
+    }
+
+    private struct One2ManyComparableLine: Equatable {
+        let id: Int?
+        let values: RecordData
     }
 
     private func normalizedIntegerValue(from value: JSONValue?) -> JSONValue? {

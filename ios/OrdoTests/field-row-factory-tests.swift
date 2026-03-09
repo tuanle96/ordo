@@ -45,17 +45,23 @@ struct FieldRowFactoryTests {
     @Test
     func monetaryUsesConfiguredPrecision() {
         let field = FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil)
+        let record: RecordData = [
+            "credit_limit": .number(2500.5),
+            "currency_id": .relation(id: 3, label: "USD"),
+        ]
 
-        let model = FieldRowFactory.model(for: field, rawValue: .number(2500.5))
+        let model = FieldRowFactory.model(for: field, rawValue: .number(2500.5), record: record)
 
-        #expect(model?.value == "2,500.50")
+        #expect(model?.value == "USD 2,500.50")
         #expect(model?.style == .standard)
     }
 
     @Test
     func unsupportedFieldsRemainOutOfEditMode() {
         let many2one = FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let one2many = FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)], searchable: nil, widget: nil)
         let many2many = FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let monetary = FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil)
         let integer = FieldSchema(name: "sequence", type: .integer, label: "Sequence", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let float = FieldSchema(name: "amount_total", type: .float, label: "Amount", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil)
         let date = FieldSchema(name: "date_order", type: .date, label: "Order Date", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
@@ -63,7 +69,9 @@ struct FieldRowFactoryTests {
         let html = FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
 
         let many2oneModel = EditableFieldFactory.model(for: many2one)
+        let one2manyModel = EditableFieldFactory.model(for: one2many)
         let many2manyModel = EditableFieldFactory.model(for: many2many)
+        let monetaryModel = EditableFieldFactory.model(for: monetary)
         let integerModel = EditableFieldFactory.model(for: integer)
         let floatModel = EditableFieldFactory.model(for: float)
         let dateModel = EditableFieldFactory.model(for: date)
@@ -75,10 +83,22 @@ struct FieldRowFactoryTests {
             Issue.record("Expected many2one field to stay editable.")
         }
 
+        if case .one2many(let subfields)? = one2manyModel?.style {
+            #expect(subfields.map(\.name) == ["name"])
+        } else {
+            Issue.record("Expected one2many field with subfields to stay editable.")
+        }
+
         if case .many2many(let comodel)? = many2manyModel?.style {
             #expect(comodel == "res.partner.category")
         } else {
             Issue.record("Expected many2many field to stay editable.")
+        }
+
+        if case .monetary(let currencyField)? = monetaryModel?.style {
+            #expect(currencyField == "currency_id")
+        } else {
+            Issue.record("Expected monetary field to stay editable.")
         }
 
         if case .integer? = integerModel?.style {
@@ -118,6 +138,19 @@ struct FieldRowFactoryTests {
         ]))
 
         #expect(model?.value == "VIP, Wholesale")
+        #expect(model?.style == .standard)
+    }
+
+    @Test
+    func one2ManyReadOnlyUsesLineCount() {
+        let field = FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .array([
+            .number(11),
+            .object(["name": .string("Custom line")]),
+        ]))
+
+        #expect(model?.value == "2 line items")
         #expect(model?.style == .standard)
     }
 }

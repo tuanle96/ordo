@@ -29,13 +29,14 @@ enum FieldRowFactory {
         .date,
         .datetime,
         .many2one,
+        .one2many,
         .many2many,
         .monetary,
         .priority,
         .statusbar,
     ]
 
-    static func model(for field: FieldSchema, rawValue: JSONValue?) -> ReadOnlyFieldRowModel? {
+    static func model(for field: FieldSchema, rawValue: JSONValue?, record: RecordData? = nil) -> ReadOnlyFieldRowModel? {
         guard let rawValue, !rawValue.isVisuallyEmpty else { return nil }
 
         let style: ReadOnlyFieldRowModel.Style
@@ -60,18 +61,18 @@ enum FieldRowFactory {
         return ReadOnlyFieldRowModel(
             id: field.name,
             label: field.label,
-            value: formattedValue(for: field, rawValue: rawValue),
+            value: formattedValue(for: field, rawValue: rawValue, record: record),
             style: style
         )
     }
 
-    static func formattedValue(for field: FieldSchema, rawValue: JSONValue) -> String {
+    static func formattedValue(for field: FieldSchema, rawValue: JSONValue, record: RecordData? = nil) -> String {
         if field.type == .priority {
             return formattedPriority(for: rawValue)
         }
 
         if field.type == .monetary {
-            return formattedMonetaryValue(for: field, rawValue: rawValue)
+            return formattedMonetaryValue(for: field, rawValue: rawValue, record: record)
         }
 
         if field.type == .selection,
@@ -85,6 +86,10 @@ enum FieldRowFactory {
             return formattedManyRelationValue(for: rawValue)
         }
 
+        if field.type == .one2many {
+            return formattedOne2ManyValue(for: rawValue)
+        }
+
         return rawValue.displayText
     }
 
@@ -95,7 +100,7 @@ enum FieldRowFactory {
         return String(repeating: "★", count: priority) + String(repeating: "☆", count: max(0, 3 - priority))
     }
 
-    private static func formattedMonetaryValue(for field: FieldSchema, rawValue: JSONValue) -> String {
+    private static func formattedMonetaryValue(for field: FieldSchema, rawValue: JSONValue, record: RecordData?) -> String {
         guard case .number(let amount) = rawValue else { return rawValue.displayText }
 
         let formatter = NumberFormatter()
@@ -106,7 +111,17 @@ enum FieldRowFactory {
         formatter.maximumFractionDigits = field.digits?.last ?? 2
         let formattedAmount = formatter.string(from: NSNumber(value: amount)) ?? rawValue.displayText
 
-        return formattedAmount
+        guard let currencyField = field.currencyField,
+              let currencyValue = record?[currencyField] else {
+            return formattedAmount
+        }
+
+        let currencyLabel = currencyValue.relationLabel ?? currencyValue.stringValue
+        guard let currencyLabel, !currencyLabel.isEmpty else {
+            return formattedAmount
+        }
+
+        return "\(currencyLabel) \(formattedAmount)"
     }
 
     private static func formattedManyRelationValue(for rawValue: JSONValue) -> String {
@@ -121,5 +136,14 @@ enum FieldRowFactory {
         }
 
         return rawValue.displayText
+    }
+
+    private static func formattedOne2ManyValue(for rawValue: JSONValue) -> String {
+        guard case .array(let values) = rawValue else { return rawValue.displayText }
+
+        let count = values.count
+        guard count > 0 else { return "—" }
+
+        return count == 1 ? "1 line item" : "\(count) line items"
     }
 }

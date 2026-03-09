@@ -371,7 +371,7 @@ final class RecordDetailViewModel {
 
     private func shouldDebounceOnchange(for field: FieldSchema) -> Bool {
         switch field.type {
-        case .char, .text, .integer, .float:
+        case .char, .text, .integer, .float, .monetary:
             return true
         default:
             return false

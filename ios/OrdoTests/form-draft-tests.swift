@@ -201,18 +201,147 @@ struct FormDraftTests {
     }
 
     @Test
+    func one2manyCreateLinesEncodeToCreateCommands() {
+        let baseline: RecordData = [:]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "product_uom_qty", type: .float, label: "Quantity", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "name": .string("Installation"),
+                "product_uom_qty": .string("2"),
+            ]),
+        ]), for: "order_line")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "order_line": .array([
+                .array([
+                    .number(0),
+                    .number(0),
+                    .object([
+                        "name": .string("Installation"),
+                        "product_uom_qty": .number(2),
+                    ]),
+                ]),
+            ]),
+        ])
+    }
+
+    @Test
+    func one2manyRemovedExistingLinesEncodeDeleteCommands() {
+        let baseline: RecordData = [
+            "order_line": .array([
+                .number(41),
+                .number(42),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .number(42),
+        ]), for: "order_line")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "order_line": .array([
+                .array([
+                    .number(2),
+                    .number(41),
+                    .bool(false),
+                ]),
+            ]),
+        ])
+    }
+
+    @Test
+    func one2manyUpdatesExistingDetailedLinesEncodeWriteCommands() {
+        let baseline: RecordData = [
+            "order_line": .array([
+                .object([
+                    "id": .number(51),
+                    "name": .string("Original"),
+                    "product_uom_qty": .number(1),
+                ]),
+            ]),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "product_uom_qty", type: .float, label: "Quantity", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "id": .number(51),
+                "name": .string("Updated"),
+                "product_uom_qty": .string("3"),
+            ]),
+        ]), for: "order_line")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "order_line": .array([
+                .array([
+                    .number(1),
+                    .number(51),
+                    .object([
+                        "name": .string("Updated"),
+                        "product_uom_qty": .number(3),
+                    ]),
+                ]),
+            ]),
+        ])
+    }
+
+    @Test
+    func requiredValidationFlagsMissingOne2Many() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: true, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == "Order Lines is required.")
+
+        draft.setValue(.array([
+            .object(["name": .string("Line 1")]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+    }
+
+    @Test
     func numericAndTemporalStringsNormalizeForMutations() {
         let baseline: RecordData = [:]
         let draft = FormDraft(record: baseline)
         let fields = [
             FieldSchema(name: "sequence", type: .integer, label: "Sequence", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "amount_total", type: .float, label: "Amount", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "date_order", type: .date, label: "Order Date", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "write_date", type: .datetime, label: "Updated", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
         ]
 
         draft.setValue(.string("42"), for: "sequence")
         draft.setValue(.string("19.95"), for: "amount_total")
+        draft.setValue(.string("2500.75"), for: "credit_limit")
         draft.setValue(.string("2026-03-08"), for: "date_order")
         draft.setValue(.string("2026-03-08 14:30"), for: "write_date")
 
@@ -220,6 +349,7 @@ struct FormDraftTests {
 
         #expect(changedValues["sequence"] == .number(42))
         #expect(changedValues["amount_total"] == .number(19.95))
+        #expect(changedValues["credit_limit"] == .number(2500.75))
         #expect(changedValues["date_order"] == .string("2026-03-08"))
         #expect(changedValues["write_date"] == .string("2026-03-08 14:30:00"))
     }
@@ -230,12 +360,14 @@ struct FormDraftTests {
         let fields = [
             FieldSchema(name: "sequence", type: .integer, label: "Sequence", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "amount_total", type: .float, label: "Amount", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+            FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "date_order", type: .date, label: "Order Date", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
             FieldSchema(name: "write_date", type: .datetime, label: "Updated", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
         ]
 
         draft.setValue(.string("forty-two"), for: "sequence")
         draft.setValue(.string("19,95"), for: "amount_total")
+        draft.setValue(.string("USD"), for: "credit_limit")
         draft.setValue(.string("08/03/2026"), for: "date_order")
         draft.setValue(.string("tomorrow noon"), for: "write_date")
 
@@ -243,6 +375,7 @@ struct FormDraftTests {
 
         #expect(errors["sequence"] == "Sequence must be a whole number.")
         #expect(errors["amount_total"] == "Amount must be a number.")
+        #expect(errors["credit_limit"] == "Credit Limit must be a number.")
         #expect(errors["date_order"] == "Order Date must use YYYY-MM-DD.")
         #expect(errors["write_date"] == "Updated must use YYYY-MM-DD HH:MM format.")
     }

@@ -63,7 +63,7 @@ private struct SchemaSectionView: View {
             if isEditing, draft != nil, !field.isReadOnly(in: values), EditableFieldFactory.model(for: field) != nil {
                 return true
             }
-            return FieldRowFactory.model(for: field, rawValue: rawValue) != nil
+            return FieldRowFactory.model(for: field, rawValue: rawValue, record: record) != nil
         }
     }
 
@@ -83,7 +83,7 @@ private struct SchemaSectionView: View {
                 validationMessage: validationErrors[field.name],
                 onValueChange: onFieldChange
             )
-        } else if let row = FieldRowFactory.model(for: field, rawValue: rawValue) {
+        } else if let row = FieldRowFactory.model(for: field, rawValue: rawValue, record: record) {
             ReadOnlyFieldRow(model: row)
         }
     }

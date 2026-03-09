@@ -25,6 +25,7 @@
 | Phase 09 — Odoo onchange foundation | ✅ Complete | Shared contracts, backend transport, iOS debounce/merge/warnings, backend fail-closed hardening, and live Odoo 17 `res.partner` validation are complete; broad returned-domain application and deeper x2many parity remain deferred |
 | Phase 10 — iOS workflow action buttons | ✅ Complete | Record detail now renders visible schema header actions for persisted read-mode records, supports confirm dialogs plus single-flight execution, updates cached record state after action completion, and ships focused unit validation plus mutable UI-test fixtures; broader simulator UI stabilization remains a follow-up hardening concern rather than a blocker for the shipped slice |
 | Phase 11 — Explicit auth logout | ✅ Complete | Guarded `POST /auth/logout` now revokes the Redis-backed `sessionHandle`, best-effort destroys the upstream Odoo session cookie bridge, and powers a remote-first Settings sign-out flow with focused backend + iOS regression coverage |
+| Core-first platform — Phase 01 generic form engine | 🚧 In Progress | User-approved core-first freeze is active; generic `one2many` foundation and `monetary` support are now shipped on iOS, while the supported field matrix, remaining renderer/editor gaps, payload normalization cleanup, and broader regression coverage stay open |
 
 ## Scope reminders
 

@@ -141,6 +141,11 @@ enum JSONValue: Codable, Hashable {
         }
     }
 
+    var objectValue: [String: JSONValue]? {
+        guard case .object(let value) = self else { return nil }
+        return value
+    }
+
     var isVisuallyEmpty: Bool {
         switch self {
         case .string(let value):

@@ -1,5 +1,30 @@
 # Project Changelog
 
+## 2026-03-09 (Core-First Phase 01 — Generic `one2many` + `monetary` Support)
+
+### Added
+
+- **Narrow generic `one2many` foundation** on iOS record detail forms with read-only line-count display, inline local line editing, and Odoo command encoding for create/update/delete
+- **Generic `monetary` field support** on iOS with schema-driven decimal editing, required/invalid-value validation, and read-only currency-aware formatting via `currencyField`
+- **Focused regression coverage** for `one2many` command encoding, required validation, read-only summaries, `monetary` normalization, `monetary` validation, and editability routing
+
+### Changed
+
+- `FormDraft` now treats `one2many` and `monetary` as first-class generic field types instead of unsupported or partially-normalized values
+- Read-only schema rendering now receives full record context so `monetary` values can display the linked currency label when available
+- Editable field routing now recognizes `monetary` alongside the existing primitive, relation, and narrow `one2many` editors
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused form-engine regression suite passes (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after both generic field slices
+- Independent code review approved both slices for merge with no blocking findings; reports live under `plans/260309-0850-core-first-platform/reports/`
+
+### Notes
+
+- This work stays intentionally **core-first**: no module-specific widgets, no `one2many` wizard parity, and no offline/sync expansion yet
+- Remaining Phase 01 work is still open: complete supported field matrix definition, any leftover renderer/editor gaps, payload normalization cleanup, and broader regression coverage
+
 ## 2026-03-09 (Explicit Auth Logout)
 
 ### Added

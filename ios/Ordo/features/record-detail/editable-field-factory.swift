@@ -6,11 +6,13 @@ struct EditableFieldRowModel {
         case multiline
         case integer
         case float
+        case monetary(currencyField: String?)
         case date
         case datetime
         case toggle
         case selection(options: [[String]])
         case many2one(comodel: String)
+        case one2many(subfields: [FieldSchema])
         case many2many(comodel: String)
     }
 
@@ -28,6 +30,8 @@ enum EditableFieldFactory {
             return .init(style: .integer)
         case .float:
             return .init(style: .float)
+        case .monetary:
+            return .init(style: .monetary(currencyField: field.currencyField))
         case .date:
             return .init(style: .date)
         case .datetime:
@@ -39,6 +43,9 @@ enum EditableFieldFactory {
         case .many2one:
             guard let comodel = field.comodel else { return nil }
             return .init(style: .many2one(comodel: comodel))
+        case .one2many:
+            guard let subfields = field.subfields, !subfields.isEmpty else { return nil }
+            return .init(style: .one2many(subfields: subfields))
         case .many2many:
             guard let comodel = field.comodel else { return nil }
             return .init(style: .many2many(comodel: comodel))
@@ -98,6 +105,15 @@ struct EditableFieldRow: View {
                 text: numericStringBinding,
                 keyboardType: .decimalPad,
                 validationMessage: validationMessage
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .monetary(let currencyField):
+            NumericFieldEditor(
+                field: field,
+                text: numericStringBinding,
+                keyboardType: .decimalPad,
+                validationMessage: validationMessage,
+                prefix: monetaryPrefix(currencyField: currencyField)
             )
             .accessibilityIdentifier("field-row-\(field.name)")
         case .date:
@@ -188,6 +204,16 @@ struct EditableFieldRow: View {
                 )
                 .environment(appState)
             }
+        case .one2many(let subfields):
+            One2ManyFieldEditor(
+                field: field,
+                subfields: subfields,
+                draft: draft,
+                fallbackValue: fallbackValue,
+                validationMessage: validationMessage,
+                onValueChange: onValueChange
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
         case .many2many(let comodel):
             VStack(alignment: .leading, spacing: 10) {
                 Text(field.label)
@@ -314,6 +340,12 @@ struct EditableFieldRow: View {
         )
     }
 
+    private func monetaryPrefix(currencyField: String?) -> String? {
+        guard let currencyField else { return nil }
+        let currencyValue = draft.values[currencyField]
+        return currencyValue?.relationLabel ?? currencyValue?.stringValue
+    }
+
     private var relationLabel: String? {
         draft.value(for: field.name, fallback: fallbackValue)?.relationLabel
             ?? fallbackValue?.relationLabel
@@ -343,15 +375,24 @@ private struct NumericFieldEditor: View {
     let text: Binding<String>
     let keyboardType: UIKeyboardType
     let validationMessage: String?
+    var prefix: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             LabeledContent(field.label) {
-                TextField(field.placeholder ?? field.label, text: text)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(keyboardType)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("field-editor-\(field.name)")
+                HStack(spacing: 8) {
+                    if let prefix, !prefix.isEmpty {
+                        Text(prefix)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    TextField(field.placeholder ?? field.label, text: text)
+                        .multilineTextAlignment(.trailing)
+                        .keyboardType(keyboardType)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("field-editor-\(field.name)")
+                }
             }
 
             if let validationMessage {
