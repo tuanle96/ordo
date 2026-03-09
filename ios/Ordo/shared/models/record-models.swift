@@ -50,6 +50,7 @@ struct RecordListResult: Codable {
     let items: [RecordData]
     let limit: Int
     let offset: Int
+    let total: Int
 }
 
 struct NameSearchResult: Codable, Identifiable, Hashable {

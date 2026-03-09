@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Ordo
 
+@MainActor
 struct CacheStoreTests {
     private let scope = CacheScope(namespace: "test-scope")
 
@@ -33,15 +34,16 @@ struct CacheStoreTests {
         let list = RecordListResult(
             items: [["id": .number(1), "name": .string("Azure Interior")]],
             limit: 30,
-            offset: 0
+            offset: 0,
+            total: 1
         )
 
-        try await store.saveListPage(list, for: "res.partner", limit: 30, offset: 0, scope: scope)
-        let cached = await store.loadListPage(for: "res.partner", limit: 30, offset: 0, scope: scope)
+        try await store.saveListPage(list, for: "res.partner", limit: 30, offset: 0, order: nil, domainKey: nil, fieldKey: "id,name", scope: scope)
+        let cached = await store.loadListPage(for: "res.partner", limit: 30, offset: 0, order: nil, domainKey: nil, fieldKey: "id,name", scope: scope)
         #expect(cached?.value.items.count == 1)
 
         try await store.clear(scope: scope)
-        let cleared = await store.loadListPage(for: "res.partner", limit: 30, offset: 0, scope: scope)
+        let cleared = await store.loadListPage(for: "res.partner", limit: 30, offset: 0, order: nil, domainKey: nil, fieldKey: "id,name", scope: scope)
 
         #expect(cleared == nil)
     }
@@ -68,4 +70,4 @@ struct CacheStoreTests {
 
         #expect(cached == nil)
     }
-    }
+}

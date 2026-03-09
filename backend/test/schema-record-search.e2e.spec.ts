@@ -14,6 +14,12 @@ describe('Schema, record, and search endpoints', () => {
 
     const schemaServiceMock = {
         getFormSchema: jest.fn().mockResolvedValue(odooFixtures.schema),
+        getListSchema: jest.fn().mockResolvedValue({
+            model: 'res.partner',
+            title: 'Partners',
+            columns: [{ name: 'name', type: 'char', label: 'Name' }],
+            search: { fields: [], filters: [], groupBy: [] },
+        }),
     };
 
     const recordServiceMock = {
@@ -21,6 +27,7 @@ describe('Schema, record, and search endpoints', () => {
             items: odooFixtures.records,
             limit: 3,
             offset: 0,
+            total: 3,
         }),
         getDefaultValues: jest.fn().mockResolvedValue({ name: 'Draft Customer', country_id: 21 }),
         getRecord: jest.fn().mockResolvedValue(odooFixtures.records[0]),
@@ -67,8 +74,28 @@ describe('Schema, record, and search endpoints', () => {
         expect(schemaServiceMock.getFormSchema).toHaveBeenCalledWith(
             expect.objectContaining({ uid: 2 }),
             'res.partner',
+            false,
         );
         expect(response.body.data).toEqual(odooFixtures.schema);
+    });
+
+    it('returns list schema envelope for /schema/:model/list', async () => {
+        const response = await request(protectedApp.getHttpServer())
+            .get('/api/v1/mobile/schema/res.partner/list')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+
+        expect(schemaServiceMock.getListSchema).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            false,
+        );
+        expect(response.body.data).toEqual({
+            model: 'res.partner',
+            title: 'Partners',
+            columns: [{ name: 'name', type: 'char', label: 'Name' }],
+            search: { fields: [], filters: [], groupBy: [] },
+        });
     });
 
     it('returns records envelope for list and detail endpoints', async () => {
@@ -83,6 +110,7 @@ describe('Schema, record, and search endpoints', () => {
             expect.objectContaining({ fields: ['id', 'name', 'email'], limit: 3 }),
         );
         expect(listResponse.body.data.items).toEqual(odooFixtures.records);
+        expect(listResponse.body.data.total).toBe(3);
 
         const detailResponse = await request(protectedApp.getHttpServer())
             .get('/api/v1/mobile/records/res.partner/3?fields=id,name,email')

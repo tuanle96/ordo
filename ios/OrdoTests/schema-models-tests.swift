@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Ordo
 
+@MainActor
 struct SchemaModelsTests {
         @Test
         func unknownFieldTypesDecodeAsUnsupported() throws {
@@ -96,6 +97,43 @@ struct SchemaModelsTests {
         )
 
         #expect(Set(schema.requestedFieldNames).isSuperset(of: ["id", "display_name", "name", "state", "comment"]))
+    }
+
+    @Test
+    func mobileListSchemaDecodesVisibleColumnsAndRequestedFields() throws {
+        let json = """
+        {
+            "model": "res.partner",
+            "title": "Partners",
+            "columns": [
+                { "name": "name", "type": "char", "label": "Name" },
+                { "name": "email", "type": "char", "label": "Email", "optional": "show" },
+                { "name": "phone", "type": "char", "label": "Phone", "optional": "hide" },
+                { "name": "image_128", "type": "image", "label": "Avatar", "columnInvisible": true }
+            ],
+            "defaultOrder": "name asc",
+            "search": {
+                "fields": [
+                    { "name": "name", "label": "Name", "type": "char" }
+                ],
+                "filters": [
+                    { "name": "companies", "label": "Companies", "domain": "[[\"is_company\",\"=\",true]]" }
+                ],
+                "groupBy": [
+                    { "name": "group_country", "label": "Country", "fieldName": "country_id" }
+                ]
+            }
+        }
+        """.data(using: .utf8)!
+
+        let schema = try JSONDecoder().decode(MobileListSchema.self, from: json)
+
+        #expect(schema.visibleColumns.map(\.name) == ["name", "email"])
+        #expect(Set(schema.requestedFieldNames).isSuperset(of: ["id", "display_name", "name", "email"]))
+        #expect(
+            schema.search.filters.first?.domainValue
+                == .array([.array([.string("is_company"), .string("="), .bool(true)])])
+        )
     }
 
     private func encodedJSONValue<T: Encodable>(from value: T) throws -> JSONValue {

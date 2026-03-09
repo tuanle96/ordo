@@ -34,6 +34,29 @@ type PythonLiteral = ConditionValue | PythonLiteral[];
 
 @Injectable()
 export class ConditionParserService {
+    parsePythonValue(expression?: string): unknown | undefined {
+        if (!expression) {
+            return undefined;
+        }
+
+        const normalized = expression.trim();
+        if (!normalized) {
+            return undefined;
+        }
+
+        try {
+            const tokens = this.tokenize(normalized);
+            const [value, index] = this.parsePythonLiteral(tokens, 0);
+            if (value === undefined || tokens[index]?.type !== 'eof') {
+                return undefined;
+            }
+
+            return value;
+        } catch {
+            return undefined;
+        }
+    }
+
     parseInvisible(expression?: string): Condition | undefined {
         return this.extractSingleCondition(this.parseRule(expression));
     }

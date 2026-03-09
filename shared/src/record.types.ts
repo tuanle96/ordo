@@ -68,6 +68,7 @@ export interface RecordListResult {
     items: RecordData[];
     limit: number;
     offset: number;
+    total: number;
 }
 
 export interface NameSearchResult {

@@ -172,7 +172,15 @@ struct BrowseFilterState: Codable, Hashable {
 }
 
 enum BrowseFilterRegistry {
-    static func fields(for descriptor: ModelDescriptor) -> [BrowseFilterField] {
+    static func fields(for descriptor: ModelDescriptor, listSchema: MobileListSchema? = nil) -> [BrowseFilterField] {
+        if let schemaFields = listSchema?.search.fields,
+           !schemaFields.isEmpty {
+            let dynamicFields = schemaFields.compactMap(field(from:))
+            if !dynamicFields.isEmpty {
+                return dynamicFields
+            }
+        }
+
         switch descriptor.model {
         case "res.partner":
             return [
@@ -203,6 +211,23 @@ enum BrowseFilterRegistry {
         default:
             return [BrowseFilterField(name: descriptor.primarySortField, label: descriptor.title, kind: .text)]
         }
+    }
+
+    nonisolated private static func field(from searchField: SearchField) -> BrowseFilterField? {
+        let kind: BrowseFilterFieldKind
+
+        switch searchField.type {
+        case .integer, .float, .monetary:
+            kind = .number
+        case .selection, .priority, .statusbar:
+            kind = .selection(searchField.selection ?? [])
+        case .boolean:
+            kind = .boolean
+        default:
+            kind = .text
+        }
+
+        return BrowseFilterField(name: searchField.name, label: searchField.label, kind: kind)
     }
 }
 

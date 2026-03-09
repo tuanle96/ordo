@@ -5,6 +5,13 @@ import OSLog
 @MainActor
 @Observable
 final class RecordListViewModel {
+    struct DisplayRow: Identifiable {
+        let summary: RecordRowSummary
+        let record: RecordData
+
+        var id: Int { summary.id }
+    }
+
     enum ViewMode: String, CaseIterable, Identifiable {
         case cards
         case table
@@ -70,6 +77,9 @@ final class RecordListViewModel {
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var canLoadMore = true
+    private(set) var totalCount: Int?
+    private(set) var listSchema: MobileListSchema?
+    private(set) var activeQuickFilterName: String?
     var viewMode: ViewMode = .cards
     private(set) var sortOption: SortOption = .serverDefault
     private(set) var filterState: BrowseFilterState
@@ -82,14 +92,19 @@ final class RecordListViewModel {
     private let searchDebounce = Duration.milliseconds(300)
     private var loadedOffsets = Set<Int>()
     private var nextOffset = 0
-    private let filterFields: [BrowseFilterField]
+    private var didAttemptListSchemaLoad = false
+    private var filterFields: [BrowseFilterField]
     private let userDefaults: UserDefaults
 
     init(descriptor: ModelDescriptor, userDefaults: UserDefaults = .standard) {
+        let initialFilterFields = BrowseFilterRegistry.fields(for: descriptor, listSchema: nil)
+        let initialFilterState = BrowseFilterStore.load(model: descriptor.model, userDefaults: userDefaults)
+            .normalized(with: initialFilterFields)
+
         self.descriptor = descriptor
         self.userDefaults = userDefaults
-        self.filterFields = BrowseFilterRegistry.fields(for: descriptor)
-        self.filterState = BrowseFilterStore.load(model: descriptor.model, userDefaults: userDefaults).normalized(with: filterFields)
+        self.filterFields = initialFilterFields
+        self.filterState = initialFilterState
     }
 
     var availableFilterFields: [BrowseFilterField] {
@@ -98,6 +113,19 @@ final class RecordListViewModel {
 
     var activeFilterCount: Int {
         filterState.activeCount
+    }
+
+    var quickFilters: [SearchFilter] {
+        listSchema?.search.filters ?? []
+    }
+
+    var tableColumns: [ListColumn] {
+        listSchema?.visibleColumns ?? []
+    }
+
+    var totalDisplayText: String? {
+        guard let totalCount else { return nil }
+        return "\(items.count) of \(totalCount)"
     }
 
     var hasActiveFilters: Bool {
@@ -110,11 +138,39 @@ final class RecordListViewModel {
     }
 
     private var activeDomain: JSONValue? {
-        filterState.domainValue(using: filterFields)
+        let filterDomain = filterState.domainValue(using: filterFields)
+        let quickFilterDomain = quickFilters.first(where: { $0.name == activeQuickFilterName })?.domainValue
+
+        switch (quickFilterDomain, filterDomain) {
+        case (nil, nil):
+            return nil
+        case let (domain?, nil), let (nil, domain?):
+            return domain
+        case let (.array(quickClauses), .array(filterClauses)):
+            return .array(quickClauses + filterClauses)
+        default:
+            return filterDomain ?? quickFilterDomain
+        }
     }
 
     private var activeDomainKey: String? {
         activeDomain?.encodedJSONString
+    }
+
+    private var activeFieldKey: String {
+        requestedFields.joined(separator: ",")
+    }
+
+    private var requestedFields: [String] {
+        if let listSchema, !listSchema.requestedFieldNames.isEmpty {
+            return listSchema.requestedFieldNames
+        }
+
+        if let descriptorFields = descriptor.listFields, !descriptorFields.isEmpty {
+            return descriptorFields
+        }
+
+        return Array(Set(["id", "display_name", "name"] + descriptor.titleFields + descriptor.subtitleFields + descriptor.footnoteFields))
     }
 
     func apply(sortOption: SortOption, using appState: AppState) async {
@@ -139,10 +195,17 @@ final class RecordListViewModel {
         }
     }
 
+    func applyQuickFilter(named filterName: String?, using appState: AppState) async {
+        let resolvedFilterName = activeQuickFilterName == filterName ? nil : filterName
+        guard resolvedFilterName != activeQuickFilterName else { return }
+        activeQuickFilterName = resolvedFilterName
+        await load(using: appState)
+    }
+
     func loadMoreIfNeeded(currentID: Int, using appState: AppState) async {
         guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard !isLoading && !isLoadingMore && canLoadMore else { return }
-        guard currentID == summaries.last?.id else { return }
+        guard currentID == displayRows.last?.id else { return }
         guard !loadedOffsets.contains(nextOffset) else { return }
 
         await loadPage(offset: nextOffset, using: appState, replacing: false)
@@ -154,9 +217,14 @@ final class RecordListViewModel {
             return
         }
 
+        if replacing {
+            await loadListSchemaIfNeeded(using: appState)
+        }
+
         let order = sortOption.order(for: descriptor)
         let domain = activeDomain
         let domainKey = activeDomainKey
+        let fieldKey = activeFieldKey
 
         if replacing {
             isLoading = true
@@ -171,8 +239,8 @@ final class RecordListViewModel {
             nextOffset = 0
         }
 
-        if replacing,
-                    let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: 0, order: order, domainKey: domainKey, scope: cacheScope) {
+    if replacing,
+            let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: 0, order: order, domainKey: domainKey, fieldKey: fieldKey, scope: cacheScope) {
             applyPage(cached.value, offset: 0, replacing: true)
             cacheMessage = "Showing saved data from \(cached.relativeTimestamp)."
         }
@@ -183,7 +251,7 @@ final class RecordListViewModel {
             let result = try await appState.withAuthenticatedToken { [self] token in
                 try await appState.apiClient.listRecords(
                     model: self.descriptor.model,
-                    fields: self.descriptor.listFields,
+                    fields: self.requestedFields,
                     limit: self.pageSize,
                     offset: offset,
                     order: order,
@@ -195,7 +263,7 @@ final class RecordListViewModel {
             applyPage(result, offset: offset, replacing: replacing)
             cacheMessage = nil
             do {
-                try await appState.cacheStore.saveListPage(result, for: descriptor.model, limit: pageSize, offset: offset, order: order, domainKey: domainKey, scope: cacheScope)
+                try await appState.cacheStore.saveListPage(result, for: descriptor.model, limit: pageSize, offset: offset, order: order, domainKey: domainKey, fieldKey: fieldKey, scope: cacheScope)
             } catch {
                 Self.logger.error("Failed to save list cache for \(self.descriptor.model, privacy: .public) offset \(offset, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
@@ -204,7 +272,7 @@ final class RecordListViewModel {
             if case APIClientError.unauthorized = error {
                 appState.signOut()
             } else if !replacing,
-                      let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: offset, order: order, domainKey: domainKey, scope: cacheScope) {
+                      let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: offset, order: order, domainKey: domainKey, fieldKey: fieldKey, scope: cacheScope) {
                 applyPage(cached.value, offset: offset, replacing: false)
                 cacheMessage = "Loaded more from saved data (\(cached.relativeTimestamp))."
             } else if !replacing {
@@ -216,6 +284,28 @@ final class RecordListViewModel {
 
         isLoading = false
         isLoadingMore = false
+    }
+
+    private func loadListSchemaIfNeeded(using appState: AppState) async {
+        guard !didAttemptListSchemaLoad else { return }
+        didAttemptListSchemaLoad = true
+
+        do {
+            let schema = try await appState.withAuthenticatedToken { [descriptor] token in
+                try await appState.apiClient.listSchema(model: descriptor.model, token: token)
+            }
+
+            listSchema = schema
+            filterFields = BrowseFilterRegistry.fields(for: descriptor, listSchema: schema)
+            filterState = filterState.normalized(with: filterFields)
+        } catch {
+            if case APIClientError.unauthorized = error {
+                appState.signOut()
+                return
+            }
+
+            Self.logger.info("ℹ️ Falling back to descriptor browse config for \(self.descriptor.model, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func loadIfNeeded(using appState: AppState) async {
@@ -274,8 +364,40 @@ final class RecordListViewModel {
         await searchTask?.value
     }
 
-    var summaries: [RecordRowSummary] {
-        items.compactMap(descriptor.summary(from:))
+    var displayRows: [DisplayRow] {
+        items.compactMap { record in
+            guard let summary = summary(for: record) else { return nil }
+            return DisplayRow(summary: summary, record: record)
+        }
+    }
+
+    private func summary(for record: RecordData) -> RecordRowSummary? {
+        if let listSchema, !listSchema.visibleColumns.isEmpty {
+            return schemaSummary(for: record, columns: listSchema.visibleColumns)
+        }
+
+        return descriptor.summary(from: record)
+    }
+
+    private func schemaSummary(for record: RecordData, columns: [ListColumn]) -> RecordRowSummary? {
+        guard let id = record["id"]?.intValue else { return nil }
+
+        let values: [String?] = columns.map { column in
+            let value = record[column.name]?.displayText
+            return value == "—" || value?.isEmpty == true ? nil : value
+        }
+
+        let fallbackTitle = descriptor.summary(from: record)?.title ?? "Record #\(id)"
+        let title = values.compactMap { $0 }.first ?? fallbackTitle
+        let subtitle = Array(values.dropFirst().prefix(2)).compactMap { $0 }.joined(separator: " · ")
+        let footnote = Array(values.dropFirst(3)).compactMap { $0 }.joined(separator: " · ")
+
+        return RecordRowSummary(
+            id: id,
+            title: title,
+            subtitle: subtitle.isEmpty ? nil : subtitle,
+            footnote: footnote.isEmpty ? nil : footnote
+        )
     }
 
     private func applyPage(_ result: RecordListResult, offset: Int, replacing: Bool) {
@@ -285,7 +407,8 @@ final class RecordListViewModel {
             items = merge(existing: items, with: result.items)
         }
 
-        canLoadMore = result.items.count == pageSize
+        totalCount = result.total
+        canLoadMore = items.count < result.total
         loadedOffsets.insert(offset)
         nextOffset = offset + result.items.count
     }

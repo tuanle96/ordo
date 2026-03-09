@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { MobileFormSchema, TokenPayload } from '@ordo/shared';
+import type { MobileFormSchema, MobileListSchema, TokenPayload } from '@ordo/shared';
 
 import { RedisService } from '../../common/redis/redis.service';
 
 @Injectable()
 export class SchemaCacheService {
     private readonly logger = new Logger(SchemaCacheService.name);
-    private readonly ttlSeconds = 300;
+    private readonly ttlSeconds = 3600;
     private readonly redisKeyPrefix: string;
     private readonly shouldLog: boolean;
 
@@ -20,12 +20,13 @@ export class SchemaCacheService {
         this.shouldLog = this.configService.get<string>('NODE_ENV', process.env.NODE_ENV ?? 'development') !== 'test';
     }
 
-    buildKey(currentUser: TokenPayload, model: string): string {
+    buildKey(currentUser: TokenPayload, segment: 'form' | 'list', model: string): string {
         const normalizedUrl = new URL(currentUser.odooUrl).toString().replace(/\/$/, '');
 
         return [
             this.redisKeyPrefix,
             'schema',
+            segment,
             this.normalizeSegment(normalizedUrl),
             this.normalizeSegment(currentUser.db),
             this.normalizeSegment(currentUser.version),
@@ -35,12 +36,17 @@ export class SchemaCacheService {
         ].join(':');
     }
 
-    async get(currentUser: TokenPayload, model: string): Promise<MobileFormSchema | null> {
+    async get<T extends MobileFormSchema | MobileListSchema>(
+        currentUser: TokenPayload,
+        segment: 'form' | 'list',
+        model: string,
+    ): Promise<T | null> {
         try {
-            return await this.redisService.getJson<MobileFormSchema>(this.buildKey(currentUser, model));
+            return await this.redisService.getJson<T>(this.buildKey(currentUser, segment, model));
         } catch (error) {
             this.warn({
                 event: 'schema_cache_read_failed',
+                segment,
                 db: currentUser.db,
                 model,
                 error: this.describeError(error),
@@ -50,16 +56,22 @@ export class SchemaCacheService {
         }
     }
 
-    async set(currentUser: TokenPayload, model: string, schema: MobileFormSchema): Promise<void> {
+    async set<T extends MobileFormSchema | MobileListSchema>(
+        currentUser: TokenPayload,
+        segment: 'form' | 'list',
+        model: string,
+        schema: T,
+    ): Promise<void> {
         try {
             await this.redisService.setJson(
-                this.buildKey(currentUser, model),
+                this.buildKey(currentUser, segment, model),
                 schema,
                 this.ttlSeconds,
             );
         } catch (error) {
             this.warn({
                 event: 'schema_cache_write_failed',
+                segment,
                 db: currentUser.db,
                 model,
                 error: this.describeError(error),

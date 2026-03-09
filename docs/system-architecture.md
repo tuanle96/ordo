@@ -196,6 +196,16 @@ The remaining core-engine browse slice closes the honest list-filtering gap with
 - **Persistence is local and scoped**: filter state is stored in `UserDefaults` per browse surface, while cached list pages are keyed by model, order, offset, and a hashed domain key so filtered pages never collide with the unfiltered cache
 - **The slice intentionally stops at filtering**: sorting and pagination reuse the current list machinery, while grouped browse sections / `group by` stay explicitly deferred because they likely need a different backend/list response shape
 
+## Schema-driven dynamic list browse (2026-03-09)
+
+The dynamic list slice adds a separate browse-schema transport instead of widening form schema, so list behavior can stay model-agnostic and Odoo-driven.
+
+- **Separate `MobileListSchema` transport** carries list columns, search fields, quick filters, and group-by metadata from backend to iOS without mutating the existing `MobileFormSchema` contract
+- **Backend browse-schema generation** uses Odoo `fields_get` plus `<tree>` / `<search>` XML parsing through a dedicated list-schema builder and exposes the result at `GET /schema/:model/list`
+- **List responses now include authoritative totals** by pairing `search_read` with `search_count`, allowing iOS to display `X of Y` instead of guessing whether another page exists
+- **iOS browse stays fallback-safe**: `RecordListViewModel` prefers schema-derived requested fields, columns, and quick filters when list schema loads, but it falls back to the existing `ModelDescriptor` path if schema fetch fails
+- **Cache isolation widened deliberately**: list-page cache keys now include both the active domain and requested field set so schema-driven pages do not collide with descriptor-fallback cache entries
+
 ## Core-engine offline mutation queue foundation (2026-03-09)
 
 The first offline-write slice stays intentionally modest: it gives Ordo a real persisted retry foundation without claiming full sync-engine parity.

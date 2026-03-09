@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RecordCardRow: View {
     let summary: RecordRowSummary
+    let columns: [ListColumn]?
 
     var body: some View {
         HStack(spacing: OrdoSpacing.md) {
@@ -37,25 +38,47 @@ struct RecordCardRow: View {
 
 struct RecordTableRow: View {
     let summary: RecordRowSummary
+    let record: RecordData?
+    let columns: [ListColumn]?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: OrdoSpacing.sm) {
-            HStack(alignment: .firstTextBaseline, spacing: OrdoSpacing.sm) {
-                Text(summary.title)
-                    .font(OrdoTypography.subheadline.weight(.semibold))
-                    .foregroundStyle(OrdoColors.textPrimary)
-                    .lineLimit(1)
+        Group {
+            if let record, let columns, !columns.isEmpty {
+                HStack(alignment: .top, spacing: OrdoSpacing.md) {
+                    ForEach(columns) { column in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(column.label)
+                                .font(OrdoTypography.caption)
+                                .foregroundStyle(OrdoColors.textTertiary)
 
-                Spacer(minLength: 0)
+                            Text(record[column.name]?.displayText ?? "—")
+                                .font(OrdoTypography.caption)
+                                .foregroundStyle(OrdoColors.textSecondary)
+                                .lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: OrdoSpacing.sm) {
+                    HStack(alignment: .firstTextBaseline, spacing: OrdoSpacing.sm) {
+                        Text(summary.title)
+                            .font(OrdoTypography.subheadline.weight(.semibold))
+                            .foregroundStyle(OrdoColors.textPrimary)
+                            .lineLimit(1)
 
-                Text("#\(summary.id)")
-                    .font(OrdoTypography.caption.monospacedDigit())
-                    .foregroundStyle(OrdoColors.textTertiary)
-            }
+                        Spacer(minLength: 0)
 
-            HStack(alignment: .top, spacing: OrdoSpacing.md) {
-                tableColumn(title: "Details", value: summary.subtitle)
-                tableColumn(title: "Meta", value: summary.footnote, alignment: .trailing)
+                        Text("#\(summary.id)")
+                            .font(OrdoTypography.caption.monospacedDigit())
+                            .foregroundStyle(OrdoColors.textTertiary)
+                    }
+
+                    HStack(alignment: .top, spacing: OrdoSpacing.md) {
+                        tableColumn(title: "Details", value: summary.subtitle)
+                        tableColumn(title: "Meta", value: summary.footnote, alignment: .trailing)
+                    }
+                }
             }
         }
         .padding(.vertical, OrdoSpacing.xs)
@@ -86,18 +109,18 @@ struct RecordTableRow: View {
             title: "Azure Interior",
             subtitle: "azure@example.com · +1 234 567",
             footnote: "San Francisco · United States"
-        ))
+        ), columns: nil)
         RecordCardRow(summary: RecordRowSummary(
             id: 2,
             title: "My Company",
             subtitle: nil,
             footnote: nil
-        ))
+        ), columns: nil)
         RecordCardRow(summary: RecordRowSummary(
             id: 3,
             title: "Ready Mat",
             subtitle: "ready@example.com",
             footnote: "Brussels · Belgium"
-        ))
+        ), columns: nil)
     }
 }

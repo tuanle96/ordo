@@ -103,6 +103,50 @@ export interface FormTab {
     content: Record<string, unknown>;
 }
 
+export interface ListColumn {
+    name: string;
+    type: FieldType;
+    label: string;
+    comodel?: string;
+    selection?: [string, string][];
+    widget?: string;
+    optional?: 'show' | 'hide';
+    columnInvisible?: boolean;
+}
+
+export interface SearchFilter {
+    name: string;
+    label: string;
+    /** JSON-encoded Odoo domain array suitable for the existing `domain` query transport. */
+    domain: string;
+}
+
+export interface SearchGroupBy {
+    name: string;
+    label: string;
+    fieldName: string;
+}
+
+export interface SearchField {
+    name: string;
+    label: string;
+    type: FieldType;
+    filterDomain?: string;
+    selection?: [string, string][];
+}
+
+export interface MobileListSchema {
+    model: string;
+    title: string;
+    columns: ListColumn[];
+    defaultOrder?: string;
+    search: {
+        fields: SearchField[];
+        filters: SearchFilter[];
+        groupBy: SearchGroupBy[];
+    };
+}
+
 export interface MobileFormSchema {
     model: string;
     title: string;

@@ -38,6 +38,11 @@ final class APIClient {
         return try await perform(route: "schema/\(model)", queryItems: queryItems, token: token)
     }
 
+    func listSchema(model: String, fresh: Bool = false, token: String) async throws -> MobileListSchema {
+        let queryItems = fresh ? [URLQueryItem(name: "fresh", value: "true")] : []
+        return try await perform(route: "schema/\(model)/list", queryItems: queryItems, token: token)
+    }
+
     func installedModules(token: String) async throws -> InstalledModulesResponse {
         try await perform(route: "modules/installed", token: token)
     }

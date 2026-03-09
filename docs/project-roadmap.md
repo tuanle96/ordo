@@ -36,6 +36,7 @@
 | Core engine remaining real work — Phase 03 read fidelity for HTML + monetary | ✅ Complete | Read-only HTML now renders rich text when parsing succeeds with safe plain-text fallback, and monetary formatting now prefers real currency-symbol output for known currency codes while preserving label fallback for unknown codes |
 | Core engine remaining real work — Phase 04 offline mutation queue foundation | ✅ Complete | iOS now persists queued record updates/actions/deletes, replays them after authenticated restore/sign-in, keeps optimistic record state for retryable offline save failures, and surfaces pending-sync state on Home + record detail |
 | Core engine remaining real work — Phase 05 release hardening and scope freeze | ✅ Complete | Broad `OrdoTests` unit validation is green after the new browse/onchange/read-fidelity/offline queue slices; docs now reflect the shipped boundary and remaining follow-up work stays explicitly deferred |
+| Core platform — Schema-driven dynamic list browse | ✅ Complete | Separate `GET /schema/:model/list` transport now parses Odoo `<tree>` / `<search>`, browse list responses include `total` from `search_count`, and iOS browse prefers schema-driven columns/filters/totals with descriptor fallback |
 
 ## Scope reminders
 

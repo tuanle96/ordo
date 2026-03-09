@@ -1,5 +1,34 @@
 # Project Changelog
 
+## 2026-03-09 (Schema-Driven Dynamic List View Slice)
+
+### Added
+
+- **Separate `MobileListSchema` transport** across shared, backend, and iOS for schema-driven browse lists, including list columns, search fields, quick filters, and group-by metadata
+- **Backend `GET /api/v1/mobile/schema/:model/list` endpoint** backed by Odoo `<tree>` and `<search>` parsing through a dedicated mobile list-schema builder
+- **Server-authoritative list totals** on record browse responses via Odoo `search_count`, exposed as `RecordListResult.total`
+- **iOS schema-driven browse runtime** with dynamic table columns, quick filters, total-count display (`X of Y`), schema-derived requested fields, and descriptor fallback when list schema is unavailable
+- **Focused regression coverage** for backend list-schema parsing/cache/controller behavior plus iOS list-schema decoding, cache keys, and browse view-model behavior
+
+### Changed
+
+- Browse cache keys now include the requested field set so schema-driven and descriptor-fallback list payloads do not collide locally
+- `BrowseFilterRegistry` now prefers schema-provided search fields when available instead of relying only on hardcoded model presets
+- The list slice stays explicitly model-agnostic in the core path; `ModelRegistry` / `ModelDescriptor` remain fallback-only browse metadata when schema fetch fails
+
+### Verified
+
+- `npm run build` — shared + backend compile cleanly after the new list-schema contract and backend endpoint landed
+- `npm test --workspace backend -- --runInBand test/mobile-list-schema-builder.service.spec.ts test/odoo-v17.adapter.spec.ts test/schema.service.spec.ts test/schema-cache.service.spec.ts test/schema-record-search.e2e.spec.ts` — focused backend list-schema + total-count regressions pass (`28/28 tests`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/CacheStoreTests/listPageRoundTripAndClear test` — focused cache regression passes (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/SchemaModelsTests/mobileListSchemaDecodesVisibleColumnsAndRequestedFields test` — focused list-schema decode regression passes (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordListViewModelTests/loadUsesCachedPageWhenNetworkFails -only-testing:OrdoTests/RecordListViewModelTests/applyingSortUsesOrderQueryAndIsolatesCacheByOrder -only-testing:OrdoTests/RecordListViewModelTests/applyingFiltersUsesDomainQueryAndCachesByDomain test` — focused browse view-model regressions pass (`** TEST SUCCEEDED **`)
+
+### Notes
+
+- This slice intentionally ships a **separate list-schema endpoint** instead of widening `GET /schema/:model`, matching the explicit v2 contract for dynamic browse behavior
+- Search-view quick filters and group-by metadata now travel to iOS, but grouped list rendering itself remains follow-up work rather than being implied by the schema transport alone
+
 ## 2026-03-09 (Core Engine Remaining Real Work — Browse Domains, Returned Domains, Read Fidelity, Offline Queue)
 
 ### Added

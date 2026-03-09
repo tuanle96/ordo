@@ -8,6 +8,7 @@ import type {
     ChatterMessage,
     ChatterThreadResult,
     MobileFormSchema,
+    MobileListSchema,
     NameSearchResult,
     OnchangeRequest,
     OnchangeResult,
@@ -20,6 +21,7 @@ import type { InstalledModuleInfo } from '../../modules/module/module.types';
 
 import { OdooAdapter } from './odoo-adapter.interface';
 import { OdooRpcService } from '../rpc/odoo-rpc.service';
+import { MobileListSchemaBuilderService } from '../schema/mobile-list-schema-builder.service';
 import { MobileSchemaBuilderService } from '../schema/mobile-schema-builder.service';
 import type { OdooFieldsSpec } from '../rpc/odoo-rpc.types';
 import type { OdooSessionContext } from '../session/odoo-session.types';
@@ -31,6 +33,7 @@ export class OdooV17Adapter implements OdooAdapter {
     constructor(
         private readonly odooRpcService: OdooRpcService,
         private readonly schemaBuilder: MobileSchemaBuilderService,
+        private readonly listSchemaBuilder: MobileListSchemaBuilderService,
     ) { }
 
     async getFormSchema(session: OdooSessionContext, model: string): Promise<MobileFormSchema> {
@@ -52,6 +55,35 @@ export class OdooV17Adapter implements OdooAdapter {
         });
 
         return this.schemaBuilder.build(model, view.arch, fieldsMeta);
+    }
+
+    async getListSchema(session: OdooSessionContext, model: string): Promise<MobileListSchema> {
+        const fieldsMeta = await this.odooRpcService.callKwWithSession<Record<string, OdooFieldMeta>>({
+            session,
+            model,
+            method: 'fields_get',
+            kwargs: {
+                attributes: ['string', 'type', 'relation', 'selection'],
+            },
+        });
+        const treeView = await this.odooRpcService.callKwWithSession<{ arch: string }>({
+            session,
+            model,
+            method: 'get_view',
+            kwargs: {
+                view_type: 'tree',
+            },
+        });
+        const searchView = await this.odooRpcService.callKwWithSession<{ arch: string }>({
+            session,
+            model,
+            method: 'get_view',
+            kwargs: {
+                view_type: 'search',
+            },
+        });
+
+        return this.listSchemaBuilder.build(model, treeView.arch, searchView.arch, fieldsMeta);
     }
 
     async getDefaultValues(
@@ -187,23 +219,36 @@ export class OdooV17Adapter implements OdooAdapter {
         model: string,
         query: RecordListQuery,
     ): Promise<RecordListResult> {
-        const items = await this.odooRpcService.callKwWithSession<RecordData[]>({
-            session,
-            model,
-            method: 'search_read',
-            kwargs: {
-                domain: query.domain ?? [],
-                fields: query.fields,
-                limit: query.limit ?? 40,
-                offset: query.offset ?? 0,
-                order: query.order,
-            },
-        });
+        const domain = query.domain ?? [];
+        const limit = query.limit ?? 40;
+        const offset = query.offset ?? 0;
+
+        const [items, total] = await Promise.all([
+            this.odooRpcService.callKwWithSession<RecordData[]>({
+                session,
+                model,
+                method: 'search_read',
+                kwargs: {
+                    domain,
+                    fields: query.fields,
+                    limit,
+                    offset,
+                    order: query.order,
+                },
+            }),
+            this.odooRpcService.callKwWithSession<number>({
+                session,
+                model,
+                method: 'search_count',
+                args: [domain],
+            }),
+        ]);
 
         return {
             items,
-            limit: query.limit ?? 40,
-            offset: query.offset ?? 0,
+            limit,
+            offset,
+            total,
         };
     }
 

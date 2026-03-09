@@ -84,6 +84,14 @@ private final class UITestURLProtocol: URLProtocol {
         let encoder = JSONEncoder()
         let path = request.url?.path ?? ""
 
+        if path.hasPrefix("/api/v1/mobile/schema/") && path.hasSuffix("/list") {
+            let model = String(path.dropFirst("/api/v1/mobile/schema/".count).dropLast("/list".count))
+            guard let schema = UITestFixtures.listSchema(for: model) else {
+                return notFound(encoder: encoder)
+            }
+            return (200, try encoder.encode(UITestEnvelope(data: schema, meta: nil)))
+        }
+
         if path.hasPrefix("/api/v1/mobile/schema/") {
             let model = String(path.dropFirst("/api/v1/mobile/schema/".count))
             guard let schema = UITestFixtures.schema(for: model) else {
@@ -346,7 +354,62 @@ private enum UITestFixtures {
 
         let items = sort(records: baseItems, order: order)
         let pagedItems = offset == 0 ? items : []
-        return RecordListResult(items: pagedItems, limit: 30, offset: offset)
+        return RecordListResult(items: pagedItems, limit: 30, offset: offset, total: items.count)
+    }
+
+    static func listSchema(for model: String) -> MobileListSchema? {
+        switch model {
+        case "res.partner":
+            return MobileListSchema(
+                model: "res.partner",
+                title: "Customers",
+                columns: [
+                    ListColumn(name: "name", type: .char, label: "Name", comodel: nil, selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                    ListColumn(name: "email", type: .char, label: "Email", comodel: nil, selection: nil, widget: nil, optional: .show, columnInvisible: nil),
+                    ListColumn(name: "phone", type: .char, label: "Phone", comodel: nil, selection: nil, widget: nil, optional: .hide, columnInvisible: nil),
+                ],
+                defaultOrder: "name asc",
+                search: .init(
+                    fields: [
+                        SearchField(name: "name", label: "Name", type: .char, filterDomain: nil, selection: nil),
+                        SearchField(name: "email", label: "Email", type: .char, filterDomain: nil, selection: nil),
+                        SearchField(name: "is_company", label: "Company", type: .boolean, filterDomain: nil, selection: nil),
+                    ],
+                    filters: [
+                        SearchFilter(name: "companies", label: "Companies", domain: "[[\"is_company\",\"=\",true]]"),
+                    ],
+                    groupBy: [
+                        SearchGroupBy(name: "group_country", label: "Country", fieldName: "country_id"),
+                    ]
+                )
+            )
+        case "crm.lead":
+            return MobileListSchema(
+                model: "crm.lead",
+                title: "Leads",
+                columns: [
+                    ListColumn(name: "name", type: .char, label: "Opportunity", comodel: nil, selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                    ListColumn(name: "partner_name", type: .char, label: "Customer", comodel: nil, selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                    ListColumn(name: "stage_id", type: .many2one, label: "Stage", comodel: "crm.stage", selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                ],
+                defaultOrder: nil,
+                search: .init(fields: [], filters: [], groupBy: [])
+            )
+        case "sale.order":
+            return MobileListSchema(
+                model: "sale.order",
+                title: "Sales Orders",
+                columns: [
+                    ListColumn(name: "name", type: .char, label: "Order", comodel: nil, selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                    ListColumn(name: "partner_id", type: .many2one, label: "Customer", comodel: "res.partner", selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                    ListColumn(name: "amount_total", type: .monetary, label: "Total", comodel: nil, selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+                ],
+                defaultOrder: nil,
+                search: .init(fields: [], filters: [], groupBy: [])
+            )
+        default:
+            return nil
+        }
     }
 
     static func record(model: String, id: Int) -> RecordData? {

@@ -4,6 +4,7 @@ import type {
     ChatterMessage,
     ChatterThreadResult,
     MobileFormSchema,
+    MobileListSchema,
     NameSearchResult,
     OnchangeRequest,
     OnchangeResult,
@@ -19,6 +20,7 @@ import type { OdooSessionContext } from '../session/odoo-session.types';
 export interface OdooAdapter {
     readonly version: string;
     getFormSchema(session: OdooSessionContext, model: string): Promise<MobileFormSchema>;
+    getListSchema(session: OdooSessionContext, model: string): Promise<MobileListSchema>;
     getDefaultValues(
         session: OdooSessionContext,
         model: string,

@@ -5,7 +5,7 @@ struct ModelDescriptor: Identifiable, Hashable {
     let title: String
     let subtitle: String
     let systemImage: String
-    let listFields: [String]
+    let listFields: [String]?
     let titleFields: [String]
     let subtitleFields: [String]
     let footnoteFields: [String]
@@ -14,7 +14,9 @@ struct ModelDescriptor: Identifiable, Hashable {
     var id: String { model }
 
     var primarySortField: String {
-        titleFields.first(where: { $0 != "display_name" }) ?? "id"
+        titleFields.first(where: { $0 != "display_name" })
+            ?? listFields?.first(where: { $0 != "id" && $0 != "display_name" })
+            ?? "id"
     }
 
     func summary(from record: RecordData) -> RecordRowSummary? {
