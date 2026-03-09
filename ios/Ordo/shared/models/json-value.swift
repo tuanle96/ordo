@@ -83,6 +83,8 @@ enum JSONValue: Codable, Hashable {
             return values[1].stringValue
         case .object(let values):
             return values["display_name"]?.stringValue ?? values["name"]?.stringValue
+        case .number(let value):
+            return "Record #\(Int(value))"
         case .string(let value):
             return value
         default:
@@ -135,7 +137,7 @@ enum JSONValue: Codable, Hashable {
         case .number(let value):
             return value.rounded() == value ? String(Int(value)) : String(value)
         case .bool(let value):
-            return value ? "Yes" : "—"
+            return value ? "Yes" : "No"
         case .array(let values):
             if values.count == 2, let label = values.last?.stringValue {
                 return label
@@ -168,8 +170,8 @@ enum JSONValue: Codable, Hashable {
             return true
         case .number:
             return false
-        case .bool(let value):
-            return !value
+        case .bool:
+            return false
         }
     }
 }

@@ -22,6 +22,7 @@ describe('Schema, record, and search endpoints', () => {
             limit: 3,
             offset: 0,
         }),
+        getDefaultValues: jest.fn().mockResolvedValue({ name: 'Draft Customer', country_id: 21 }),
         getRecord: jest.fn().mockResolvedValue(odooFixtures.records[0]),
         runOnchange: jest.fn().mockResolvedValue({
             values: { name: 'Updated by onchange' },
@@ -95,6 +96,20 @@ describe('Schema, record, and search endpoints', () => {
             expect.objectContaining({ fields: ['id', 'name', 'email'] }),
         );
         expect(detailResponse.body.data).toEqual(odooFixtures.records[0]);
+    });
+
+    it('returns default values envelope for create hydration', async () => {
+        const response = await request(protectedApp.getHttpServer())
+            .get('/api/v1/mobile/records/res.partner/defaults?fields=name,country_id')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+
+        expect(recordServiceMock.getDefaultValues).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'res.partner',
+            expect.objectContaining({ fields: ['name', 'country_id'] }),
+        );
+        expect(response.body.data).toEqual({ name: 'Draft Customer', country_id: 21 });
     });
 
     it('returns envelopes for create, update, delete, and action endpoints', async () => {

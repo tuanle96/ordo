@@ -52,6 +52,23 @@ export class OdooV17Adapter implements OdooAdapter {
         return this.schemaBuilder.build(model, view.arch, fieldsMeta);
     }
 
+    async getDefaultValues(
+        session: OdooSessionContext,
+        model: string,
+        fields: string[],
+    ): Promise<RecordData> {
+        if (fields.length === 0) {
+            return {};
+        }
+
+        return this.odooRpcService.callKwWithSession<RecordData>({
+            session,
+            model,
+            method: 'default_get',
+            args: [fields],
+        });
+    }
+
     async createRecord(
         session: OdooSessionContext,
         model: string,

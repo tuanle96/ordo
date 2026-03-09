@@ -22,11 +22,16 @@
 - The narrow `one2many` editor now shares the same support assumptions for `html` and `monetary` as the top-level generic form engine instead of lagging behind the outer renderer/editor matrix
 - `FormDraft` now treats required `html` fields like other text-entry fields during client-side validation, so empty rich-text inputs no longer slip past generic save checks
 - `JSONValue` relation helpers and `FormDraft` now tolerate object-shaped relation payloads (`{ id, display_name/name }`) in addition to tuple-style `[id, label]` values, keeping `many2one` / `many2many` change detection, mutation encoding, and onchange merges on the same generic normalization path
+- `FormDraft` now performs line-level required validation for supported editable `one2many` subfields before save, surfacing errors like `Order Lines line 1: Description is required.` while intentionally skipping collapsed existing lines that only carry `id`
+- Read-only boolean values now stay on the generic display path even when the value is `false`, rendering as `No` instead of disappearing as visually empty
+- Auth decoding regressions now unwrap optional `APIEnvelope.data` explicitly in tests, matching the current shared envelope contract and removing a focused iOS test compile blocker
 
 ### Verified
 
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused form-engine regression suite passes (`** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests test` — focused draft normalization suite still passes after adding object-shaped relation payload coverage for `many2one` / `many2many` (`** TEST SUCCEEDED **`)
+- Independent tester validation confirms focused `FormDraftTests` coverage passes for the new `one2many` line-level required-validation slice, including the new regressions for supported subfield validation and collapsed existing-line bypass (`plans/reports/tester-260309-1430-ios-one2many-required-validation.md`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/AuthDecodingTests test` — focused read-only rendering + auth envelope decode regressions pass after fixing boolean `false` visibility and aligning tests with optional `APIEnvelope.data` (`** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordDetailViewModelTests -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused detail/onchange + form-engine suites pass, including monetary onchange debounce regression
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FieldRowFactoryTests test` — focused formatter/editability suite passes, including the new HTML plain-text fallback regression
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after both generic field slices
@@ -39,7 +44,7 @@
 ### Notes
 
 - This work stays intentionally **core-first**: no module-specific widgets, no `one2many` wizard parity, and no offline/sync expansion yet
-- Remaining Phase 01 work is still open: close any leftover renderer/editor gaps beyond the shipped top-level + narrow one2many matrix, finish payload normalization cleanup, and broaden regression coverage beyond the current field-slice seams
+- The generic field-matrix Phase 01 track is now complete; next core-first work should move to the explicitly-ranked closeout gaps (create defaults, delete parity, and other follow-up slices) instead of reopening module-specific field widgets
 
 ## 2026-03-09 (Explicit Auth Logout)
 

@@ -3,12 +3,14 @@ import SwiftUI
 struct RecordDetailView: View {
     @Environment(AppState.self) private var appState
     @Environment(RecentItemsStore.self) private var recentItems
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: RecordDetailViewModel
     @State private var chatterViewModel: RecordChatterViewModel
     @State private var isEditing = false
     @State private var draft: FormDraft?
     @State private var showDiscardConfirmation = false
     @State private var pendingWorkflowAction: ActionButton?
+    @State private var showDeleteConfirmation = false
 
     init(descriptor: ModelDescriptor, recordID: Int? = nil) {
         _viewModel = State(initialValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
@@ -143,6 +145,24 @@ struct RecordDetailView: View {
                     if schema.hasChatter, !isCreating, viewModel.recordID != nil {
                         ChatterSectionView(viewModel: chatterViewModel)
                     }
+
+                    if !isEditing, !isCreating, viewModel.recordID != nil {
+                        Section("Danger Zone") {
+                            Button(role: .destructive) {
+                                showDeleteConfirmation = true
+                            } label: {
+                                HStack {
+                                    if viewModel.isDeleting {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    }
+                                    Text(viewModel.isDeleting ? "Deleting…" : "Delete Record")
+                                }
+                            }
+                            .disabled(!viewModel.canDelete)
+                            .accessibilityIdentifier("detail-delete-button")
+                        }
+                    }
                 }
                 .accessibilityIdentifier("record-detail-screen")
                 .refreshable {
@@ -204,6 +224,16 @@ struct RecordDetailView: View {
             }
         } message: {
             Text("Your unsaved changes will be lost.")
+        }
+        .alert("Delete this record?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task {
+                    await handleDeleteTap()
+                }
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .alert(
             pendingWorkflowAction?.label ?? "Run Action",
@@ -272,6 +302,15 @@ struct RecordDetailView: View {
             let displayName = savedRecord["display_name"]?.displayText ?? savedRecord["name"]?.displayText ?? "Record"
             recentItems.add(model: viewModel.descriptor.model, recordID: recordID, displayName: displayName)
         }
+    }
+
+    private func handleDeleteTap() async {
+        guard let recordID = viewModel.recordID else { return }
+        let didDelete = await viewModel.deleteRecord(using: appState)
+        guard didDelete else { return }
+
+        recentItems.remove(model: viewModel.descriptor.model, recordID: recordID)
+        dismiss()
     }
 
     private var workflowActionConfirmationBinding: Binding<Bool> {

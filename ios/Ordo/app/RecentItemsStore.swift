@@ -13,8 +13,8 @@ struct RecentItem: Codable, Identifiable, Hashable {
 @MainActor
 @Observable
 final class RecentItemsStore {
-    private static let defaultStorageKey = "ordo.recentItems"
-    private static let defaultMaxItems = 10
+    private nonisolated(unsafe) static let defaultStorageKey = "ordo.recentItems"
+    private nonisolated(unsafe) static let defaultMaxItems = 10
 
     private let defaults: UserDefaults
     private let storageKey: String
@@ -53,6 +53,14 @@ final class RecentItemsStore {
         }
 
         items = current
+        save()
+    }
+
+    func remove(model: String, recordID: Int) {
+        let updatedItems = items.filter { !($0.model == model && $0.recordID == recordID) }
+        guard updatedItems.count != items.count else { return }
+
+        items = updatedItems
         save()
     }
 

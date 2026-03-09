@@ -105,6 +105,12 @@ final class FormDraft {
 
     func validationErrors(for fields: [FieldSchema]) -> [String: String] {
         fields.reduce(into: [String: String]()) { errors, field in
+            if field.type == .one2many,
+               let subfieldError = one2ManySubfieldValidationError(for: field, value: value(for: field.name, fallback: nil)) {
+                errors[field.name] = subfieldError
+                return
+            }
+
             let normalizedValue = comparableValue(for: field, value: value(for: field.name, fallback: nil))
 
             switch field.type {
@@ -143,7 +149,7 @@ final class FormDraft {
             guard field.isRequired(in: storage) else { return }
 
             switch field.type {
-            case .char, .text, .html, .selection:
+            case .char, .text, .html, .selection, .priority:
                 let trimmed = value(for: field.name, fallback: nil)?.stringValue?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed?.isEmpty != false {
@@ -170,6 +176,46 @@ final class FormDraft {
             default:
                 break
             }
+        }
+    }
+
+    private func one2ManySubfieldValidationError(for field: FieldSchema, value: JSONValue?) -> String? {
+        guard let subfields = field.subfields, !subfields.isEmpty,
+              case .array(let rawLines)? = value else {
+            return nil
+        }
+
+        let supportedSubfields = subfields.filter { isLineLevelValidationSupported(for: $0.type) }
+        guard !supportedSubfields.isEmpty else { return nil }
+
+        for (index, rawLine) in rawLines.enumerated() {
+            guard case .object(let rawValues) = rawLine else { continue }
+
+            var lineValues = rawValues
+            let lineID = lineValues.removeValue(forKey: "id")?.intValue
+
+            if lineID != nil && lineValues.isEmpty {
+                continue
+            }
+
+            let lineDraft = FormDraft(record: lineValues)
+            let lineErrors = lineDraft.validationErrors(for: supportedSubfields)
+
+            if let subfield = supportedSubfields.first(where: { lineErrors[$0.name] != nil }),
+               let lineError = lineErrors[subfield.name] {
+                return "\(field.label) line \(index + 1): \(lineError)"
+            }
+        }
+
+        return nil
+    }
+
+    private func isLineLevelValidationSupported(for type: FieldType) -> Bool {
+        switch type {
+        case .char, .text, .html, .integer, .float, .monetary, .boolean, .selection, .date, .datetime:
+            return true
+        default:
+            return false
         }
     }
 

@@ -30,11 +30,12 @@ struct AuthDecodingTests {
         """.data(using: .utf8)!
 
         let envelope = try JSONDecoder().decode(APIEnvelope<TokenResponse>.self, from: payload)
+        let response = try #require(envelope.data)
 
         #expect(envelope.success)
-        #expect(envelope.data.user.email == nil)
-        #expect(envelope.data.user.tz == nil)
-        #expect(envelope.data.user.avatarUrl == nil)
+        #expect(response.user.email == nil)
+        #expect(response.user.tz == nil)
+        #expect(response.user.avatarUrl == nil)
     }
 
     @Test
@@ -61,9 +62,10 @@ struct AuthDecodingTests {
         """.data(using: .utf8)!
 
         let envelope = try JSONDecoder().decode(APIEnvelope<AuthenticatedPrincipal>.self, from: payload)
+        let principal = try #require(envelope.data)
 
         #expect(envelope.success)
-        #expect(envelope.data.email == nil)
-        #expect(envelope.data.tz == nil)
+        #expect(principal.email == nil)
+        #expect(principal.tz == nil)
     }
 }

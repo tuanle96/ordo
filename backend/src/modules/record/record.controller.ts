@@ -50,6 +50,15 @@ export class RecordController {
         return this.recordService.listRecords(currentUser, model, query);
     }
 
+    @Get(':model/defaults')
+    getDefaultValues(
+        @CurrentUser() currentUser: TokenPayload,
+        @Param('model') model: string,
+        @Query() query: RecordQueryDto,
+    ): Promise<RecordData> {
+        return this.recordService.getDefaultValues(currentUser, model, query);
+    }
+
     @Get(':model/:id')
     getRecord(
         @CurrentUser() currentUser: TokenPayload,

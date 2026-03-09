@@ -52,4 +52,23 @@ struct RecentItemsStoreTests {
         let thirdStore = RecentItemsStore(defaults: defaults, storageKey: "recent-items-test")
         #expect(thirdStore.items.isEmpty)
     }
+
+    @Test
+    func removeDeletesSpecificStoredItem() {
+        let suiteName = "com.ordo.app.tests.recent-items.remove.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = RecentItemsStore(defaults: defaults, storageKey: "recent-items-test")
+        store.add(model: "res.partner", recordID: 1, displayName: "Azure Interior")
+        store.add(model: "crm.lead", recordID: 2, displayName: "Website redesign")
+
+        store.remove(model: "res.partner", recordID: 1)
+
+        #expect(store.items.map(\.id) == ["crm.lead-2"])
+
+        let reloadedStore = RecentItemsStore(defaults: defaults, storageKey: "recent-items-test")
+        #expect(reloadedStore.items.map(\.id) == ["crm.lead-2"])
+    }
 }

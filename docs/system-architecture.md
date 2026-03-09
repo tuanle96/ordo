@@ -188,6 +188,16 @@ The current onchange architecture now covers the first honest server-backed slic
 - **iOS draft-merge lifecycle** centralizes edits in `RecordDetailViewModel`, debounces text-like changes, cancels superseded requests, and merges returned values through `FormDraft` with field-version protection so stale responses cannot overwrite newer user edits
 - **Current support boundary is narrow by design**: inline warning display and stored returned domains are supported, but broad relation-editor domain application, offline replay, and full `one2many`/`many2many` parity remain deferred follow-up work
 
+## Core-first generic form engine scope (2026-03-09)
+
+The current Phase 01 core-first slice completes the minimum reusable form-engine path without widening into module-specific UI:
+
+- **Canonical mobile-safe field matrix** now covers `char`, `text`, `html`, `integer`, `float`, `boolean`, `selection`, `date`, `datetime`, `many2one`, `many2many`, `monetary`, and a narrow `one2many` editor foundation
+- **Generic renderer/editor parity** on iOS now exists across that matrix, including multiline HTML editing, currency-aware monetary display, debounced onchange for text-like monetary/html fields, and narrow inline `one2many` editing for supported scalar subfields
+- **Generic draft normalization** in `FormDraft` now unifies scalar parsing, relation mutation encoding, object-shaped relation tolerance (`{ id, display_name/name }`), and Odoo command generation for narrow `one2many` create/update/delete flows
+- **Line-level `one2many` validation** now catches missing required values for supported editable subfields before save while intentionally skipping collapsed existing lines that only carry `id`, preserving the current narrow server-record representation
+- **Scope discipline remains explicit**: nested `many2one` / `many2many` inside `one2many`, broad returned-domain application, full x2many onchange parity, and wizard-like line workflows are still deferred follow-up work
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:
@@ -198,4 +208,4 @@ The following remain deferred beyond the current scope:
 - dashboard aggregation beyond a tiny future slice
 - autosave and offline queued writes
 - draft recovery after app relaunch
-- expanded field type editors beyond `char`/`text`/`boolean`/`selection`
+- expanded field type editors beyond the current Phase 01 matrix and narrow `one2many` scope

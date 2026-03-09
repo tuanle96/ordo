@@ -68,6 +68,7 @@ struct FieldRowFactoryTests {
         let date = FieldSchema(name: "date_order", type: .date, label: "Order Date", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let datetime = FieldSchema(name: "write_date", type: .datetime, label: "Updated", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let html = FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let priority = FieldSchema(name: "priority", type: .priority, label: "Priority", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
 
         let many2oneModel = EditableFieldFactory.model(for: many2one)
         let one2manyModel = EditableFieldFactory.model(for: one2many)
@@ -78,6 +79,7 @@ struct FieldRowFactoryTests {
         let dateModel = EditableFieldFactory.model(for: date)
         let datetimeModel = EditableFieldFactory.model(for: datetime)
         let htmlModel = EditableFieldFactory.model(for: html)
+        let priorityModel = EditableFieldFactory.model(for: priority)
 
         if case .many2one(let comodel)? = many2oneModel?.style {
             #expect(comodel == "res.country")
@@ -132,6 +134,12 @@ struct FieldRowFactoryTests {
         } else {
             Issue.record("Expected html field to stay editable as multiline text.")
         }
+
+        if case .priority? = priorityModel?.style {
+            #expect(priorityModel != nil)
+        } else {
+            Issue.record("Expected priority field to stay editable.")
+        }
     }
 
     @Test
@@ -142,6 +150,16 @@ struct FieldRowFactoryTests {
 
         #expect(model?.value == "Pay now")
         #expect(model?.style == .multiline)
+    }
+
+    @Test
+    func booleanFalseReadOnlyStaysVisible() {
+        let field = FieldSchema(name: "is_company", type: .boolean, label: "Company", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .bool(false))
+
+        #expect(model?.value == "No")
+        #expect(model?.style == .standard)
     }
 
     @Test

@@ -4,6 +4,7 @@ struct EditableFieldRowModel {
     enum Style {
         case text
         case multiline
+        case priority
         case integer
         case float
         case monetary(currencyField: String?)
@@ -26,6 +27,8 @@ enum EditableFieldFactory {
             return .init(style: .text)
         case .text, .html:
             return .init(style: .multiline)
+        case .priority:
+            return .init(style: .priority)
         case .integer:
             return .init(style: .integer)
         case .float:
@@ -88,6 +91,38 @@ struct EditableFieldRow: View {
                     .lineLimit(3...6)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("field-editor-\(field.name)")
+                validationText
+            }
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .priority:
+            VStack(alignment: .leading, spacing: 8) {
+                Text(field.label)
+                    .font(.subheadline.weight(.medium))
+
+                HStack(spacing: 12) {
+                    ForEach(1...3, id: \.self) { rating in
+                        Button {
+                            applyChange(.string(String(rating)))
+                        } label: {
+                            Image(systemName: currentPriority >= rating ? "star.fill" : "star")
+                                .font(.title3)
+                                .foregroundStyle(currentPriority >= rating ? .yellow : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("field-priority-\(field.name)-\(rating)")
+                    }
+
+                    Spacer()
+
+                    if currentPriority > 0 {
+                        Button("Clear") {
+                            applyChange(nil)
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .accessibilityIdentifier("field-clear-\(field.name)")
+                    }
+                }
+
                 validationText
             }
             .accessibilityIdentifier("field-row-\(field.name)")
@@ -349,6 +384,12 @@ struct EditableFieldRow: View {
     private var relationLabel: String? {
         draft.value(for: field.name, fallback: fallbackValue)?.relationLabel
             ?? fallbackValue?.relationLabel
+    }
+
+    private var currentPriority: Int {
+        let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+        let rawValue = value?.stringValue ?? value?.displayText ?? "0"
+        return max(0, min(Int(rawValue) ?? value?.intValue ?? 0, 3))
     }
 
     private var selectedRelations: [RelationValue] {

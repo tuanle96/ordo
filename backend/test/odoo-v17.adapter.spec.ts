@@ -3,6 +3,26 @@ import { BadGatewayException } from '@nestjs/common';
 import { OdooV17Adapter } from '../src/odoo/adapters/odoo-v17.adapter';
 
 describe('OdooV17Adapter onchange', () => {
+    it('loads narrow default values through default_get', async () => {
+        const odooRpcService = {
+            callKwWithSession: jest.fn().mockResolvedValue({ name: 'Draft Customer', country_id: 21 }),
+        };
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never);
+
+        await expect(adapter.getDefaultValues(
+            { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
+            'res.partner',
+            ['name', 'country_id'],
+        )).resolves.toEqual({ name: 'Draft Customer', country_id: 21 });
+
+        expect(odooRpcService.callKwWithSession).toHaveBeenCalledWith({
+            session: { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' },
+            model: 'res.partner',
+            method: 'default_get',
+            args: [['name', 'country_id']],
+        });
+    });
+
     it('uses request-scoped fields spec for onchange RPC and normalizes the result', async () => {
         const odooRpcService = {
             runModelOnchangeWithSession: jest.fn().mockResolvedValue({

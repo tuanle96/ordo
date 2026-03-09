@@ -67,6 +67,15 @@ export class RecordService {
         return record;
     }
 
+    async getDefaultValues(
+        currentUser: TokenPayload,
+        model: string,
+        query: RecordQueryDto,
+    ): Promise<RecordData> {
+        const { session, adapter } = await this.resolveContext(currentUser);
+        return adapter.getDefaultValues(session, model, query.fields ?? []);
+    }
+
     async search(
         currentUser: TokenPayload,
         model: string,

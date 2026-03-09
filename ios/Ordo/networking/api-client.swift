@@ -72,6 +72,11 @@ final class APIClient {
         return try await perform(route: "records/\(model)/\(id)", queryItems: queryItems, token: token)
     }
 
+    func defaultValues(model: String, fields: [String], token: String) async throws -> RecordData {
+        let queryItems = [URLQueryItem(name: "fields", value: fields.joined(separator: ","))]
+        return try await perform(route: "records/\(model)/defaults", queryItems: queryItems, token: token)
+    }
+
     func chatter(model: String, id: Int, before: Int? = nil, token: String) async throws -> ChatterThreadResult {
         var queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: "20")]
 
@@ -143,6 +148,14 @@ final class APIClient {
     ) async throws -> RecordMutationResult {
         let body = try JSONEncoder().encode(RecordMutationRequest(values: values, fields: fields))
         return try await perform(route: "records/\(model)", method: "POST", token: token, body: body)
+    }
+
+    func deleteRecord(
+        model: String,
+        id: Int,
+        token: String
+    ) async throws -> RecordDeleteResult {
+        try await perform(route: "records/\(model)/\(id)", method: "DELETE", token: token)
     }
 
     func runRecordAction(

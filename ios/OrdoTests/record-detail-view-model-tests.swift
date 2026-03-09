@@ -78,6 +78,7 @@ struct RecordDetailViewModelTests {
     @Test
     func createFlowPostsMutationAndTransitionsIntoDetailMode() async throws {
         var createRequestCount = 0
+        var defaultsRequestCount = 0
 
         DetailViewModelTestURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
@@ -88,6 +89,11 @@ struct RecordDetailViewModelTests {
 
             if path.contains("/schema/res.partner") {
                 return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchema)))
+            }
+
+            if path.hasSuffix("/records/res.partner/defaults") && request.httpMethod == "GET" {
+                defaultsRequestCount += 1
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailCreateDefaultsRecord)))
             }
 
             if path.hasSuffix("/records/res.partner") && request.httpMethod == "POST" {
@@ -102,17 +108,128 @@ struct RecordDetailViewModelTests {
         let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: nil)
         await viewModel.load(using: appState)
 
-        let draft = FormDraft(record: [:])
+        let draft = FormDraft(record: viewModel.record ?? [:])
         draft.setValue(.string("New Customer"), for: "name")
 
         let didSave = await viewModel.save(draft: draft, using: appState)
 
         #expect(didSave == true)
         #expect(createRequestCount == 1)
+        #expect(defaultsRequestCount == 1)
         #expect(viewModel.recordID == 99)
         #expect(viewModel.record?["name"]?.stringValue == "New Customer")
         #expect(viewModel.saveMessage == "Record created.")
         #expect(viewModel.isCreating == false)
+    }
+
+    @Test
+    func createModeHydratesServerDefaultsBeforeEditing() async throws {
+        var capturedDefaultsFields: [String] = []
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithDefaults)))
+            }
+
+            if path.hasSuffix("/records/res.partner/defaults") && request.httpMethod == "GET" {
+                capturedDefaultsFields = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?
+                    .queryItems?
+                    .first(where: { $0.name == "fields" })?
+                    .value?
+                    .split(separator: ",")
+                    .map(String.init) ?? []
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailCreateDefaultsRecord)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: nil)
+        await viewModel.load(using: appState)
+
+        #expect(Set(capturedDefaultsFields) == Set(["country_id", "name", "priority"]))
+        #expect(viewModel.record?["country_id"]?.relationID == 21)
+        #expect(viewModel.record?["priority"]?.stringValue == "2")
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func deleteRecordCallsBackendAndClearsFailureState() async throws {
+        var deleteRequestCount = 0
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchema)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecord)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "DELETE" {
+                deleteRequestCount += 1
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordDeleteResult(id: 1, deleted: true))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let didDelete = await viewModel.deleteRecord(using: appState)
+
+        #expect(didDelete == true)
+        #expect(deleteRequestCount == 1)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test
+    func deleteRecordSurfacesInlineErrorOnFailure() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchema)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecord)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "DELETE" {
+                return (500, try JSONEncoder().encode(FailingDetailEnvelope(errors: [DetailErrorPayload(code: "delete_failed", message: "Delete failed", field: nil)])))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let didDelete = await viewModel.deleteRecord(using: appState)
+
+        #expect(didDelete == false)
+        #expect(viewModel.errorMessage == "Delete failed")
     }
 
     @Test
@@ -468,6 +585,19 @@ private let partnerSchema = MobileFormSchema(
     hasChatter: false
 )
 
+private let partnerSchemaWithDefaults = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "priority", type: .priority, label: "Priority", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let partnerSchemaWithOnchange = MobileFormSchema(
     model: "res.partner",
     title: "Customer",
@@ -511,6 +641,12 @@ private let detailCreatedPartnerRecord: RecordData = [
     "display_name": .string("New Customer"),
     "name": .string("New Customer"),
     "nickname": .null,
+]
+
+private let detailCreateDefaultsRecord: RecordData = [
+    "name": .string("Draft Customer"),
+    "country_id": .number(21),
+    "priority": .string("2"),
 ]
 
 private let saleOrderSchemaWithAction = MobileFormSchema(
@@ -648,5 +784,26 @@ private struct DetailEnvelope<T: Encodable>: Encodable {
     let errors: [DetailErrorPayload] = []
 }
 
+private struct FailingDetailEnvelope: Encodable {
+    let success = false
+    let data: JSONValue? = nil
+    let meta: DetailMeta? = nil
+    let errors: [DetailErrorPayload]
+
+    init(errors: [DetailErrorPayload]) {
+        self.errors = errors
+    }
+}
+
 private struct DetailMeta: Encodable { let total: Int? = nil; let offset: Int? = nil; let limit: Int? = nil; let timestamp: String? = nil }
-private struct DetailErrorPayload: Encodable { let code: String = ""; let message: String = ""; let field: String? = nil }
+private struct DetailErrorPayload: Encodable {
+    let code: String
+    let message: String
+    let field: String?
+
+    init(code: String = "", message: String = "", field: String? = nil) {
+        self.code = code
+        self.message = message
+        self.field = field
+    }
+}

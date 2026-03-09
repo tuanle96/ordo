@@ -17,6 +17,7 @@ final class RecordDetailViewModel {
     private(set) var onchangeDomains: [String: JSONValue] = [:]
     private(set) var isLoading = false
     private(set) var isSaving = false
+    private(set) var isDeleting = false
     private(set) var runningActionName: String?
     private(set) var validationErrors: [String: String] = [:]
 
@@ -36,6 +37,10 @@ final class RecordDetailViewModel {
 
     var isRunningWorkflowAction: Bool {
         runningActionName != nil
+    }
+
+    var canDelete: Bool {
+        !isCreating && recordID != nil && !isDeleting && !isSaving && runningActionName == nil
     }
 
     var visibleWorkflowActions: [ActionButton] {
@@ -284,6 +289,40 @@ final class RecordDetailViewModel {
         }
     }
 
+    func deleteRecord(using appState: AppState) async -> Bool {
+        guard let recordID, !isCreating, !isDeleting else { return false }
+
+        isDeleting = true
+        errorMessage = nil
+        saveMessage = nil
+        defer { isDeleting = false }
+
+        do {
+            _ = try await appState.withAuthenticatedToken { [self] token in
+                try await appState.apiClient.deleteRecord(
+                    model: self.descriptor.model,
+                    id: recordID,
+                    token: token
+                )
+            }
+
+            validationErrors = [:]
+            cacheMessage = nil
+            errorMessage = nil
+            resetOnchangeState()
+            return true
+        } catch {
+            Self.logger.error("❌ Failed to delete \(self.descriptor.model, privacy: .public)#\(recordID, privacy: .public): \(String(describing: error), privacy: .public)")
+            if case APIClientError.unauthorized = error {
+                appState.signOut()
+            } else {
+                errorMessage = error.localizedDescription
+            }
+
+            return false
+        }
+    }
+
     private func editableFields(using values: RecordData) -> [FieldSchema] {
         guard let schema else { return [] }
 
@@ -420,7 +459,29 @@ final class RecordDetailViewModel {
             }
 
             self.schema = schema
-            self.record = [:]
+            let defaultFieldNames = defaultValueFieldNames(for: schema)
+
+            do {
+                self.record = try await appState.withAuthenticatedToken { [self] token in
+                    try await appState.apiClient.defaultValues(
+                        model: self.descriptor.model,
+                        fields: defaultFieldNames,
+                        token: token
+                    )
+                }
+                errorMessage = nil
+            } catch {
+                if case APIClientError.unauthorized = error {
+                    appState.signOut()
+                    isLoading = false
+                    return
+                }
+
+                Self.logger.error("⚠️ Failed to load create defaults for \(self.descriptor.model, privacy: .public): \(String(describing: error), privacy: .public)")
+                self.record = [:]
+                errorMessage = "Couldn’t load server defaults. You can still enter values manually."
+            }
+
             cacheMessage = nil
         } catch {
             Self.logger.error("❌ Failed to load create schema for \(self.descriptor.model, privacy: .public): \(String(describing: error), privacy: .public)")
@@ -432,5 +493,15 @@ final class RecordDetailViewModel {
         }
 
         isLoading = false
+    }
+
+    private func defaultValueFieldNames(for schema: MobileFormSchema) -> [String] {
+        var fields = schema.allFields.map(\.name)
+
+        if let statusField = schema.header.statusbar?.field {
+            fields.append(statusField)
+        }
+
+        return Array(Set(fields)).sorted()
     }
 }

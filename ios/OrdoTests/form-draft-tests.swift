@@ -404,6 +404,52 @@ struct FormDraftTests {
     }
 
     @Test
+    func one2manyRequiredScalarSubfieldShowsLineLevelError() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "product_uom_qty", type: .float, label: "Quantity", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "product_uom_qty": .string("2"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == "Order Lines line 1: Description is required.")
+
+        draft.setValue(.array([
+            .object([
+                "name": .string("Consulting"),
+                "product_uom_qty": .string("2"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+    }
+
+    @Test
+    func one2manyCollapsedExistingLineSkipsSubfieldValidation() {
+        let draft = FormDraft(record: [
+            "order_line": .array([
+                .object([
+                    "id": .number(51),
+                ]),
+            ]),
+        ])
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+    }
+
+    @Test
     func one2manyHtmlAndMonetarySubfieldsNormalizeWithinCommands() {
         let baseline: RecordData = [:]
         let draft = FormDraft(record: baseline)
