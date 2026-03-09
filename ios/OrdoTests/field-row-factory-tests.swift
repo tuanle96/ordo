@@ -94,8 +94,21 @@ struct FieldRowFactoryTests {
 
         let model = FieldRowFactory.model(for: field, rawValue: .number(2500.5), record: record)
 
-        #expect(model?.value == "USD 2,500.50")
+        #expect(model?.value == "$2,500.50")
         #expect(model?.style == .standard)
+    }
+
+    @Test
+    func monetaryFallsBackToCurrencyLabelWhenCodeIsUnknown() {
+        let field = FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil)
+        let record: RecordData = [
+            "credit_limit": .number(2500.5),
+            "currency_id": .relation(id: 3, label: "Credits"),
+        ]
+
+        let model = FieldRowFactory.model(for: field, rawValue: .number(2500.5), record: record)
+
+        #expect(model?.value == "Credits 2,500.50")
     }
 
     @Test
@@ -215,6 +228,7 @@ struct FieldRowFactoryTests {
 
         #expect(model?.value == "Pay now")
         #expect(model?.style == .multiline)
+        #expect(model?.richText != nil)
     }
 
     @Test

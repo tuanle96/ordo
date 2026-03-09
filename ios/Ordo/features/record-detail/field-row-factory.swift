@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum InlineAttachmentKind: Equatable {
     case image
@@ -29,6 +30,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     let label: String
     let value: String
     let style: Style
+    let richText: AttributedString?
     let previewData: Data?
     let attachment: ReadOnlyFieldRowAttachment?
 
@@ -37,6 +39,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
         label: String,
         value: String,
         style: Style,
+        richText: AttributedString? = nil,
         previewData: Data? = nil,
         attachment: ReadOnlyFieldRowAttachment? = nil
     ) {
@@ -44,6 +47,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
         self.label = label
         self.value = value
         self.style = style
+        self.richText = richText
         self.previewData = previewData
         self.attachment = attachment
     }
@@ -105,6 +109,7 @@ enum FieldRowFactory {
             label: field.label,
             value: formattedValue(for: field, rawValue: rawValue, record: record),
             style: style,
+            richText: field.type == .html ? attributedHTMLValue(for: rawValue) : nil,
             previewData: (field.type == .image || field.type == .signature) ? attachment?.data : nil,
             attachment: attachment
         )
@@ -181,10 +186,41 @@ enum FieldRowFactory {
             return formattedAmount
         }
 
+        if let currencyFormattedAmount = formattedCurrencyAmount(amount, currencyLabel: currencyLabel, fractionDigits: field.digits?.last ?? 2) {
+            return currencyFormattedAmount
+        }
+
         return "\(currencyLabel) \(formattedAmount)"
     }
 
+    private static func formattedCurrencyAmount(_ amount: Double, currencyLabel: String, fractionDigits: Int) -> String? {
+        let trimmedLabel = currencyLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedLabel.count == 3, trimmedLabel == trimmedLabel.uppercased() else {
+            return nil
+        }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.currencyCode = trimmedLabel
+        formatter.minimumFractionDigits = fractionDigits
+        formatter.maximumFractionDigits = fractionDigits
+
+        return formatter.string(from: NSNumber(value: amount))
+    }
+
     private static func formattedHTMLValue(for rawValue: JSONValue) -> String {
+        if let richText = attributedHTMLValue(for: rawValue) {
+            let renderedText = String(richText.characters)
+                .replacingOccurrences(of: "\u{00A0}", with: " ")
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if !renderedText.isEmpty {
+                return renderedText
+            }
+        }
+
         guard let html = rawValue.stringValue, !html.isEmpty else {
             return rawValue.displayText
         }
@@ -200,6 +236,32 @@ enum FieldRowFactory {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return plainText.isEmpty ? "—" : plainText
+    }
+
+    private static func attributedHTMLValue(for rawValue: JSONValue) -> AttributedString? {
+        guard let html = rawValue.stringValue, !html.isEmpty,
+              let data = html.data(using: .utf8) else {
+            return nil
+        }
+
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue,
+        ]
+
+        guard let attributed = try? NSMutableAttributedString(data: data, options: options, documentAttributes: nil) else {
+            return nil
+        }
+
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        attributed.enumerateAttribute(.font, in: fullRange) { value, range, _ in
+            let resolvedFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .body)
+            let descriptor = resolvedFont.fontDescriptor.withSymbolicTraits(resolvedFont.fontDescriptor.symbolicTraits) ?? resolvedFont.fontDescriptor
+            let scaledFont = UIFont(descriptor: descriptor, size: UIFont.preferredFont(forTextStyle: .body).pointSize)
+            attributed.addAttribute(.font, value: scaledFont, range: range)
+        }
+
+        return try? AttributedString(attributed, including: \.uiKit)
     }
 
     private static func formattedBinaryValue(for field: FieldSchema, rawValue: JSONValue, record: RecordData?) -> String {

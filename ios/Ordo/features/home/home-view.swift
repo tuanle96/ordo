@@ -17,6 +17,10 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: OrdoSpacing.lg) {
+                if let statusMessage = appState.statusMessage, !statusMessage.isEmpty {
+                    OfflineStateBanner(title: appState.pendingMutationCount > 0 ? "Pending sync" : "Status", message: statusMessage)
+                }
+
                 // MARK: - Greeting Card
                 OrdoCard {
                     HStack(spacing: OrdoSpacing.md) {
@@ -152,6 +156,10 @@ struct HomeView: View {
 
                                 if let version = appState.displayVersion {
                                     metricRow("Version", value: version)
+                                }
+
+                                if appState.pendingMutationCount > 0 {
+                                    metricRow("Pending Changes", value: String(appState.pendingMutationCount))
                                 }
                             }
                         }

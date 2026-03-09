@@ -78,6 +78,7 @@ struct EditableFieldRow: View {
     let model: EditableFieldRowModel
     let draft: FormDraft
     let fallbackValue: JSONValue?
+    let searchDomain: JSONValue?
     let validationMessage: String?
     let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
 
@@ -273,6 +274,7 @@ struct EditableFieldRow: View {
                     field: field,
                     comodel: comodel,
                     currentValue: draft.value(for: field.name, fallback: fallbackValue),
+                    searchDomain: searchDomain,
                     onSelect: { selection in
                         applyChange(selection)
                     }
@@ -345,6 +347,7 @@ struct EditableFieldRow: View {
                     field: field,
                     comodel: comodel,
                     currentSelections: selectedRelations,
+                    searchDomain: searchDomain,
                     onSelect: { selections in
                         applyChange(.array(selections.map { .relation(id: $0.id, label: $0.label) }))
                     }
@@ -1176,6 +1179,7 @@ private struct Many2OnePickerSheet: View {
     let field: FieldSchema
     let comodel: String
     let currentValue: JSONValue?
+    let searchDomain: JSONValue?
     let onSelect: (JSONValue?) -> Void
 
     @State private var query = ""
@@ -1283,7 +1287,7 @@ private struct Many2OnePickerSheet: View {
             guard !Task.isCancelled else { return }
 
             let searchResults = try await appState.withAuthenticatedToken { token in
-                try await appState.apiClient.search(model: comodel, query: trimmedQuery, limit: 20, token: token)
+                try await appState.apiClient.search(model: comodel, query: trimmedQuery, limit: 20, domain: searchDomain, token: token)
             }
 
             guard !Task.isCancelled else { return }
@@ -1305,6 +1309,7 @@ private struct Many2ManyPickerSheet: View {
     let field: FieldSchema
     let comodel: String
     let currentSelections: [RelationValue]
+    let searchDomain: JSONValue?
     let onSelect: ([RelationValue]) -> Void
 
     @State private var query = ""
@@ -1313,10 +1318,11 @@ private struct Many2ManyPickerSheet: View {
     @State private var errorMessage: String?
     @State private var selectedRelations: [RelationValue]
 
-    init(field: FieldSchema, comodel: String, currentSelections: [RelationValue], onSelect: @escaping ([RelationValue]) -> Void) {
+    init(field: FieldSchema, comodel: String, currentSelections: [RelationValue], searchDomain: JSONValue?, onSelect: @escaping ([RelationValue]) -> Void) {
         self.field = field
         self.comodel = comodel
         self.currentSelections = currentSelections
+        self.searchDomain = searchDomain
         self.onSelect = onSelect
         _selectedRelations = State(initialValue: currentSelections)
     }
@@ -1450,7 +1456,7 @@ private struct Many2ManyPickerSheet: View {
             guard !Task.isCancelled else { return }
 
             let searchResults = try await appState.withAuthenticatedToken { token in
-                try await appState.apiClient.search(model: comodel, query: trimmedQuery, limit: 20, token: token)
+                try await appState.apiClient.search(model: comodel, query: trimmedQuery, limit: 20, domain: searchDomain, token: token)
             }
 
             guard !Task.isCancelled else { return }

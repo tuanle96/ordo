@@ -22,10 +22,11 @@ struct RecordListViewModelTests {
         }
 
         let appState = try await makeRestoredAppState()
+        let userDefaults = makeIsolatedUserDefaults()
         let cachedList = RecordListResult(items: [["id": .number(1), "name": .string("Azure Interior")]], limit: 30, offset: 0)
-        try await appState.cacheStore.saveListPage(cachedList, for: "res.partner", limit: 30, offset: 0, order: nil, scope: try #require(appState.cacheScope))
+        try await appState.cacheStore.saveListPage(cachedList, for: "res.partner", limit: 30, offset: 0, order: nil, domainKey: nil, scope: try #require(appState.cacheScope))
 
-        let viewModel = RecordListViewModel(descriptor: try #require(ModelRegistry.supported.first))
+        let viewModel = try makeViewModel(userDefaults: userDefaults)
         await viewModel.load(using: appState)
 
         #expect(viewModel.summaries.map(\.title) == ["Azure Interior"])
@@ -51,7 +52,7 @@ struct RecordListViewModelTests {
         }
 
         let appState = try await makeRestoredAppState()
-        let viewModel = RecordListViewModel(descriptor: try #require(ModelRegistry.supported.first))
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
 
         await viewModel.load(using: appState)
 
@@ -82,17 +83,75 @@ struct RecordListViewModelTests {
         }
 
         let appState = try await makeRestoredAppState()
-        let viewModel = RecordListViewModel(descriptor: try #require(ModelRegistry.supported.first))
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
 
         await viewModel.apply(sortOption: .titleAscending, using: appState)
 
         #expect(requestedOrders == ["name asc"])
         #expect(viewModel.summaries.map(\.title) == ["Deco Addict"])
 
-        let cached = await appState.cacheStore.loadListPage(for: "res.partner", limit: 30, offset: 0, order: "name asc", scope: try #require(appState.cacheScope))
+        let cached = await appState.cacheStore.loadListPage(for: "res.partner", limit: 30, offset: 0, order: "name asc", domainKey: nil, scope: try #require(appState.cacheScope))
         #expect(cached?.value.items.count == 1)
 
-        let defaultCache = await appState.cacheStore.loadListPage(for: "res.partner", limit: 30, offset: 0, order: nil, scope: try #require(appState.cacheScope))
+        let defaultCache = await appState.cacheStore.loadListPage(for: "res.partner", limit: 30, offset: 0, order: nil, domainKey: nil, scope: try #require(appState.cacheScope))
+        #expect(defaultCache == nil)
+    }
+
+    @Test
+    func applyingFiltersUsesDomainQueryAndCachesByDomain() async throws {
+        var requestedDomains: [String?] = []
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let domain = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "domain" })?.value
+                requestedDomains.append(domain)
+                let payload = RecordListResult(items: [["id": .number(4), "name": .string("VIP Customer")]], limit: 30, offset: 0)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let userDefaults = makeIsolatedUserDefaults()
+        let viewModel = try makeViewModel(userDefaults: userDefaults)
+
+        await viewModel.apply(
+            filterState: BrowseFilterState(conditions: [
+                BrowseFilterCondition(fieldName: "customer_rank", filterOperator: .greaterThan, value: .number(0)),
+            ]),
+            using: appState
+        )
+
+        let expectedDomain = "[[\"customer_rank\",\">\",0]]"
+        #expect(requestedDomains == [expectedDomain])
+        #expect(viewModel.activeFilterCount == 1)
+        #expect(viewModel.summaries.map(\.title) == ["VIP Customer"])
+
+        let filteredCache = await appState.cacheStore.loadListPage(
+            for: "res.partner",
+            limit: 30,
+            offset: 0,
+            order: nil,
+            domainKey: expectedDomain,
+            scope: try #require(appState.cacheScope)
+        )
+        #expect(filteredCache?.value.items.count == 1)
+
+        let defaultCache = await appState.cacheStore.loadListPage(
+            for: "res.partner",
+            limit: 30,
+            offset: 0,
+            order: nil,
+            domainKey: nil,
+            scope: try #require(appState.cacheScope)
+        )
         #expect(defaultCache == nil)
     }
 
@@ -111,6 +170,20 @@ struct RecordListViewModelTests {
 
         await appState.restoreSession()
         return appState
+    }
+
+    private func makeViewModel(userDefaults: UserDefaults) throws -> RecordListViewModel {
+        RecordListViewModel(
+            descriptor: try #require(ModelRegistry.supported.first),
+            userDefaults: userDefaults
+        )
+    }
+
+    private func makeIsolatedUserDefaults() -> UserDefaults {
+        let suiteName = "record-list-view-model-tests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
+        return userDefaults
     }
 }
 

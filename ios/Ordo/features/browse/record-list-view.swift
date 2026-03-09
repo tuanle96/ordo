@@ -3,6 +3,7 @@ import SwiftUI
 struct RecordListView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: RecordListViewModel
+    @State private var isShowingFilterSheet = false
 
     init(descriptor: ModelDescriptor) {
         _viewModel = State(initialValue: RecordListViewModel(descriptor: descriptor))
@@ -25,6 +26,13 @@ struct RecordListView: View {
                         Section {
                             OfflineStateBanner(title: "Showing saved data", message: cacheMessage)
                                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        }
+                    }
+
+                    if let filterSummary = viewModel.filterSummary {
+                        Section {
+                            Label(filterSummary, systemImage: "line.3.horizontal.decrease.circle.fill")
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -94,6 +102,18 @@ struct RecordListView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isShowingFilterSheet = true
+                } label: {
+                    Label(
+                        viewModel.hasActiveFilters ? "Filters (\(viewModel.activeFilterCount))" : "Filters",
+                        systemImage: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                    )
+                }
+                .accessibilityIdentifier("record-list-filter-button")
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Picker("Layout", selection: Binding(
                         get: { viewModel.viewMode },
@@ -134,6 +154,18 @@ struct RecordListView: View {
         }
         .task(id: viewModel.query) {
             await viewModel.performSearch(using: appState)
+        }
+        .sheet(isPresented: $isShowingFilterSheet) {
+            FilterSheetView(
+                descriptor: viewModel.descriptor,
+                fields: viewModel.availableFilterFields,
+                initialState: viewModel.filterState,
+                onApply: { filterState in
+                    Task {
+                        await viewModel.apply(filterState: filterState, using: appState)
+                    }
+                }
+            )
         }
     }
 

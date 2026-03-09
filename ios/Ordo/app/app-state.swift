@@ -14,22 +14,31 @@ final class AppState {
     private(set) var session: StoredSession?
     private(set) var currentPrincipal: AuthenticatedPrincipal?
     private(set) var installedModuleNames: Set<String> = []
+    private(set) var pendingMutationCount = 0
     var statusMessage: String?
 
     let config: AppConfig
     let sessionStore: SessionStoring
     let apiClient: APIClient
     let cacheStore: CacheStoring
+    let mutationQueueStore: MutationQueueStoring
 
     private var hasAttemptedRestore = false
     private var refreshTask: Task<Void, Error>?
     private let sessionRefreshLeadTime: TimeInterval = 60
 
-    init(config: AppConfig, sessionStore: SessionStoring, apiClient: APIClient, cacheStore: CacheStoring) {
+    init(
+        config: AppConfig,
+        sessionStore: SessionStoring,
+        apiClient: APIClient,
+        cacheStore: CacheStoring,
+        mutationQueueStore: MutationQueueStoring = FileMutationQueueStore()
+    ) {
         self.config = config
         self.sessionStore = sessionStore
         self.apiClient = apiClient
         self.cacheStore = cacheStore
+        self.mutationQueueStore = mutationQueueStore
     }
 
     var displayUserName: String {
@@ -99,11 +108,13 @@ final class AppState {
             }
             await fetchInstalledModules()
             phase = .authenticated
-            statusMessage = nil
+            await refreshPendingMutationCount()
+            await replayPendingMutations()
         } catch {
             try? sessionStore.clear()
             session = nil
             currentPrincipal = nil
+            pendingMutationCount = 0
             phase = .login
             statusMessage = "Your saved session could not be restored. Please sign in again."
         }
@@ -138,8 +149,9 @@ final class AppState {
         session = storedSession
         currentPrincipal = principal
         await fetchInstalledModules()
-        statusMessage = nil
         phase = .authenticated
+        await refreshPendingMutationCount()
+        await replayPendingMutations()
     }
 
     func withAuthenticatedToken<T>(_ operation: @escaping (String) async throws -> T) async throws -> T {
@@ -193,6 +205,7 @@ final class AppState {
         session = nil
         currentPrincipal = nil
         installedModuleNames = []
+        pendingMutationCount = 0
         phase = .login
         statusMessage = nil
         refreshTask = nil
@@ -222,6 +235,56 @@ final class AppState {
 
     func clearCache() async throws {
         try await cacheStore.clear(scope: cacheScope)
+    }
+
+    func enqueuePendingMutation(_ mutation: QueuedRecordMutation) async throws {
+        guard let scope = cacheScope else {
+            throw APIClientError.unauthorized
+        }
+
+        try await mutationQueueStore.enqueue(mutation, scope: scope)
+        await refreshPendingMutationCount()
+        statusMessage = pendingMutationCount == 1 ? "1 change is pending sync." : "\(pendingMutationCount) changes are pending sync."
+    }
+
+    func replayPendingMutations() async {
+        guard let scope = cacheScope, phase == .authenticated else { return }
+
+        let queuedMutations = await mutationQueueStore.load(scope: scope)
+        guard !queuedMutations.isEmpty else {
+            pendingMutationCount = 0
+            return
+        }
+
+        var replayedCount = 0
+
+        for mutation in queuedMutations {
+            do {
+                try await replay(mutation, scope: scope)
+                try await mutationQueueStore.remove(id: mutation.id, scope: scope)
+                replayedCount += 1
+            } catch {
+                guard case APIClientError.unauthorized = error else {
+                    var failedMutation = mutation
+                    failedMutation.retryCount += 1
+                    failedMutation.lastError = error.localizedDescription
+                    try? await mutationQueueStore.update(failedMutation, scope: scope)
+                    continue
+                }
+
+                break
+            }
+        }
+
+        await refreshPendingMutationCount()
+
+        if replayedCount > 0 {
+            statusMessage = pendingMutationCount == 0
+                ? "Synced \(replayedCount) pending change\(replayedCount == 1 ? "" : "s")."
+                : "Synced \(replayedCount) pending change\(replayedCount == 1 ? "" : "s"). \(pendingMutationCount) still pending."
+        } else if pendingMutationCount > 0 {
+            statusMessage = pendingMutationCount == 1 ? "1 change is pending sync." : "\(pendingMutationCount) changes are pending sync."
+        }
     }
 
     private func fetchInstalledModules() async {
@@ -283,12 +346,68 @@ final class AppState {
 
             try self.sessionStore.save(updatedSession)
             self.session = updatedSession
-            self.statusMessage = nil
+            if self.pendingMutationCount == 0 {
+                self.statusMessage = nil
+            }
         }
 
         refreshTask = task
         defer { refreshTask = nil }
         try await task.value
+    }
+
+    private func refreshPendingMutationCount() async {
+        pendingMutationCount = await mutationQueueStore.pendingCount(scope: cacheScope)
+    }
+
+    private func replay(_ mutation: QueuedRecordMutation, scope: CacheScope) async throws {
+        switch mutation.kind {
+        case .update:
+            let result = try await withAuthenticatedToken { [self] token in
+                try await self.apiClient.updateRecord(
+                    model: mutation.model,
+                    id: mutation.recordID,
+                    values: mutation.values,
+                    fields: mutation.fields,
+                    token: token
+                )
+            }
+
+            try await cacheStore.saveRecord(result.record, for: mutation.model, id: mutation.recordID, scope: scope)
+        case .delete:
+            _ = try await withAuthenticatedToken { [self] token in
+                try await self.apiClient.deleteRecord(model: mutation.model, id: mutation.recordID, token: token)
+            }
+
+            try await cacheStore.deleteRecord(for: mutation.model, id: mutation.recordID, scope: scope)
+        case .action:
+            let actionName = mutation.actionName ?? ""
+            let result = try await withAuthenticatedToken { [self] token in
+                try await self.apiClient.runRecordAction(
+                    model: mutation.model,
+                    id: mutation.recordID,
+                    actionName: actionName,
+                    fields: mutation.fields,
+                    token: token
+                )
+            }
+
+            let record: RecordData
+            if let updatedRecord = result.record {
+                record = updatedRecord
+            } else {
+                record = try await withAuthenticatedToken { [self] token in
+                    try await self.apiClient.record(
+                        model: mutation.model,
+                        id: mutation.recordID,
+                        fields: mutation.fields,
+                        token: token
+                    )
+                }
+            }
+
+            try await cacheStore.saveRecord(record, for: mutation.model, id: mutation.recordID, scope: scope)
+        }
     }
 }
 
@@ -299,7 +418,8 @@ extension AppState {
             config: config,
             sessionStore: KeychainSessionStore(),
             apiClient: APIClient(baseURL: config.defaultBaseURL),
-            cacheStore: FileCacheStore()
+            cacheStore: FileCacheStore(),
+            mutationQueueStore: FileMutationQueueStore()
         )
     }
 
@@ -308,7 +428,8 @@ extension AppState {
             config: .preview,
             sessionStore: InMemorySessionStore(),
             apiClient: APIClient(baseURL: AppConfig.preview.defaultBaseURL),
-            cacheStore: FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: "OrdoPreviewCache", directoryHint: .isDirectory))
+            cacheStore: FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: "OrdoPreviewCache", directoryHint: .isDirectory)),
+            mutationQueueStore: FileMutationQueueStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: "OrdoPreviewMutationQueue", directoryHint: .isDirectory))
         )
         state.session = .preview
         state.currentPrincipal = .preview

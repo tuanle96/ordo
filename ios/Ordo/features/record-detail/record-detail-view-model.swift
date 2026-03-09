@@ -25,6 +25,7 @@ final class RecordDetailViewModel {
     private(set) var errorMessage: String?
     private(set) var cacheMessage: String?
     private(set) var saveMessage: String?
+    private(set) var pendingMutationMessage: String?
     private(set) var onchangeWarnings: [OnchangeWarning] = []
     private(set) var onchangeDomains: [String: JSONValue] = [:]
     private(set) var isLoading = false
@@ -107,6 +108,22 @@ final class RecordDetailViewModel {
         runningActionName == action.name
     }
 
+    func effectiveSearchDomain(for field: FieldSchema) -> JSONValue? {
+        let staticDomain = normalizedSearchDomain(field.domain)
+        let onchangeDomain = normalizedSearchDomain(onchangeDomains[field.name])
+
+        switch (staticDomain, onchangeDomain) {
+        case (.none, .none):
+            return nil
+        case let (.some(domain), .none), let (.none, .some(domain)):
+            return domain
+        case let (.some(.array(staticClauses)), .some(.array(onchangeClauses))):
+            return .array(staticClauses + onchangeClauses)
+        default:
+            return onchangeDomain ?? staticDomain
+        }
+    }
+
     func load(using appState: AppState, forceRefresh: Bool = false) async {
         guard appState.session?.accessToken != nil else {
             errorMessage = "Sign in again to load this record."
@@ -187,6 +204,7 @@ final class RecordDetailViewModel {
         validationErrors = [:]
         saveMessage = nil
         errorMessage = nil
+        pendingMutationMessage = nil
         resetOnchangeFeedback()
         return FormDraft(record: record)
     }
@@ -205,6 +223,7 @@ final class RecordDetailViewModel {
         cancelPendingOnchange()
         validationErrors = [:]
         saveMessage = nil
+        pendingMutationMessage = nil
         resetOnchangeFeedback()
     }
 
@@ -213,6 +232,7 @@ final class RecordDetailViewModel {
         validationErrors.removeValue(forKey: field.name)
         saveMessage = nil
         errorMessage = nil
+        pendingMutationMessage = nil
 
         guard field.onchange != nil else { return }
         scheduleOnchange(for: field, draft: draft, using: appState)
@@ -272,6 +292,7 @@ final class RecordDetailViewModel {
             validationErrors = [:]
             errorMessage = nil
             saveMessage = wasCreating ? "Record created." : "Changes saved."
+            pendingMutationMessage = nil
             resetOnchangeFeedback()
 
             if let recordID = self.recordID, let cacheScope = appState.cacheScope {
@@ -288,6 +309,8 @@ final class RecordDetailViewModel {
             Self.logger.error("❌ Failed to save \(self.descriptor.model, privacy: .public)#\(targetRecordID, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {
                 appState.signOut()
+            } else if await queueOfflineUpdateIfPossible(error: error, changedValues: changedValues, fields: schema.requestedFieldNames, using: appState) {
+                return true
             } else {
                 errorMessage = error.localizedDescription
             }
@@ -322,6 +345,7 @@ final class RecordDetailViewModel {
             errorMessage = nil
             validationErrors = [:]
             saveMessage = result.changed ? "\(action.label) completed." : "No changes from \(action.label.lowercased())."
+            pendingMutationMessage = nil
 
             if let cacheScope = appState.cacheScope {
                 do {
@@ -336,6 +360,8 @@ final class RecordDetailViewModel {
             Self.logger.error("❌ Failed to run action \(action.name, privacy: .public) for \(self.descriptor.model, privacy: .public)#\(recordID, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {
                 appState.signOut()
+            } else if await queueOfflineActionIfPossible(error: error, action: action, fields: schema.requestedFieldNames, using: appState) {
+                return true
             } else {
                 errorMessage = error.localizedDescription
             }
@@ -364,12 +390,15 @@ final class RecordDetailViewModel {
             validationErrors = [:]
             cacheMessage = nil
             errorMessage = nil
+            pendingMutationMessage = nil
             resetOnchangeState()
             return true
         } catch {
             Self.logger.error("❌ Failed to delete \(self.descriptor.model, privacy: .public)#\(recordID, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {
                 appState.signOut()
+            } else if await queueOfflineDeleteIfPossible(error: error, using: appState) {
+                return true
             } else {
                 errorMessage = error.localizedDescription
             }
@@ -507,6 +536,117 @@ final class RecordDetailViewModel {
         resetOnchangeFeedback()
     }
 
+    private func queueOfflineUpdateIfPossible(
+        error: Error,
+        changedValues: RecordData,
+        fields: [String],
+        using appState: AppState
+    ) async -> Bool {
+        guard isRetryableOfflineFailure(error), let recordID, !changedValues.isEmpty else {
+            return false
+        }
+
+        do {
+            try await appState.enqueuePendingMutation(
+                QueuedRecordMutation(
+                    model: descriptor.model,
+                    recordID: recordID,
+                    kind: .update,
+                    values: changedValues,
+                    fields: fields
+                )
+            )
+
+            record = (record ?? [:]).merging(changedValues) { _, new in new }
+            validationErrors = [:]
+            errorMessage = nil
+            saveMessage = "Changes queued offline."
+            pendingMutationMessage = "We’ll sync this record automatically when the connection returns."
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func queueOfflineActionIfPossible(
+        error: Error,
+        action: ActionButton,
+        fields: [String],
+        using appState: AppState
+    ) async -> Bool {
+        guard isRetryableOfflineFailure(error), let recordID else {
+            return false
+        }
+
+        do {
+            try await appState.enqueuePendingMutation(
+                QueuedRecordMutation(
+                    model: descriptor.model,
+                    recordID: recordID,
+                    kind: .action,
+                    fields: fields,
+                    actionName: action.name
+                )
+            )
+
+            errorMessage = nil
+            saveMessage = "\(action.label) queued offline."
+            pendingMutationMessage = "We’ll run this action automatically when the connection returns."
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func queueOfflineDeleteIfPossible(error: Error, using appState: AppState) async -> Bool {
+        guard isRetryableOfflineFailure(error), let recordID, let cacheScope = appState.cacheScope else {
+            return false
+        }
+
+        do {
+            let fields = schema?.requestedFieldNames ?? []
+            try await appState.enqueuePendingMutation(
+                QueuedRecordMutation(
+                    model: descriptor.model,
+                    recordID: recordID,
+                    kind: .delete,
+                    fields: fields
+                )
+            )
+            try? await appState.cacheStore.deleteRecord(for: descriptor.model, id: recordID, scope: cacheScope)
+            errorMessage = nil
+            saveMessage = "Delete queued offline."
+            pendingMutationMessage = "We’ll delete this record on the server when the connection returns."
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func isRetryableOfflineFailure(_ error: Error) -> Bool {
+        if error is CancellationError || error is DecodingError {
+            return false
+        }
+
+        if case APIClientError.unauthorized = error {
+            return false
+        }
+
+        guard let urlError = error as? URLError else { return false }
+
+        switch urlError.code {
+        case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .internationalRoamingOff, .callIsActive, .dataNotAllowed:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func normalizedSearchDomain(_ domain: JSONValue?) -> JSONValue? {
+        guard case .array(let clauses)? = domain else { return nil }
+        return clauses.isEmpty ? nil : .array(clauses)
+    }
+
     private func loadCreateSchema(using appState: AppState, forceRefresh: Bool = false) async {
         do {
             let schema = try await appState.withAuthenticatedToken { [self] token in
@@ -538,6 +678,7 @@ final class RecordDetailViewModel {
             }
 
             cacheMessage = nil
+            pendingMutationMessage = nil
         } catch {
             Self.logger.error("❌ Failed to load create schema for \(self.descriptor.model, privacy: .public): \(String(describing: error), privacy: .public)")
             if case APIClientError.unauthorized = error {

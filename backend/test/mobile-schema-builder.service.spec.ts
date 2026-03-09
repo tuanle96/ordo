@@ -338,4 +338,28 @@ describe('MobileSchemaBuilderService', () => {
             fields: [expect.objectContaining({ name: 'phone', type: 'char', widget: 'phone' })],
         });
     });
+
+    it('detects Odoo 17 chatter declared as <div class="oe_chatter">', () => {
+        const service = new MobileSchemaBuilderService(new ConditionParserService());
+        const xml = `
+            <form string="Partners">
+              <sheet>
+                <group>
+                  <field name="name" />
+                </group>
+              </sheet>
+              <div class="oe_chatter">
+                <field name="message_follower_ids" />
+                <field name="activity_ids" />
+                <field name="message_ids" />
+              </div>
+            </form>
+        `;
+
+        const schema = service.build('res.partner', xml, {
+            name: { type: 'char', string: 'Name' },
+        });
+
+        expect(schema.hasChatter).toBe(true);
+    });
 });

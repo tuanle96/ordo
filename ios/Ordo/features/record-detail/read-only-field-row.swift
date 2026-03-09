@@ -77,10 +77,17 @@ struct ReadOnlyFieldRow: View {
     @ViewBuilder
     private func row(multiline: Bool) -> some View {
         LabeledContent(model.label) {
-            Text(model.value)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(multiline ? nil : 1)
-                .accessibilityIdentifier("field-value-\(model.id)")
+            if multiline, let richText = model.richText {
+                Text(richText)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(nil)
+                    .accessibilityIdentifier("field-value-\(model.id)")
+            } else {
+                Text(model.value)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(multiline ? nil : 1)
+                    .accessibilityIdentifier("field-value-\(model.id)")
+            }
         }
         .accessibilityIdentifier("field-row-\(model.id)")
     }

@@ -177,6 +177,49 @@ export class OdooRpcService {
         }, request.session.cookieHeader);
     }
 
+    /**
+     * Like callKwWithSession, but for Odoo methods that return None/void
+     * (e.g. message_unsubscribe). These methods produce a JSON-RPC envelope
+     * with `"result": null` (or no result key), which the strict guard in
+     * postJsonRoute rejects. This variant skips the result presence check.
+     */
+    async callKwVoidWithSession(request: OdooCallKwRequest): Promise<void> {
+        const baseUrl = this.normalizeBaseUrl(request.session.odooUrl);
+        const response = await this.fetchWithTimeout(new URL('/web/dataset/call_kw', `${baseUrl}/`).toString(), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(request.session.cookieHeader ? { Cookie: request.session.cookieHeader } : {}),
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'call',
+                params: {
+                    model: request.model,
+                    method: request.method,
+                    args: request.args ?? [],
+                    kwargs: request.kwargs ?? {},
+                },
+                id: Date.now(),
+            }),
+        });
+
+        if (!response.ok) {
+            this.logger.error({
+                event: 'odoo_upstream_http_error',
+                path: '/web/dataset/call_kw',
+                status: response.status,
+            });
+            throw new BadGatewayException(`Odoo upstream request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as { error?: Parameters<OdooRpcService['mapOdooError']>[0] };
+        if (payload.error) {
+            throw this.mapOdooError(payload.error);
+        }
+        // Intentionally no result check — void Odoo methods return None/null
+    }
+
     async getFieldsSpecWithSession(
         session: Pick<OdooCallKwRequest['session'], 'odooUrl' | 'cookieHeader'>,
         model: string,

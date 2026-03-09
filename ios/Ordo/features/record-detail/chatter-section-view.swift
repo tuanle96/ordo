@@ -3,7 +3,7 @@ import SwiftUI
 struct ChatterSectionView: View {
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: RecordChatterViewModel
-    @State private var isShowingScheduleSheet = false
+    @Binding var isShowingScheduleSheet: Bool
 
     var body: some View {
         Section("Chatter") {
@@ -84,14 +84,10 @@ struct ChatterSectionView: View {
             }
             .padding(.vertical, OrdoSpacing.xs)
         }
-        .sheet(isPresented: $isShowingScheduleSheet) {
-            ScheduleActivitySheet(viewModel: viewModel, isPresented: $isShowingScheduleSheet)
-                .environment(appState)
-        }
     }
 }
 
-private struct ScheduleActivitySheet: View {
+struct ScheduleActivitySheet: View {
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: RecordChatterViewModel
     @Binding var isPresented: Bool

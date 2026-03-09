@@ -1,5 +1,32 @@
 # Project Changelog
 
+## 2026-03-09 (Core Engine Remaining Real Work — Browse Domains, Returned Domains, Read Fidelity, Offline Queue)
+
+### Added
+
+- **Browse domain/filter foundation** on iOS with persisted multi-condition filter state, JSON-encoded `domain` transport over the existing backend list/search routes, and cache key isolation by active domain
+- **Returned onchange domain application** for relation editors so effective field-level domains now flow into `many2one` and `many2many` picker searches instead of being stored but ignored
+- **Persisted offline mutation queue foundation** for record detail save/action/delete flows, including file-backed queue storage, replay after authenticated restore/sign-in, retry-count tracking, and pending-sync state surfaced on Home and record detail
+- **Focused regression coverage** for browse domain transport, effective search-domain resolution, queue persistence/replay, and optimistic offline update behavior
+
+### Changed
+
+- Read-only HTML rendering now prefers attributed/rich rendering when parsing succeeds while keeping the existing safe plain-text fallback path
+- Monetary display formatting now prefers real currency-symbol output for recognizable codes like `USD` / `EUR`, while still falling back to the raw schema-linked label when the currency code is unknown
+- `AppState` now refreshes pending mutation counts and opportunistically replays queued mutations after session restore or successful sign-in instead of leaving offline writes stranded until a manual retry path exists
+- The actor-backed cache and queue stores now use explicit nonisolated initializer overloads so the broader iOS validation pass stays compatible with the project's default MainActor isolation without relying on generated default-argument symbols
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordListViewModelTests test` — focused browse-domain/filter regression suite passes
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordDetailViewModelTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/MutationQueueStoreTests -only-testing:OrdoTests/AppStateMutationReplayTests test` — focused onchange/read-fidelity/offline-queue regressions pass
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests test` — broad iOS unit target passes after the hardening follow-up (`** TEST SUCCEEDED **`)
+
+### Notes
+
+- This closes the remaining **real** core-engine gaps identified after the repo audit without reopening already-shipped media, statusbar, or generic-field slices
+- Browse `group by`, full sync/conflict resolution, background retry scheduling, and broader x2many onchange parity remain explicit follow-up work rather than being smuggled into this completed slice
+
 ## 2026-03-09 (Core-First Phase 02D — Signature Capture + Inline Preview/Export)
 
 ### Added

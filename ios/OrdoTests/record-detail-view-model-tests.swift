@@ -410,6 +410,121 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func saveQueuesOfflineUpdateAndKeepsOptimisticRecordState() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/modules/installed") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: InstalledModulesResponse(modules: []))))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchema)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecord)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "PATCH" {
+                throw URLError(.notConnectedToInternet)
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        draft.setValue(.string("Queued Name"), for: "name")
+
+        let didSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(didSave == true)
+        #expect(viewModel.record?["name"] == .string("Queued Name"))
+        #expect(viewModel.saveMessage == "Changes queued offline.")
+        #expect(viewModel.pendingMutationMessage?.contains("sync") == true)
+        #expect(appState.pendingMutationCount == 1)
+    }
+
+    @Test
+    func effectiveSearchDomainPrefersReturnedOnchangeDomain() async throws {
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithRelationOnchange)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecordWithCountry)))
+            }
+
+            if path.hasSuffix("/records/res.partner/onchange") && request.httpMethod == "POST" {
+                return (201, try JSONEncoder().encode(DetailEnvelope(data: OnchangeResult(
+                    values: [:],
+                    warnings: nil,
+                    domains: ["country_id": .array([.array([.string("code"), .string("="), .string("US")])])]
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        let triggerField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "name" }))
+        let countryField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "country_id" }))
+
+        viewModel.applyFieldEdit(.string("Acme"), for: triggerField, draft: draft, using: appState)
+        await viewModel.waitForOnchangeToSettle()
+
+        #expect(viewModel.effectiveSearchDomain(for: countryField) == .array([
+            .array([.string("active"), .string("="), .bool(true)]),
+            .array([.string("code"), .string("="), .string("US")]),
+        ]))
+    }
+
+    @Test
+    func effectiveSearchDomainFallsBackToStaticFieldDomain() async throws {
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        let field = FieldSchema(
+            name: "country_id",
+            type: .many2one,
+            label: "Country",
+            required: nil,
+            readonly: nil,
+            invisible: nil,
+            domain: .array([.array([.string("active"), .string("="), .bool(true)])]),
+            comodel: "res.country",
+            selection: nil,
+            currencyField: nil,
+            placeholder: nil,
+            digits: nil,
+            subfields: nil,
+            searchable: nil,
+            widget: nil
+        )
+
+        #expect(viewModel.effectiveSearchDomain(for: field) == .array([
+            .array([.string("active"), .string("="), .bool(true)]),
+        ]))
+    }
+
+    @Test
     func staleOnchangeResponsesDoNotOverwriteNewerDraftEdits() async throws {
         var requestOrder: [String] = []
 
@@ -776,11 +891,13 @@ struct RecordDetailViewModelTests {
 
         let sessionStore = DetailSessionStore(session: .preview)
         let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let queueStore = FileMutationQueueStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
         let appState = AppState(
             config: .preview,
             sessionStore: sessionStore,
             apiClient: APIClient(baseURL: URL(string: AppConfig.fallbackBaseURL)!, session: URLSession(configuration: configuration)),
-            cacheStore: cacheStore
+            cacheStore: cacheStore,
+            mutationQueueStore: queueStore
         )
 
         await appState.restoreSession()
@@ -821,6 +938,18 @@ private let partnerSchemaWithOnchange = MobileFormSchema(
     sections: [FormSection(label: "Contact", fields: [
         FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "name", source: "view", dependencies: ["nickname"], mergeReturnedValue: true), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
         FieldSchema(name: "nickname", type: .char, label: "Nickname", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
+private let partnerSchemaWithRelationOnchange = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "name", source: "view", dependencies: ["country_id"], mergeReturnedValue: true), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: .array([.array([.string("active"), .string("="), .bool(true)])]), comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
     ])],
     tabs: [],
     hasChatter: false
@@ -879,6 +1008,13 @@ private let detailPartnerRecord: RecordData = [
     "display_name": .string("Azure Interior"),
     "name": .string("Azure Interior"),
     "nickname": .string("VIP 1"),
+]
+
+private let detailPartnerRecordWithCountry: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "country_id": .relation(id: 21, label: "Belgium"),
 ]
 
 private let detailPartnerRecordWithHTML: RecordData = [

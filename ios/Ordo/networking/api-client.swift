@@ -48,6 +48,7 @@ final class APIClient {
         limit: Int,
         offset: Int,
         order: String? = nil,
+        domain: JSONValue? = nil,
         token: String
     ) async throws -> RecordListResult {
         var queryItems = [
@@ -60,14 +61,18 @@ final class APIClient {
             queryItems.append(URLQueryItem(name: "order", value: order))
         }
 
+        if let encodedDomain = domain?.encodedJSONString, !encodedDomain.isEmpty {
+            queryItems.append(URLQueryItem(name: "domain", value: encodedDomain))
+        }
+
         return try await perform(route: "records/\(model)", queryItems: queryItems, token: token)
     }
 
-    func search(model: String, query: String, limit: Int, token: String) async throws -> [NameSearchResult] {
+    func search(model: String, query: String, limit: Int, domain: JSONValue? = nil, token: String) async throws -> [NameSearchResult] {
         let queryItems = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "limit", value: String(limit)),
-        ]
+        ] + (domain?.encodedJSONString.map { [URLQueryItem(name: "domain", value: $0)] } ?? [])
 
         return try await perform(route: "search/\(model)", queryItems: queryItems, token: token)
     }

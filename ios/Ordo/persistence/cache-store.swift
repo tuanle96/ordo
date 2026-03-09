@@ -7,8 +7,9 @@ protocol CacheStoring {
     func saveSchema(_ schema: MobileFormSchema, for model: String, scope: CacheScope) async throws
     func loadRecord(for model: String, id: Int, scope: CacheScope) async -> CachedValue<RecordData>?
     func saveRecord(_ record: RecordData, for model: String, id: Int, scope: CacheScope) async throws
-    func loadListPage(for model: String, limit: Int, offset: Int, order: String?, scope: CacheScope) async -> CachedValue<RecordListResult>?
-    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String?, scope: CacheScope) async throws
+    func deleteRecord(for model: String, id: Int, scope: CacheScope) async throws
+    func loadListPage(for model: String, limit: Int, offset: Int, order: String?, domainKey: String?, scope: CacheScope) async -> CachedValue<RecordListResult>?
+    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String?, domainKey: String?, scope: CacheScope) async throws
     func clear(scope: CacheScope?) async throws
 }
 
@@ -38,15 +39,40 @@ actor FileCacheStore: CacheStoring {
     private let dateProvider: @Sendable () -> Date
     private let logger = Logger(subsystem: "com.ordo.app", category: "cache-store")
 
-    init(
-        baseDirectoryURL: URL? = nil,
-        fileManager: FileManager = .default,
-        dateProvider: @escaping @Sendable () -> Date = Date.init
+    nonisolated init() {
+        let fileManager = FileManager.default
+        self.fileManager = fileManager
+        self.dateProvider = Date.init
+        self.baseDirectoryURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appending(path: "OrdoCache", directoryHint: .isDirectory)
+    }
+
+    nonisolated init(baseDirectoryURL: URL) {
+        self.fileManager = .default
+        self.dateProvider = Date.init
+        self.baseDirectoryURL = baseDirectoryURL
+    }
+
+    nonisolated init(baseDirectoryURL: URL, fileManager: FileManager) {
+        self.fileManager = fileManager
+        self.dateProvider = Date.init
+        self.baseDirectoryURL = baseDirectoryURL
+    }
+
+    nonisolated init(baseDirectoryURL: URL, dateProvider: @escaping @Sendable () -> Date) {
+        self.fileManager = .default
+        self.dateProvider = dateProvider
+        self.baseDirectoryURL = baseDirectoryURL
+    }
+
+    nonisolated init(
+        baseDirectoryURL: URL,
+        fileManager: FileManager,
+        dateProvider: @escaping @Sendable () -> Date
     ) {
         self.fileManager = fileManager
         self.dateProvider = dateProvider
-        self.baseDirectoryURL = baseDirectoryURL ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "OrdoCache", directoryHint: .isDirectory)
+        self.baseDirectoryURL = baseDirectoryURL
     }
 
     func loadSchema(for model: String, scope: CacheScope) async -> CachedValue<MobileFormSchema>? {
@@ -65,12 +91,18 @@ actor FileCacheStore: CacheStoring {
         try await saveValue(record, at: fileURL(for: .record(model: model, id: id), scope: scope))
     }
 
-    func loadListPage(for model: String, limit: Int, offset: Int, order: String? = nil, scope: CacheScope) async -> CachedValue<RecordListResult>? {
-        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order), scope: scope), lifetime: .list)
+    func deleteRecord(for model: String, id: Int, scope: CacheScope) async throws {
+        let url = fileURL(for: .record(model: model, id: id), scope: scope)
+        guard fileManager.fileExists(atPath: url.path()) else { return }
+        try fileManager.removeItem(at: url)
     }
 
-    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String? = nil, scope: CacheScope) async throws {
-        try await saveValue(result, at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order), scope: scope))
+    func loadListPage(for model: String, limit: Int, offset: Int, order: String? = nil, domainKey: String? = nil, scope: CacheScope) async -> CachedValue<RecordListResult>? {
+        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order, domainKey: domainKey), scope: scope), lifetime: .list)
+    }
+
+    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String? = nil, domainKey: String? = nil, scope: CacheScope) async throws {
+        try await saveValue(result, at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order, domainKey: domainKey), scope: scope))
     }
 
     func clear(scope: CacheScope? = nil) async throws {
@@ -139,7 +171,7 @@ private enum CacheLifetime {
 private enum CacheKey {
     case schema(String)
     case record(model: String, id: Int)
-    case list(model: String, limit: Int, offset: Int, order: String?)
+    case list(model: String, limit: Int, offset: Int, order: String?, domainKey: String?)
 
     var filename: String {
         switch self {
@@ -147,8 +179,8 @@ private enum CacheKey {
             return "schema-\(safe(model)).json"
         case .record(let model, let id):
             return "record-\(safe(model))-\(id).json"
-        case .list(let model, let limit, let offset, let order):
-            return "list-\(safe(model))-\(safe(order ?? "default"))-\(limit)-\(offset).json"
+        case .list(let model, let limit, let offset, let order, let domainKey):
+            return "list-\(safe(model))-\(safe(order ?? "default"))-\(safe(domainKey ?? "domain-default"))-\(limit)-\(offset).json"
         }
     }
 

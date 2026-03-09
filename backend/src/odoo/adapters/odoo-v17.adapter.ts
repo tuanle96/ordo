@@ -406,7 +406,7 @@ export class OdooV17Adapter implements OdooAdapter {
     ): Promise<ChatterDetailsResult> {
         const partnerId = await this.getCurrentPartnerId(session);
 
-        await this.odooRpcService.callKwWithSession<boolean>({
+        await this.odooRpcService.callKwVoidWithSession({
             session,
             model,
             method: 'message_unsubscribe',

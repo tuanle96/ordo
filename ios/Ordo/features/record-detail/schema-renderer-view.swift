@@ -6,6 +6,7 @@ struct SchemaRendererView: View {
     var draft: FormDraft? = nil
     var isEditing = false
     var hiddenFieldNames: Set<String> = []
+    var searchDomains: [String: JSONValue] = [:]
     var validationErrors: [String: String] = [:]
     var onFieldChange: ((FieldSchema, JSONValue?) -> Void)? = nil
 
@@ -17,6 +18,7 @@ struct SchemaRendererView: View {
                 draft: draft,
                 isEditing: isEditing,
                 hiddenFieldNames: hiddenFieldNames,
+                searchDomains: searchDomains,
                 validationErrors: validationErrors,
                 onFieldChange: onFieldChange,
                 title: section.label ?? "Details",
@@ -32,6 +34,7 @@ struct SchemaRendererView: View {
                     draft: draft,
                     isEditing: isEditing,
                     hiddenFieldNames: hiddenFieldNames,
+                    searchDomains: searchDomains,
                     validationErrors: validationErrors,
                     onFieldChange: onFieldChange,
                     title: section.label ?? tab.label,
@@ -48,6 +51,7 @@ private struct SchemaSectionView: View {
     let draft: FormDraft?
     let isEditing: Bool
     let hiddenFieldNames: Set<String>
+    let searchDomains: [String: JSONValue]
     let validationErrors: [String: String]
     let onFieldChange: ((FieldSchema, JSONValue?) -> Void)?
     let title: String
@@ -86,6 +90,7 @@ private struct SchemaSectionView: View {
                 model: editor,
                 draft: draft,
                 fallbackValue: record[field.name],
+                searchDomain: searchDomains[field.name],
                 validationMessage: validationErrors[field.name],
                 onValueChange: onFieldChange
             )

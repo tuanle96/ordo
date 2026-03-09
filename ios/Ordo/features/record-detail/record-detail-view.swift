@@ -11,6 +11,7 @@ struct RecordDetailView: View {
     @State private var showDiscardConfirmation = false
     @State private var pendingWorkflowAction: ActionButton?
     @State private var showDeleteConfirmation = false
+    @State private var isShowingScheduleSheet = false
 
     init(descriptor: ModelDescriptor, recordID: Int? = nil) {
         _viewModel = State(initialValue: RecordDetailViewModel(descriptor: descriptor, recordID: recordID))
@@ -61,6 +62,13 @@ struct RecordDetailView: View {
                             Text(saveMessage)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(.green)
+                        }
+                    }
+
+                    if let pendingMutationMessage = viewModel.pendingMutationMessage, !pendingMutationMessage.isEmpty {
+                        Section {
+                            OfflineStateBanner(title: "Pending sync", message: pendingMutationMessage)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                         }
                     }
 
@@ -158,6 +166,7 @@ struct RecordDetailView: View {
                         draft: draft,
                         isEditing: isEditing,
                         hiddenFieldNames: hiddenSchemaFieldNames(schema: schema, values: currentValues),
+                        searchDomains: schemaSearchDomains(schema),
                         validationErrors: viewModel.validationErrors,
                         onFieldChange: { field, value in
                             guard let draft else { return }
@@ -167,7 +176,7 @@ struct RecordDetailView: View {
                     .id("schema-\(viewModel.recordID)-\(isEditing ? "editing" : "readonly")")
 
                     if schema.hasChatter, !isCreating, viewModel.recordID != nil {
-                        ChatterSectionView(viewModel: chatterViewModel)
+                        ChatterSectionView(viewModel: chatterViewModel, isShowingScheduleSheet: $isShowingScheduleSheet)
                     }
 
                     if !isEditing, !isCreating, viewModel.recordID != nil {
@@ -280,6 +289,10 @@ struct RecordDetailView: View {
         } message: {
             Text(pendingWorkflowAction?.confirm ?? "")
         }
+        .sheet(isPresented: $isShowingScheduleSheet) {
+            ScheduleActivitySheet(viewModel: chatterViewModel, isPresented: $isShowingScheduleSheet)
+                .environment(appState)
+        }
         .task {
             await viewModel.load(using: appState)
             if let record = viewModel.record {
@@ -356,6 +369,15 @@ struct RecordDetailView: View {
 
     private func hiddenSchemaFieldNames(schema: MobileFormSchema, values: RecordData) -> Set<String> {
         headerNameField(in: schema, values: values) == nil ? [] : ["name"]
+    }
+
+    private func schemaSearchDomains(_ schema: MobileFormSchema) -> [String: JSONValue] {
+        Dictionary(
+            uniqueKeysWithValues: schema.allFields.compactMap { field in
+                guard let domain = viewModel.effectiveSearchDomain(for: field) else { return nil }
+                return (field.name, domain)
+            }
+        )
     }
 
     private func handleSaveTap() async {

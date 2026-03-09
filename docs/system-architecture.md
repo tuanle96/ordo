@@ -186,7 +186,24 @@ The current onchange architecture now covers the first honest server-backed slic
 - **Backend orchestration path** adds `POST /records/:model/onchange`, which resolves the upstream Odoo session, fetches a fields spec, calls Odoo's `onchange`, and normalizes value/warning/domain payloads fail-closed before returning them to iOS
 - **Schema-declared trigger metadata** means only fields explicitly marked by the parsed mobile schema participate in the first rollout; this avoids pretending every field/widget/context side effect is supported
 - **iOS draft-merge lifecycle** centralizes edits in `RecordDetailViewModel`, debounces text-like changes, cancels superseded requests, and merges returned values through `FormDraft` with field-version protection so stale responses cannot overwrite newer user edits
-- **Current support boundary is narrow by design**: inline warning display and stored returned domains are supported, but broad relation-editor domain application, offline replay, and full `one2many`/`many2many` parity remain deferred follow-up work
+- **Current support boundary is still narrow by design**: inline warning display and stored returned domains are supported, and those returned domains now drive effective `many2one` / `many2many` picker search filters on iOS, but full `one2many` / `many2many` onchange parity and broader server-side side-effect modeling remain deferred follow-up work
+
+## Browse domain/filter foundation (2026-03-09)
+
+The remaining core-engine browse slice closes the honest list-filtering gap without inventing a second browse contract:
+
+- **Browse filters stay transport-light**: iOS list screens now build multi-condition `domain` payloads and send them over the existing backend list/search routes instead of requiring new filter-specific endpoints
+- **Persistence is local and scoped**: filter state is stored in `UserDefaults` per browse surface, while cached list pages are keyed by model, order, offset, and a hashed domain key so filtered pages never collide with the unfiltered cache
+- **The slice intentionally stops at filtering**: sorting and pagination reuse the current list machinery, while grouped browse sections / `group by` stay explicitly deferred because they likely need a different backend/list response shape
+
+## Core-engine offline mutation queue foundation (2026-03-09)
+
+The first offline-write slice stays intentionally modest: it gives Ordo a real persisted retry foundation without claiming full sync-engine parity.
+
+- **Queue storage is file-backed and scope-aware**: pending record updates, deletes, and workflow actions persist per `CacheScope`, dedupe equivalent intents on the same record, and track retry counts plus the last surfaced error
+- **Replay is auth-driven, not background-magic**: `AppState` refreshes the pending count and attempts replay after authenticated restore/sign-in, reusing the existing authenticated API client, canonical post-write reads, and cache update path
+- **UI state stays honest**: Home and record detail surfaces show pending-sync state, while retryable offline save/action/delete failures can queue work and keep the user-facing state optimistic only inside the already-loaded record flow
+- **Scope discipline remains explicit**: there is still no conflict resolution, no background scheduler, no draft recovery after relaunch, and no generic sync dashboard beyond the lightweight pending-count/banner surface
 
 ## Core-first generic form engine scope (2026-03-09)
 
@@ -253,9 +270,11 @@ The first statusbar interaction slice increases Odoo parity without pretending t
 The following remain deferred beyond the current scope:
 
 - sync engine
+- grouped browse / `group by` list architecture
 - notifications
 - file proxying
 - dashboard aggregation beyond a tiny future slice
-- autosave and offline queued writes
+- background retry scheduling and conflict resolution for queued writes
+- autosave
 - draft recovery after app relaunch
 - expanded field type editors beyond the current Phase 01 matrix and narrow `one2many` scope

@@ -72,6 +72,7 @@ final class RecordListViewModel {
     private(set) var canLoadMore = true
     var viewMode: ViewMode = .cards
     private(set) var sortOption: SortOption = .serverDefault
+    private(set) var filterState: BrowseFilterState
     var query = ""
 
     let descriptor: ModelDescriptor
@@ -81,9 +82,39 @@ final class RecordListViewModel {
     private let searchDebounce = Duration.milliseconds(300)
     private var loadedOffsets = Set<Int>()
     private var nextOffset = 0
+    private let filterFields: [BrowseFilterField]
+    private let userDefaults: UserDefaults
 
-    init(descriptor: ModelDescriptor) {
+    init(descriptor: ModelDescriptor, userDefaults: UserDefaults = .standard) {
         self.descriptor = descriptor
+        self.userDefaults = userDefaults
+        self.filterFields = BrowseFilterRegistry.fields(for: descriptor)
+        self.filterState = BrowseFilterStore.load(model: descriptor.model, userDefaults: userDefaults).normalized(with: filterFields)
+    }
+
+    var availableFilterFields: [BrowseFilterField] {
+        filterFields
+    }
+
+    var activeFilterCount: Int {
+        filterState.activeCount
+    }
+
+    var hasActiveFilters: Bool {
+        activeFilterCount > 0
+    }
+
+    var filterSummary: String? {
+        guard hasActiveFilters else { return nil }
+        return activeFilterCount == 1 ? "1 filter applied" : "\(activeFilterCount) filters applied"
+    }
+
+    private var activeDomain: JSONValue? {
+        filterState.domainValue(using: filterFields)
+    }
+
+    private var activeDomainKey: String? {
+        activeDomain?.encodedJSONString
     }
 
     func apply(sortOption: SortOption, using appState: AppState) async {
@@ -94,6 +125,18 @@ final class RecordListViewModel {
 
     func load(using appState: AppState) async {
         await loadPage(offset: 0, using: appState, replacing: true)
+    }
+
+    func apply(filterState: BrowseFilterState, using appState: AppState) async {
+        let normalizedState = filterState.normalized(with: filterFields)
+        guard normalizedState != self.filterState else { return }
+        self.filterState = normalizedState
+        BrowseFilterStore.save(normalizedState, model: descriptor.model, userDefaults: userDefaults)
+        await load(using: appState)
+
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
+            await performSearch(using: appState)
+        }
     }
 
     func loadMoreIfNeeded(currentID: Int, using appState: AppState) async {
@@ -112,6 +155,8 @@ final class RecordListViewModel {
         }
 
         let order = sortOption.order(for: descriptor)
+        let domain = activeDomain
+        let domainKey = activeDomainKey
 
         if replacing {
             isLoading = true
@@ -127,12 +172,12 @@ final class RecordListViewModel {
         }
 
         if replacing,
-          let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: 0, order: order, scope: cacheScope) {
+                    let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: 0, order: order, domainKey: domainKey, scope: cacheScope) {
             applyPage(cached.value, offset: 0, replacing: true)
             cacheMessage = "Showing saved data from \(cached.relativeTimestamp)."
         }
 
-      Self.logger.info("📋 Loading page for \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public) replacing=\(replacing, privacy: .public) order=\(order ?? "default", privacy: .public)")
+            Self.logger.info("📋 Loading page for \(self.descriptor.model, privacy: .public) offset=\(offset, privacy: .public) replacing=\(replacing, privacy: .public) order=\(order ?? "default", privacy: .public) domain=\(domainKey ?? "default", privacy: .public)")
 
         do {
             let result = try await appState.withAuthenticatedToken { [self] token in
@@ -142,6 +187,7 @@ final class RecordListViewModel {
                     limit: self.pageSize,
                     offset: offset,
                     order: order,
+                    domain: domain,
                     token: token
                 )
             }
@@ -149,7 +195,7 @@ final class RecordListViewModel {
             applyPage(result, offset: offset, replacing: replacing)
             cacheMessage = nil
             do {
-                try await appState.cacheStore.saveListPage(result, for: descriptor.model, limit: pageSize, offset: offset, order: order, scope: cacheScope)
+                try await appState.cacheStore.saveListPage(result, for: descriptor.model, limit: pageSize, offset: offset, order: order, domainKey: domainKey, scope: cacheScope)
             } catch {
                 Self.logger.error("Failed to save list cache for \(self.descriptor.model, privacy: .public) offset \(offset, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
@@ -158,7 +204,7 @@ final class RecordListViewModel {
             if case APIClientError.unauthorized = error {
                 appState.signOut()
             } else if !replacing,
-                      let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: offset, order: order, scope: cacheScope) {
+                      let cached = await appState.cacheStore.loadListPage(for: descriptor.model, limit: pageSize, offset: offset, order: order, domainKey: domainKey, scope: cacheScope) {
                 applyPage(cached.value, offset: offset, replacing: false)
                 cacheMessage = "Loaded more from saved data (\(cached.relativeTimestamp))."
             } else if !replacing {
@@ -199,6 +245,7 @@ final class RecordListViewModel {
                         model: self.descriptor.model,
                         query: trimmedQuery,
                         limit: 15,
+                        domain: self.activeDomain,
                         token: token
                     )
                 }

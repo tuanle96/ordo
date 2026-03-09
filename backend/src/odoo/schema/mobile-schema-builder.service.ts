@@ -78,7 +78,7 @@ export class MobileSchemaBuilderService {
             header: this.buildHeader(form.header, fieldsMeta),
             sections: this.buildSections(form.sheet ?? form, fieldsMeta, inheritedInvisible),
             tabs: this.buildTabs(form.sheet?.notebook ?? form.notebook, fieldsMeta, inheritedInvisible),
-            hasChatter: Boolean(form.chatter ?? form.sheet?.chatter),
+            hasChatter: Boolean(form.chatter ?? form.sheet?.chatter ?? this.hasOeChatterDiv(form)),
         };
     }
 
@@ -431,6 +431,14 @@ export class MobileSchemaBuilderService {
             default:
                 return 'text';
         }
+    }
+
+    /** Detect Odoo 17 chatter pattern: <div class="oe_chatter"> placed after </sheet>. */
+    private hasOeChatterDiv(form: XmlNode): boolean {
+        const divs = this.asArray(form.div).concat(this.asArray(form.sheet?.div));
+        return divs.some(
+            (div) => typeof div?.['@_class'] === 'string' && div['@_class'].includes('oe_chatter'),
+        );
     }
 
     private asArray<T>(value: T | T[] | undefined): T[] {
