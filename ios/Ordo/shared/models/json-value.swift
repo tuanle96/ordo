@@ -1,5 +1,15 @@
 import Foundation
 
+enum InlineImageSupport {
+    static let maxBytes = 2_000_000
+    static let limitDescription = "2 MB"
+}
+
+enum InlineBinaryDocumentSupport {
+    static let maxBytes = 1_500_000
+    static let limitDescription = "1.5 MB"
+}
+
 struct RelationValue: Hashable, Identifiable {
     let id: Int
     let label: String
@@ -111,6 +121,11 @@ enum JSONValue: Codable, Hashable {
         }
     }
 
+    var binaryData: Data? {
+        guard let payload = base64Payload else { return nil }
+        return Data(base64Encoded: payload, options: [.ignoreUnknownCharacters])
+    }
+
     var relationValues: [RelationValue] {
         if let relationValue {
             return [relationValue]
@@ -173,5 +188,20 @@ enum JSONValue: Codable, Hashable {
         case .bool:
             return false
         }
+    }
+
+    private var base64Payload: String? {
+        guard case .string(let rawValue) = self else { return nil }
+
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.hasPrefix("data:"),
+           let separator = trimmed.firstIndex(of: ",") {
+            let payloadStart = trimmed.index(after: separator)
+            return String(trimmed[payloadStart...])
+        }
+
+        return trimmed
     }
 }

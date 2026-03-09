@@ -1,9 +1,14 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct EditableFieldRowModel {
     enum Style {
         case text
         case multiline
+        case image
+        case binary(filenameField: String?)
         case priority
         case integer
         case float
@@ -27,6 +32,10 @@ enum EditableFieldFactory {
             return .init(style: .text)
         case .text, .html:
             return .init(style: .multiline)
+        case .image:
+            return .init(style: .image)
+        case .binary:
+            return .init(style: .binary(filenameField: field.filenameField))
         case .priority:
             return .init(style: .priority)
         case .integer:
@@ -93,6 +102,24 @@ struct EditableFieldRow: View {
                     .accessibilityIdentifier("field-editor-\(field.name)")
                 validationText
             }
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .image:
+            ImageFieldEditor(
+                field: field,
+                draft: draft,
+                fallbackValue: fallbackValue,
+                validationMessage: validationMessage,
+                onValueChange: onValueChange
+            )
+            .accessibilityIdentifier("field-row-\(field.name)")
+        case .binary:
+            BinaryDocumentFieldEditor(
+                field: field,
+                draft: draft,
+                fallbackValue: fallbackValue,
+                validationMessage: validationMessage,
+                onValueChange: onValueChange
+            )
             .accessibilityIdentifier("field-row-\(field.name)")
         case .priority:
             VStack(alignment: .leading, spacing: 8) {
@@ -407,6 +434,352 @@ struct EditableFieldRow: View {
             onValueChange(field, value)
         } else {
             draft.setValue(value, for: field.name)
+        }
+    }
+}
+
+private struct BinaryDocumentFieldEditor: View {
+    let field: FieldSchema
+    let draft: FormDraft
+    let fallbackValue: JSONValue?
+    let validationMessage: String?
+    let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
+
+    @State private var isShowingPicker = false
+    @State private var pickerError: String?
+    @State private var isLoading = false
+    @State private var localFilename: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(field.label)
+                .font(.subheadline.weight(.medium))
+
+            Label(currentFilename ?? "No document selected", systemImage: currentDocumentData == nil ? "doc" : "doc.fill")
+                .font(.subheadline)
+                .foregroundStyle(currentDocumentData == nil ? .secondary : .primary)
+                .accessibilityIdentifier("field-document-label-\(field.name)")
+
+            HStack(spacing: 12) {
+                Button(currentDocumentData == nil ? "Choose File" : "Replace File") {
+                    isShowingPicker = true
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isLoading)
+                .accessibilityIdentifier("field-editor-\(field.name)")
+
+                if currentDocumentData != nil {
+                    Button("Clear") {
+                        clearDocument()
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("field-clear-\(field.name)")
+                }
+            }
+
+            Text("Small files only — up to \(InlineBinaryDocumentSupport.limitDescription).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-error-\(field.name)")
+            }
+
+            if let pickerError {
+                Text(pickerError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-picker-error-\(field.name)")
+            }
+        }
+        .sheet(isPresented: $isShowingPicker) {
+            DocumentPickerSheet(
+                onPick: { url in
+                    Task {
+                        await loadDocument(from: url)
+                    }
+                },
+                onCancel: {
+                    isShowingPicker = false
+                }
+            )
+        }
+    }
+
+    private var currentDocumentData: Data? {
+        let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+        return value?.binaryData
+    }
+
+    private var currentFilename: String? {
+        if let filenameField = field.filenameField,
+           let filename = draft.value(for: filenameField, fallback: nil)?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !filename.isEmpty {
+            return filename
+        }
+
+        if let localFilename = localFilename?.trimmingCharacters(in: .whitespacesAndNewlines), !localFilename.isEmpty {
+            return localFilename
+        }
+
+        return currentDocumentData == nil ? nil : "Document attached"
+    }
+
+    private func clearDocument() {
+        pickerError = nil
+        localFilename = nil
+
+        if let filenameField = field.filenameField {
+            draft.setValue(nil, for: filenameField)
+        }
+
+        applyChange(nil)
+    }
+
+    private func loadDocument(from url: URL) async {
+        isLoading = true
+        pickerError = nil
+        defer {
+            isLoading = false
+            isShowingPicker = false
+        }
+
+        let hasScopedAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasScopedAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let filename = try resolvedFilename(from: url)
+            let documentData = try Data(contentsOf: url)
+
+            guard !documentData.isEmpty else {
+                pickerError = "Couldn’t load the selected file."
+                return
+            }
+
+            guard documentData.count <= InlineBinaryDocumentSupport.maxBytes else {
+                pickerError = "\(field.label) must be \(InlineBinaryDocumentSupport.limitDescription) or smaller."
+                return
+            }
+
+            localFilename = filename
+
+            if let filenameField = field.filenameField {
+                draft.setValue(.string(filename), for: filenameField)
+            }
+
+            applyChange(.string(documentData.base64EncodedString()))
+        } catch {
+            pickerError = "Couldn’t load the selected file."
+        }
+    }
+
+    private func resolvedFilename(from url: URL) throws -> String {
+        if let filename = try url.resourceValues(forKeys: [.nameKey]).name?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !filename.isEmpty {
+            return filename
+        }
+
+        let fallback = url.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !fallback.isEmpty else {
+            throw CocoaError(.fileReadUnknown)
+        }
+
+        return fallback
+    }
+
+    private func applyChange(_ value: JSONValue?) {
+        if let onValueChange {
+            onValueChange(field, value)
+        } else {
+            draft.setValue(value, for: field.name)
+        }
+    }
+}
+
+private struct ImageFieldEditor: View {
+    let field: FieldSchema
+    let draft: FormDraft
+    let fallbackValue: JSONValue?
+    let validationMessage: String?
+    let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
+
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var pickerError: String?
+    @State private var isLoading = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(field.label)
+                .font(.subheadline.weight(.medium))
+
+            Group {
+                if let uiImage = currentUIImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .accessibilityIdentifier("field-image-preview-\(field.name)")
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(uiColor: .secondarySystemBackground))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
+                        .overlay {
+                            VStack(spacing: 6) {
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                                Text("No image selected")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityIdentifier("field-image-placeholder-\(field.name)")
+                }
+            }
+
+            HStack(spacing: 12) {
+                PhotosPicker(selection: $selectedItem, matching: .images, photoLibrary: .shared()) {
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(currentImageData == nil ? "Choose Image" : "Replace Image")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isLoading)
+                .accessibilityIdentifier("field-editor-\(field.name)")
+
+                if currentImageData != nil {
+                    Button("Clear") {
+                        pickerError = nil
+                        applyChange(nil)
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("field-clear-\(field.name)")
+                }
+            }
+
+            Text("Small images only — up to \(InlineImageSupport.limitDescription).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-error-\(field.name)")
+            }
+
+            if let pickerError {
+                Text(pickerError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("field-picker-error-\(field.name)")
+            }
+        }
+        .onChange(of: selectedItem) { _, newValue in
+            guard let newValue else { return }
+            Task {
+                await loadImage(from: newValue)
+            }
+        }
+    }
+
+    private var currentImageData: Data? {
+        let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+        return value?.binaryData
+    }
+
+    private var currentUIImage: UIImage? {
+        guard let currentImageData else { return nil }
+        return UIImage(data: currentImageData)
+    }
+
+    private func loadImage(from item: PhotosPickerItem) async {
+        isLoading = true
+        pickerError = nil
+        defer {
+            isLoading = false
+            selectedItem = nil
+        }
+
+        do {
+            guard let imageData = try await item.loadTransferable(type: Data.self), !imageData.isEmpty else {
+                pickerError = "Couldn’t load the selected image."
+                return
+            }
+
+            guard imageData.count <= InlineImageSupport.maxBytes else {
+                pickerError = "\(field.label) must be \(InlineImageSupport.limitDescription) or smaller."
+                return
+            }
+
+            applyChange(.string(imageData.base64EncodedString()))
+        } catch {
+            pickerError = "Couldn’t load the selected image."
+        }
+    }
+
+    private func applyChange(_ value: JSONValue?) {
+        if let onValueChange {
+            onValueChange(field, value)
+        } else {
+            draft.setValue(value, for: field.name)
+        }
+    }
+}
+
+private struct DocumentPickerSheet: UIViewControllerRepresentable {
+    let onPick: (URL) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick, onCancel: onCancel)
+    }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let controller = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
+        controller.delegate = context.coordinator
+        controller.allowsMultipleSelection = false
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let onPick: (URL) -> Void
+        private let onCancel: () -> Void
+
+        init(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+            self.onPick = onPick
+            self.onCancel = onCancel
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else {
+                onCancel()
+                return
+            }
+
+            onPick(url)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            onCancel()
         }
     }
 }

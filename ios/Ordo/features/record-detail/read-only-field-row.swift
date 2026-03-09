@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ReadOnlyFieldRow: View {
     let model: ReadOnlyFieldRowModel
@@ -9,6 +10,8 @@ struct ReadOnlyFieldRow: View {
             row(multiline: false)
         case .multiline:
             row(multiline: true)
+        case .image:
+            imageRow
         case .status:
             LabeledContent(model.label) {
                 Label(model.value, systemImage: "circle.fill")
@@ -60,6 +63,30 @@ struct ReadOnlyFieldRow: View {
                 .multilineTextAlignment(.trailing)
                 .lineLimit(multiline ? nil : 1)
                 .accessibilityIdentifier("field-value-\(model.id)")
+        }
+        .accessibilityIdentifier("field-row-\(model.id)")
+    }
+
+    @ViewBuilder
+    private var imageRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.label)
+                .font(.subheadline.weight(.medium))
+
+            if let previewData = model.previewData,
+               let previewImage = UIImage(data: previewData) {
+                Image(uiImage: previewImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxHeight: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityIdentifier("field-image-\(model.id)")
+            } else {
+                Text(model.value)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("field-value-\(model.id)")
+            }
         }
         .accessibilityIdentifier("field-row-\(model.id)")
     }

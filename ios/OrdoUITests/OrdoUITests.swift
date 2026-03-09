@@ -129,6 +129,33 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testDetailHeaderNameEditFlowPersistsUpdatedValueLocally() throws {
+        let app = makeApp(resetStorage: true)
+        app.launch()
+
+        signIn(app)
+        tapBrowseTab(app)
+        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-model-res-partner"].tap()
+        openFirstRecordDetail(app)
+
+        openEditMode(app)
+
+        let headerNameField = app.textFields["record-header-name-editor"]
+        XCTAssertTrue(headerNameField.waitForExistence(timeout: extendedTimeout))
+        headerNameField.clearAndTypeText("Northwind Studio")
+
+        let saveButton = app.buttons["detail-save-button"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: standardTimeout))
+        saveButton.tap()
+
+        waitForReadOnlyDetail(app)
+        let title = app.staticTexts["record-detail-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: standardTimeout))
+        XCTAssertEqual(title.label, "Northwind Studio")
+    }
+
+    @MainActor
     func testDetailMany2OneSaveFlowPersistsSelectedRelation() throws {
         let app = makeApp(resetStorage: true)
         app.launch()
@@ -426,7 +453,12 @@ final class OrdoUITests: XCTestCase {
         }
 
         XCTAssertTrue(cancelButton.waitForExistence(timeout: extendedTimeout))
-        XCTAssertTrue(app.textFields["field-editor-name"].waitForExistence(timeout: extendedTimeout))
+        let bodyNameEditor = app.textFields["field-editor-name"]
+        let headerNameEditor = app.textFields["record-header-name-editor"]
+        XCTAssertTrue(
+            bodyNameEditor.waitForExistence(timeout: 3)
+                || headerNameEditor.waitForExistence(timeout: extendedTimeout)
+        )
     }
 
     private func openFirstRecordDetail(_ app: XCUIApplication) {

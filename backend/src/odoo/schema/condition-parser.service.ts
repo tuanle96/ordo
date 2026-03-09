@@ -247,7 +247,34 @@ export class ConditionParserService {
             return [{ type: 'constant', constant: tokens[index].value === 'true' }, index + 1];
         }
 
-        return this.parseComparison(tokens, index);
+        if (tokens[index]?.type === 'number') {
+            const constant = this.numericConstant(tokens[index].value);
+            return constant === undefined
+                ? [undefined, index]
+                : [{ type: 'constant', constant }, index + 1];
+        }
+
+        const comparison = this.parseComparison(tokens, index);
+        if (comparison[0]) {
+            return comparison;
+        }
+
+        const fieldToken = tokens[index];
+        if (fieldToken?.type === 'identifier' && this.isBoundaryToken(tokens[index + 1]?.type)) {
+            return [
+                {
+                    type: 'condition',
+                    condition: {
+                        field: fieldToken.value ?? '',
+                        op: '==',
+                        value: true,
+                    },
+                },
+                index + 1,
+            ];
+        }
+
+        return [undefined, index];
     }
 
     private parseComparison(tokens: Token[], index: number): [ConditionRule | undefined, number] {
@@ -537,6 +564,26 @@ export class ConditionParserService {
             default:
                 return undefined;
         }
+    }
+
+    private numericConstant(rawValue?: string): boolean | undefined {
+        switch (rawValue) {
+            case '1':
+                return true;
+            case '0':
+                return false;
+            default:
+                return undefined;
+        }
+    }
+
+    private isBoundaryToken(tokenType?: TokenType): boolean {
+        return tokenType === 'eof'
+            || tokenType === 'rparen'
+            || tokenType === 'and'
+            || tokenType === 'or'
+            || tokenType === 'comma'
+            || tokenType === 'rbracket';
     }
 
     private combine(type: 'and' | 'or', rules: ConditionRule[]): ConditionRule {

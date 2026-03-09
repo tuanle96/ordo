@@ -44,6 +44,31 @@ struct FieldRowFactoryTests {
     }
 
     @Test
+    func imageReadOnlyUsesPreviewStyle() {
+        let field = FieldSchema(name: "image_128", type: .image, label: "Photo", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .string(Self.sampleImageBase64))
+
+        #expect(model?.value == "Image attached")
+        #expect(model?.style == .image)
+        #expect(model?.previewData != nil)
+    }
+
+    @Test
+    func binaryReadOnlyUsesFilenameCompanionWhenPresent() {
+        let field = FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let record: RecordData = [
+            "attachment": .string(Data([0x25, 0x50, 0x44, 0x46]).base64EncodedString()),
+            "attachment_name": .string("invoice.pdf"),
+        ]
+
+        let model = FieldRowFactory.model(for: field, rawValue: record["attachment"], record: record)
+
+        #expect(model?.value == "invoice.pdf")
+        #expect(model?.style == .standard)
+    }
+
+    @Test
     func monetaryUsesConfiguredPrecision() {
         let field = FieldSchema(name: "credit_limit", type: .monetary, label: "Credit Limit", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: "currency_id", placeholder: nil, digits: [16, 2], subfields: nil, searchable: nil, widget: nil)
         let record: RecordData = [
@@ -68,6 +93,8 @@ struct FieldRowFactoryTests {
         let date = FieldSchema(name: "date_order", type: .date, label: "Order Date", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let datetime = FieldSchema(name: "write_date", type: .datetime, label: "Updated", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let html = FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let image = FieldSchema(name: "image_128", type: .image, label: "Photo", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let binary = FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
         let priority = FieldSchema(name: "priority", type: .priority, label: "Priority", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
 
         let many2oneModel = EditableFieldFactory.model(for: many2one)
@@ -79,6 +106,8 @@ struct FieldRowFactoryTests {
         let dateModel = EditableFieldFactory.model(for: date)
         let datetimeModel = EditableFieldFactory.model(for: datetime)
         let htmlModel = EditableFieldFactory.model(for: html)
+        let imageModel = EditableFieldFactory.model(for: image)
+        let binaryModel = EditableFieldFactory.model(for: binary)
         let priorityModel = EditableFieldFactory.model(for: priority)
 
         if case .many2one(let comodel)? = many2oneModel?.style {
@@ -133,6 +162,18 @@ struct FieldRowFactoryTests {
             #expect(htmlModel != nil)
         } else {
             Issue.record("Expected html field to stay editable as multiline text.")
+        }
+
+        if case .image? = imageModel?.style {
+            #expect(imageModel != nil)
+        } else {
+            Issue.record("Expected image field to stay editable.")
+        }
+
+        if case .binary(let filenameField)? = binaryModel?.style {
+            #expect(filenameField == "attachment_name")
+        } else {
+            Issue.record("Expected binary field to stay editable.")
         }
 
         if case .priority? = priorityModel?.style {
@@ -194,5 +235,15 @@ struct FieldRowFactoryTests {
 
         #expect(model?.value == "2 line items")
         #expect(model?.style == .standard)
+    }
+
+    private static var sampleImageBase64: String {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2))
+        let image = renderer.image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        }
+
+        return image.pngData()?.base64EncodedString() ?? ""
     }
 }

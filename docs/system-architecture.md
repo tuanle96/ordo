@@ -198,6 +198,26 @@ The current Phase 01 core-first slice completes the minimum reusable form-engine
 - **Line-level `one2many` validation** now catches missing required values for supported editable subfields before save while intentionally skipping collapsed existing lines that only carry `id`, preserving the current narrow server-record representation
 - **Scope discipline remains explicit**: nested `many2one` / `many2many` inside `one2many`, broad returned-domain application, full x2many onchange parity, and wizard-like line workflows are still deferred follow-up work
 
+## Core-first closeout foundations (2026-03-09)
+
+The post-matrix closeout slice finishes the small but important CRUD/correctness gaps without stretching into media or workflow-specific widgets:
+
+- **Create defaults stay narrow by contract**: backend record routes now expose `GET /records/:model/defaults` and forward only the requested mobile field names to Odoo `default_get`, returning raw `RecordData` instead of fabricating a full record shell
+- **iOS create hydration is now server-backed**: `RecordDetailViewModel` loads schema first, derives a defaults field list from visible mobile fields plus optional statusbar state, hydrates the initial record from server defaults, and still falls back to manual entry if defaults loading fails
+- **Delete parity is intentionally guarded**: the record-detail screen only enables destructive delete when a persisted record is idle, confirms intent before dispatch, removes the deleted record from recent-items state, and dismisses only after a successful backend response
+- **`priority` remains a generic scalar field**: the iOS star control is only a view-layer affordance over the existing draft/change/save path, with no widget-specific backend contract or mutation semantics
+- **Scope discipline remains explicit**: broader `binary`/document upload, signature capture, and statusbar tap-to-change are still deferred because they introduce broader transport or business-state concerns than this closeout slice is meant to solve
+
+## Core-first image-first media widget slice (2026-03-09)
+
+The first honest media step ships `image` support without pretending Ordo already has a full attachment platform:
+
+- **Image support stays iOS-local and transport-light**: record detail now renders bounded read-only previews for `image` fields and edit mode offers choose/replace/clear via the native `PhotosPicker`, while save still reuses the existing create/update mutation payloads
+- **No new backend contract was needed**: image edits travel as the existing `RecordData` string payload, so the current `POST /records/:model` and `PATCH /records/:model/:id` routes remain the only write transport for this slice
+- **Client-side validation is the first guardrail**: `FormDraft` and the image editor reject invalid/oversize inline images before save, with the current MVP capped at **2 MB raw image data** to stay inside the existing request-body envelope while still being usable on-device
+- **Cache and reload pressure stay explicit**: canonical post-save record reload and the 24-hour record cache still store the full returned base64 image payload, so this slice is intentionally limited to small images and record-detail surfaces only
+- **Scope discipline remains explicit**: broader generic `binary` upload, filename/document metadata, signature capture, camera/crop flows, and statusbar tap-to-change remain deferred until there is a dedicated contract or a stronger product need
+
 ## Deferred architecture
 
 The following remain deferred beyond the current scope:

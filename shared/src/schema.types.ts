@@ -76,6 +76,8 @@ export interface FieldSchema {
     selection?: [string, string][];
     /** Present for monetary fields when the record carries a related currency field. */
     currencyField?: string;
+    /** Present for binary fields when Odoo exposes a companion filename field. */
+    filenameField?: string;
     placeholder?: string;
     digits?: [number, number];
     subfields?: FieldSchema[];

@@ -23,7 +23,7 @@ describe('MobileSchemaBuilderService', () => {
                                     <field name="country_id" />
                                     <field name="order_line" />
                                     <field name="category_id" />
-                                    <field name="attachment" />
+                                    <field name="attachment" filename="attachment_name" />
                                     <field name="avatar_128" />
                                     <field name="notes_html" />
                                     <field name="priority" />
@@ -48,6 +48,7 @@ describe('MobileSchemaBuilderService', () => {
             order_line: { type: 'one2many', string: 'Order Lines', relation: 'sale.order.line' },
             category_id: { type: 'many2many', string: 'Tags', relation: 'res.partner.category' },
             attachment: { type: 'binary', string: 'Attachment' },
+            attachment_name: { type: 'char', string: 'Attachment Name' },
             avatar_128: { type: 'image', string: 'Avatar' },
             notes_html: { type: 'html', string: 'Notes' },
             priority: { type: 'priority', string: 'Priority' },
@@ -79,6 +80,9 @@ describe('MobileSchemaBuilderService', () => {
         });
         expect(sectionFields.find((field) => field.name === 'credit_limit')).toEqual(
             expect.objectContaining({ currencyField: 'currency_id', digits: [16, 2] }),
+        );
+        expect(sectionFields.find((field) => field.name === 'attachment')).toEqual(
+            expect.objectContaining({ filenameField: 'attachment_name' }),
         );
     });
 
@@ -256,5 +260,83 @@ describe('MobileSchemaBuilderService', () => {
             },
         ]);
         expect(schema.hasChatter).toBe(true);
+    });
+
+    it('collects title-container name fields before grouped sections for partner forms', () => {
+        const service = new MobileSchemaBuilderService(new ConditionParserService());
+        const xml = `
+            <form string="Partners">
+              <sheet>
+                <field name="avatar_128" invisible="1" />
+                <field name="image_1920" widget="image" />
+                <div class="oe_title">
+                  <field name="is_company" invisible="1" />
+                  <field name="company_type" widget="radio" />
+                  <h1>
+                    <field name="name" invisible="not is_company" required="type == 'contact'" />
+                    <field name="name" invisible="is_company" required="type == 'contact'" />
+                  </h1>
+                </div>
+                <group string="Contact">
+                  <field name="phone" widget="phone" />
+                </group>
+              </sheet>
+            </form>
+        `;
+
+        const schema = service.build('res.partner', xml, {
+            avatar_128: { type: 'image', string: 'Avatar' },
+            image_1920: { type: 'image', string: 'Image' },
+            is_company: { type: 'boolean', string: 'Company' },
+            company_type: { type: 'selection', string: 'Company Type', selection: [['company', 'Company'], ['person', 'Individual']] },
+            name: { type: 'char', string: 'Name', required: true },
+            phone: { type: 'char', string: 'Phone' },
+        });
+
+        expect(schema.sections).toHaveLength(2);
+        expect(schema.sections[0]).toEqual({
+            label: null,
+            fields: [
+                expect.objectContaining({
+                    name: 'is_company',
+                    type: 'boolean',
+                    modifiers: { invisible: { type: 'constant', constant: true } },
+                }),
+                expect.objectContaining({ name: 'company_type', type: 'selection' }),
+                expect.objectContaining({
+                    name: 'name',
+                    type: 'char',
+                    modifiers: expect.objectContaining({
+                        invisible: {
+                            type: 'not',
+                            rules: [
+                                {
+                                    type: 'condition',
+                                    condition: { field: 'is_company', op: '==', value: true },
+                                },
+                            ],
+                        },
+                        required: {
+                            type: 'condition',
+                            condition: { field: 'type', op: '==', value: 'contact' },
+                        },
+                    }),
+                }),
+                expect.objectContaining({
+                    name: 'name',
+                    type: 'char',
+                    modifiers: expect.objectContaining({
+                        invisible: {
+                            type: 'condition',
+                            condition: { field: 'is_company', op: '==', value: true },
+                        },
+                    }),
+                }),
+            ],
+        });
+        expect(schema.sections[1]).toEqual({
+            label: 'Contact',
+            fields: [expect.objectContaining({ name: 'phone', type: 'char', widget: 'phone' })],
+        });
     });
 });

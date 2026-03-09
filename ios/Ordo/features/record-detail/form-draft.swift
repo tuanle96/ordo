@@ -56,9 +56,17 @@ final class FormDraft {
 
             let current = comparableValue(for: field, value: currentRawValue)
             let original = comparableValue(for: field, value: baseline[field.name])
+            let binaryFilenameMutation = binaryFilenameMutation(for: field, baseline: baseline)
 
-            guard current != original else { return }
-            result[field.name] = mutationValue(for: field, value: currentRawValue) ?? .null
+            guard current != original || binaryFilenameMutation != nil else { return }
+
+            if current != original {
+                result[field.name] = mutationValue(for: field, value: currentRawValue) ?? .null
+            }
+
+            if let binaryFilenameMutation {
+                result[binaryFilenameMutation.fieldName] = binaryFilenameMutation.value
+            }
         }
     }
 
@@ -142,6 +150,30 @@ final class FormDraft {
                     errors[field.name] = "\(field.label) must use YYYY-MM-DD HH:MM format."
                     return
                 }
+            case .image:
+                if let rawValue = value(for: field.name, fallback: nil), !rawValue.isVisuallyEmpty {
+                    guard let imageData = rawValue.binaryData, !imageData.isEmpty else {
+                        errors[field.name] = "\(field.label) must be a valid image."
+                        return
+                    }
+
+                    if imageData.count > InlineImageSupport.maxBytes {
+                        errors[field.name] = "\(field.label) must be \(InlineImageSupport.limitDescription) or smaller."
+                        return
+                    }
+                }
+            case .binary:
+                if let rawValue = value(for: field.name, fallback: nil), !rawValue.isVisuallyEmpty {
+                    guard let documentData = rawValue.binaryData, !documentData.isEmpty else {
+                        errors[field.name] = "\(field.label) must be a valid file."
+                        return
+                    }
+
+                    if documentData.count > InlineBinaryDocumentSupport.maxBytes {
+                        errors[field.name] = "\(field.label) must be \(InlineBinaryDocumentSupport.limitDescription) or smaller."
+                        return
+                    }
+                }
             default:
                 break
             }
@@ -161,6 +193,14 @@ final class FormDraft {
                 }
             case .many2one:
                 if normalizedValue == nil {
+                    errors[field.name] = "\(field.label) is required."
+                }
+            case .image:
+                if value(for: field.name, fallback: nil)?.binaryData == nil {
+                    errors[field.name] = "\(field.label) is required."
+                }
+            case .binary:
+                if value(for: field.name, fallback: nil)?.binaryData == nil {
                     errors[field.name] = "\(field.label) is required."
                 }
             case .many2many:
@@ -264,6 +304,25 @@ final class FormDraft {
         default:
             return value
         }
+    }
+
+    private func binaryFilenameMutation(for field: FieldSchema, baseline: RecordData) -> (fieldName: String, value: JSONValue)? {
+        guard field.type == .binary, let filenameField = field.filenameField else {
+            return nil
+        }
+
+        let current = normalizedFilenameValue(from: storage[filenameField] ?? baseline[filenameField])
+        let original = normalizedFilenameValue(from: baseline[filenameField])
+        guard current != original else { return nil }
+        return (filenameField, current ?? .null)
+    }
+
+    private func normalizedFilenameValue(from value: JSONValue?) -> JSONValue? {
+        guard case .string(let rawString)? = value else { return nil }
+
+        let trimmed = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return .string(trimmed)
     }
 
     private func normalizedOnchangeValue(

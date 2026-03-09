@@ -4,6 +4,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     enum Style: Equatable {
         case standard
         case multiline
+        case image
         case status
         case phone
         case email
@@ -15,6 +16,15 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     let label: String
     let value: String
     let style: Style
+    let previewData: Data?
+
+    init(id: String, label: String, value: String, style: Style, previewData: Data? = nil) {
+        self.id = id
+        self.label = label
+        self.value = value
+        self.style = style
+        self.previewData = previewData
+    }
 }
 
 enum FieldRowFactory {
@@ -32,7 +42,9 @@ enum FieldRowFactory {
         .one2many,
         .many2many,
         .monetary,
+        .binary,
         .html,
+        .image,
         .priority,
         .statusbar,
     ]
@@ -42,7 +54,9 @@ enum FieldRowFactory {
 
         let style: ReadOnlyFieldRowModel.Style
         if supportedTypes.contains(field.type) {
-            if field.type == .statusbar {
+            if field.type == .image {
+                style = .image
+            } else if field.type == .statusbar {
                 style = .status
             } else if field.name.contains("phone") || field.name.contains("mobile") {
                 style = .phone
@@ -63,7 +77,8 @@ enum FieldRowFactory {
             id: field.name,
             label: field.label,
             value: formattedValue(for: field, rawValue: rawValue, record: record),
-            style: style
+            style: style,
+            previewData: field.type == .image ? rawValue.binaryData : nil
         )
     }
 
@@ -78,6 +93,14 @@ enum FieldRowFactory {
 
         if field.type == .html {
             return formattedHTMLValue(for: rawValue)
+        }
+
+        if field.type == .image {
+            return rawValue.binaryData == nil ? "Image unavailable" : "Image attached"
+        }
+
+        if field.type == .binary {
+            return formattedBinaryValue(for: field, rawValue: rawValue, record: record)
         }
 
         if field.type == .selection,
@@ -145,6 +168,16 @@ enum FieldRowFactory {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return plainText.isEmpty ? "—" : plainText
+    }
+
+    private static func formattedBinaryValue(for field: FieldSchema, rawValue: JSONValue, record: RecordData?) -> String {
+        if let filenameField = field.filenameField,
+           let filename = record?[filenameField]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !filename.isEmpty {
+            return filename
+        }
+
+        return rawValue.binaryData == nil ? "Document unavailable" : "Document attached"
     }
 
     private static func formattedManyRelationValue(for rawValue: JSONValue) -> String {

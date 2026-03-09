@@ -233,6 +233,93 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func saveImageFieldPostsBase64PayloadAndRefreshesRecord() async throws {
+        var capturedRequest: RecordMutationRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithImage)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecordWithImage)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "PATCH" {
+                capturedRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: try #require(request.httpBody))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 1, record: detailPartnerRecordUpdatedWithImage))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        draft.setValue(.string(sampleImageBase64), for: "image_128")
+
+        let didSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(didSave == true)
+        #expect(capturedRequest?.values["image_128"] == .string(sampleImageBase64))
+        #expect(viewModel.record?["image_128"] == .string(sampleImageBase64))
+        #expect(viewModel.saveMessage == "Changes saved.")
+    }
+
+    @Test
+    func saveBinaryFieldPostsBase64PayloadAndFilenameCompanion() async throws {
+        var capturedRequest: RecordMutationRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithBinaryDocument)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecordWithBinaryDocument)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "PATCH" {
+                capturedRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: try #require(request.httpBody))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 1, record: detailPartnerRecordUpdatedWithBinaryDocument))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        draft.setValue(.string(sampleDocumentBase64), for: "attachment")
+        draft.setValue(.string("quote.pdf"), for: "attachment_name")
+
+        let didSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(didSave == true)
+        #expect(capturedRequest?.values["attachment"] == .string(sampleDocumentBase64))
+        #expect(capturedRequest?.values["attachment_name"] == .string("quote.pdf"))
+        #expect(viewModel.record?["attachment"] == .string(sampleDocumentBase64))
+        #expect(viewModel.record?["attachment_name"] == .string("quote.pdf"))
+        #expect(viewModel.saveMessage == "Changes saved.")
+    }
+
+    @Test
     func applyFieldEditDebouncesOnchangeAndSurfacesWarnings() async throws {
         var capturedRequest: OnchangeRequest?
 
@@ -622,6 +709,30 @@ private let partnerSchemaWithHTMLOnchange = MobileFormSchema(
     hasChatter: false
 )
 
+private let partnerSchemaWithImage = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "image_128", type: .image, label: "Photo", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
+private let partnerSchemaWithBinaryDocument = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let detailPartnerRecord: RecordData = [
     "id": .number(1),
     "display_name": .string("Azure Interior"),
@@ -635,6 +746,39 @@ private let detailPartnerRecordWithHTML: RecordData = [
     "bio": .string("<p>Welcome</p>"),
     "comment": .string("Initial summary"),
 ]
+
+private let detailPartnerRecordWithImage: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "image_128": .null,
+]
+
+private let detailPartnerRecordUpdatedWithImage: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "image_128": .string(sampleImageBase64),
+]
+
+private let detailPartnerRecordWithBinaryDocument: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "attachment": .null,
+    "attachment_name": .null,
+]
+
+private let detailPartnerRecordUpdatedWithBinaryDocument: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "name": .string("Azure Interior"),
+    "attachment": .string(sampleDocumentBase64),
+    "attachment_name": .string("quote.pdf"),
+]
+
+private let sampleImageBase64 = Data([0xFF, 0xD8, 0xFF, 0xD9]).base64EncodedString()
+private let sampleDocumentBase64 = Data([0x25, 0x50, 0x44, 0x46, 0x2D]).base64EncodedString()
 
 private let detailCreatedPartnerRecord: RecordData = [
     "id": .number(99),

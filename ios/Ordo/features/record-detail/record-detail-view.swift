@@ -23,6 +23,10 @@ struct RecordDetailView: View {
         viewModel.isCreating
     }
 
+    private var currentValues: RecordData {
+        draft?.values ?? viewModel.record ?? [:]
+    }
+
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.record == nil {
@@ -89,7 +93,7 @@ struct RecordDetailView: View {
 
                     Section {
                         RecordHeaderCard(
-                            displayName: record["display_name"]?.displayText ?? record["name"]?.displayText ?? (isCreating ? "New \(schema.title)" : schema.title),
+                            displayName: headerDisplayName(schema: schema, record: record),
                             status: {
                                 if let statusField = schema.header.statusbar?.field,
                                    let statusSchema = schema.allFields.first(where: { $0.name == statusField }),
@@ -98,7 +102,10 @@ struct RecordDetailView: View {
                                     return formattedStatus == "—" ? nil : formattedStatus
                                 }
                                 return nil
-                            }()
+                            }(),
+                            isEditing: isEditing,
+                            nameText: headerNameBinding(schema: schema, record: record),
+                            namePlaceholder: headerNameField(in: schema, values: currentValues)?.label
                         )
                     }
 
@@ -134,6 +141,7 @@ struct RecordDetailView: View {
                         record: record,
                         draft: draft,
                         isEditing: isEditing,
+                        hiddenFieldNames: hiddenSchemaFieldNames(schema: schema, values: currentValues),
                         validationErrors: viewModel.validationErrors,
                         onFieldChange: { field, value in
                             guard let draft else { return }
@@ -287,6 +295,51 @@ struct RecordDetailView: View {
         if let record = viewModel.record {
             draft = FormDraft(record: record)
         }
+    }
+
+    private func headerDisplayName(schema: MobileFormSchema, record: RecordData) -> String {
+        let draftName = draft?
+            .value(for: "name", fallback: record["name"])?
+            .stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let draftName, !draftName.isEmpty {
+            return draftName
+        }
+
+        return record["display_name"]?.displayText
+            ?? record["name"]?.displayText
+            ?? (isCreating ? "New \(schema.title)" : schema.title)
+    }
+
+    private func headerNameField(in schema: MobileFormSchema, values: RecordData) -> FieldSchema? {
+        guard isEditing else { return nil }
+
+        return schema.allFields.first { field in
+            field.name == "name"
+                && !field.isInvisible(in: values)
+                && !field.isReadOnly(in: values)
+                && EditableFieldFactory.model(for: field) != nil
+        }
+    }
+
+    private func headerNameBinding(schema: MobileFormSchema, record: RecordData) -> Binding<String>? {
+        guard let draft, let field = headerNameField(in: schema, values: currentValues) else {
+            return nil
+        }
+
+        return Binding(
+            get: {
+                draft.value(for: field.name, fallback: record[field.name])?.stringValue ?? ""
+            },
+            set: { newValue in
+                viewModel.applyFieldEdit(newValue.isEmpty ? nil : .string(newValue), for: field, draft: draft, using: appState)
+            }
+        )
+    }
+
+    private func hiddenSchemaFieldNames(schema: MobileFormSchema, values: RecordData) -> Set<String> {
+        headerNameField(in: schema, values: values) == nil ? [] : ["name"]
     }
 
     private func handleSaveTap() async {

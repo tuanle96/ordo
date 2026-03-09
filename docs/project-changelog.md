@@ -1,5 +1,82 @@
 # Project Changelog
 
+## 2026-03-09 (Core-First Phase 02A — Image-First Media Widget MVP)
+
+### Added
+
+- **Read-only `image` preview support** on iOS record detail so schema-driven forms show a bounded preview instead of hiding or dumping raw base64 payloads
+- **Edit-mode image choose/replace/clear flow** using the native iOS `PhotosPicker`, reusing the existing draft/change/save pipeline instead of inventing a media-specific transport
+- **Inline image payload validation** for required-image rules plus invalid/oversize payload rejection before save
+- **Focused regression coverage** for image read formatting, image required/size validation, and base64 image save + canonical post-save reload behavior
+
+### Changed
+
+- `FieldRowFactory`, `ReadOnlyFieldRow`, and `EditableFieldFactory` now treat `image` as a first-class generic field type across read and edit paths instead of an explicitly deferred widget gap
+- The image MVP intentionally stays on the existing record mutation contract: selected media is stored as a base64-backed `JSONValue.string` in the draft and sent through the current create/update routes with no backend contract expansion
+- The current inline image cap is documented as **2 MB raw image data**, which keeps the MVP inside the existing backend body-limit envelope while avoiding a misleadingly tiny picker threshold for users
+
+### Verified
+
+- Focused tester validation for the shipped image slice passed end-to-end in the iOS unit target: `FieldRowFactoryTests` (8/8), `FormDraftTests` (50/50), and `RecordDetailViewModelTests` (25/25), for **83/83 passing tests total** — see `plans/reports/tester-260309-1340-image-first-media-widget-validation.md`
+
+### Notes
+
+- This completes the **image-first** media step only; broader `binary`/document upload, `signature`, camera/crop flows, and statusbar tap-to-change remain intentionally deferred
+- No backend or shared transport changes were required for this MVP because the existing record mutation envelope already carries the base64 string payload cleanly
+
+## 2026-03-09 (Contact Name Editability Fix)
+
+### Fixed
+
+- **`res.partner` contact name editability** now works for real Odoo partner forms whose `name` fields live inside title/layout containers instead of simple top-level groups
+- **Unary Odoo modifier expressions** such as `is_company`, `not is_company`, and numeric constants like `1` / `0` now parse into the shared mobile modifier contract instead of being dropped during schema generation
+- **iOS record header name editing** now reuses the existing draft/save pipeline in edit mode, so users can update the contact name directly from the header without keeping a duplicate editable name row in the body
+
+### Changed
+
+- `MobileSchemaBuilderService` now traverses common Odoo layout/title containers (`div`, `h1`-`h6`, `span`, `p`) when collecting schema fields, while still keeping grouped sections intact
+- `ConditionParserService` now treats standalone identifiers as truthy conditions and preserves unary negation/constant cases used by real Odoo form modifiers
+- `RecordDetailView` and `SchemaRendererView` now hide the body `name` editor when the header owns the editable contact-name surface, avoiding duplicate edit targets for the same field
+
+### Verified
+
+- `npm run build --workspace backend && npm run test --workspace backend -- --runInBand condition-parser.service.spec.ts mobile-schema-builder.service.spec.ts` — backend compile + focused regression coverage pass
+- `npm run test --workspace backend` — full backend Jest suite passes (`13/13 suites`, `63/63 tests`)
+- Changed Swift files report no editor diagnostics after the header-editing integration (`RecordHeaderCard`, `record-detail-view`, `schema-renderer-view`, `OrdoUITests`)
+
+### Notes
+
+- The backend fix is intentionally narrow to the real Odoo layout pattern observed in `res.partner`; heavily customized addon views using other container tags may still need follow-up traversal support later
+- A targeted iOS UI regression was added for header name editing, but this session's simulator output capture was noisy enough that a clean in-terminal `xcodebuild` success line could not be recorded alongside the green backend results
+
+## 2026-03-09 (Core-First Phase 01 Closeout — Defaults, Delete, Priority)
+
+### Added
+
+- **Narrow create-defaults transport** via `GET /api/v1/mobile/records/:model/defaults?fields=...`, forwarding only the requested mobile field list to Odoo `default_get`
+- **Create-mode defaults hydration** on iOS so schema-driven forms start from real server defaults instead of an invented empty record baseline
+- **Delete parity on iOS record detail** with a destructive confirmation flow, guarded single-flight state, recent-items cleanup, and post-success dismiss
+- **Generic `priority` editor** on iOS as a lightweight star-style control that still reuses the existing draft/change/save pipeline instead of introducing widget-specific backend logic
+- **Focused regression coverage** for backend defaults transport plus iOS create-hydration, delete success/failure, priority edit routing, and recent-item removal behavior
+
+### Changed
+
+- Create-mode detail loading now fetches schema first, derives a narrow defaults field list from the mobile form, and seeds the initial record/draft state from the returned defaults payload
+- Defaults failures are now **explicit but non-fatal** on iOS: the screen falls back to manual entry and surfaces an inline message instead of blocking record creation entirely
+- Persisted records now expose a safe delete affordance only when not creating, saving, deleting, or running a workflow action
+- `RecentItemsStore` now supports targeted removal so deleted records disappear from the recent-items surface immediately after a successful destructive action
+
+### Verified
+
+- `npm test --workspace backend -- --runInBand schema-record-search.e2e.spec.ts odoo-v17.adapter.spec.ts` — focused backend defaults route + adapter regressions pass (`2 suites`, `14 tests`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,id=31564EDD-347C-4B08-94FD-EF52A7A499D0' -only-testing:OrdoTests/RecordDetailViewModelTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/RecentItemsStoreTests test` — focused iOS create/delete/priority/recent-items regressions pass (`** TEST SUCCEEDED **`)
+- Independent code review approved the slice after doc follow-up, confirming narrow contract fit and no blocking regressions in defaults hydration, delete flow, or priority edit reuse
+
+### Notes
+
+- This closes the **Phase 01 closeout foundations** slice without widening into media upload or workflow-state guesswork
+- Broader `binary`, `signature`, and statusbar tap-to-change remain explicitly deferred follow-up work after the image-first follow-up landed
+
 ## 2026-03-09 (Core-First Phase 01 — Generic `one2many` + `monetary` Support)
 
 ### Added

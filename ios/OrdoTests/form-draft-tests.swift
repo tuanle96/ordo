@@ -76,6 +76,81 @@ struct FormDraftTests {
     }
 
     @Test
+    func requiredValidationFlagsMissingImage() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "image_128", type: .image, label: "Photo", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        #expect(draft.validationErrors(for: fields)["image_128"] == "Photo is required.")
+
+        draft.setValue(.string(Data([0xFF, 0xD8, 0xFF, 0xD9]).base64EncodedString()), for: "image_128")
+
+        #expect(draft.validationErrors(for: fields)["image_128"] == nil)
+    }
+
+    @Test
+    func imagePayloadValidationRejectsOversizedInlineImage() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "image_128", type: .image, label: "Photo", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.string(Data(repeating: 7, count: InlineImageSupport.maxBytes + 1).base64EncodedString()), for: "image_128")
+
+        #expect(draft.validationErrors(for: fields)["image_128"] == "Photo must be \(InlineImageSupport.limitDescription) or smaller.")
+    }
+
+    @Test
+    func requiredValidationFlagsMissingBinaryDocument() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        #expect(draft.validationErrors(for: fields)["attachment"] == "Attachment is required.")
+
+        draft.setValue(.string(Data([0x25, 0x50, 0x44, 0x46]).base64EncodedString()), for: "attachment")
+        draft.setValue(.string("quote.pdf"), for: "attachment_name")
+
+        #expect(draft.validationErrors(for: fields)["attachment"] == nil)
+    }
+
+    @Test
+    func binaryPayloadValidationRejectsOversizedInlineDocument() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.string(Data(repeating: 9, count: InlineBinaryDocumentSupport.maxBytes + 1).base64EncodedString()), for: "attachment")
+
+        #expect(draft.validationErrors(for: fields)["attachment"] == "Attachment must be \(InlineBinaryDocumentSupport.limitDescription) or smaller.")
+    }
+
+    @Test
+    func binaryChangedValuesIncludeFilenameCompanionWhenPresent() {
+        let baseline: RecordData = [
+            "attachment": .string(Data([0x41]).base64EncodedString()),
+            "attachment_name": .string("old.pdf"),
+        ]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "attachment", type: .binary, label: "Attachment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, filenameField: "attachment_name", placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.string(Data([0x42, 0x43]).base64EncodedString()), for: "attachment")
+        draft.setValue(.string("invoice.pdf"), for: "attachment_name")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "attachment": .string(Data([0x42, 0x43]).base64EncodedString()),
+            "attachment_name": .string("invoice.pdf"),
+        ])
+    }
+
+    @Test
     func many2oneChangedValuesNormalizeToRelationID() {
         let baseline: RecordData = [
             "country_id": .relation(id: 233, label: "United States"),

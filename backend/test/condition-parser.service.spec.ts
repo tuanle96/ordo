@@ -9,6 +9,12 @@ describe('ConditionParserService', () => {
             op: '==',
             value: 'done',
         });
+
+        expect(service.parseInvisible('is_company')).toEqual({
+            field: 'is_company',
+            op: '==',
+            value: true,
+        });
     });
 
     it('parses list invisible expressions', () => {
@@ -47,6 +53,21 @@ describe('ConditionParserService', () => {
                 },
             ],
         });
+
+        expect(service.parseRule('not is_company')).toEqual({
+            type: 'not',
+            rules: [
+                {
+                    type: 'condition',
+                    condition: { field: 'is_company', op: '==', value: true },
+                },
+            ],
+        });
+    });
+
+    it('parses numeric constants used by Odoo invisibility flags', () => {
+        expect(service.parseRule('1')).toEqual({ type: 'constant', constant: true });
+        expect(service.parseRule('0')).toEqual({ type: 'constant', constant: false });
     });
 
     it('parses Odoo prefix domain arrays into rule trees', () => {

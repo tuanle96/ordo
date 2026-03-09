@@ -17,6 +17,26 @@ import { ConditionParserService } from './condition-parser.service';
 
 @Injectable()
 export class MobileSchemaBuilderService {
+    private readonly layoutContainerKeys = ['div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'p'] as const;
+
+    private readonly preGroupFieldTypes = new Set<FieldSchema['type']>([
+        'char',
+        'text',
+        'integer',
+        'float',
+        'boolean',
+        'selection',
+        'date',
+        'datetime',
+        'many2one',
+        'one2many',
+        'many2many',
+        'monetary',
+        'html',
+        'priority',
+        'signature',
+    ]);
+
     private readonly supportedFieldTypes = new Set<FieldSchema['type']>([
         'char',
         'text',
@@ -111,12 +131,20 @@ export class MobileSchemaBuilderService {
             return fields.length > 0 ? [{ label: null, fields }] : [];
         }
 
-        return groups
+        const ungroupedFields = this.collectUngroupedFields(container, fieldsMeta, containerInvisible)
+            .filter((field) => this.preGroupFieldTypes.has(field.type));
+
+        const groupedSections = groups
             .map((group) => ({
                 label: group['@_string'] ? String(group['@_string']) : null,
                 fields: this.collectFields(group, fieldsMeta, containerInvisible),
             }))
             .filter((section) => section.fields.length > 0);
+
+        return [
+            ...(ungroupedFields.length > 0 ? [{ label: null, fields: ungroupedFields }] : []),
+            ...groupedSections,
+        ];
     }
 
     private buildTabs(
@@ -142,8 +170,37 @@ export class MobileSchemaBuilderService {
         inheritedInvisible?: ConditionRule,
     ): FieldSchema[] {
         const directFields = this.asArray(container?.field).map((field) => this.toFieldSchema(field, fieldsMeta, inheritedInvisible));
+        const layoutFields = this.collectNestedContainerFields(container, fieldsMeta, inheritedInvisible, false);
         const nestedFields = this.asArray(container?.group).flatMap((group) => this.collectFields(group, fieldsMeta, this.mergeRules('or', inheritedInvisible, this.nodeInvisibleRule(group))));
-        return [...directFields, ...nestedFields].filter((field): field is FieldSchema => Boolean(field));
+        return [...directFields, ...layoutFields, ...nestedFields].filter((field): field is FieldSchema => Boolean(field));
+    }
+
+    private collectUngroupedFields(
+        container: XmlNode | undefined,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+        inheritedInvisible?: ConditionRule,
+    ): FieldSchema[] {
+        const directFields = this.asArray(container?.field).map((field) => this.toFieldSchema(field, fieldsMeta, inheritedInvisible));
+        const layoutFields = this.collectNestedContainerFields(container, fieldsMeta, inheritedInvisible, true);
+        return [...directFields, ...layoutFields].filter((field): field is FieldSchema => Boolean(field));
+    }
+
+    private collectNestedContainerFields(
+        container: XmlNode | undefined,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+        inheritedInvisible: ConditionRule | undefined,
+        excludeGroups: boolean,
+    ): FieldSchema[] {
+        return this.childContainers(container).flatMap((child) => {
+            const childInvisible = this.mergeRules('or', inheritedInvisible, this.nodeInvisibleRule(child));
+            return excludeGroups
+                ? this.collectUngroupedFields(child, fieldsMeta, childInvisible)
+                : this.collectFields(child, fieldsMeta, childInvisible);
+        });
+    }
+
+    private childContainers(container: XmlNode | undefined): XmlNode[] {
+        return this.layoutContainerKeys.flatMap((key) => this.asArray(container?.[key]));
     }
 
     private toFieldSchema(
@@ -179,11 +236,29 @@ export class MobileSchemaBuilderService {
             comodel: meta.relation,
             selection: meta.selection,
             currencyField: meta.currency_field,
+            filenameField: this.extractFilenameField(fieldNode, meta, fieldsMeta),
             digits: meta.digits,
             subfields: subfields.length > 0 ? subfields : undefined,
             searchable: meta.type === 'many2one' || meta.type === 'many2many',
             widget: fieldNode['@_widget'],
         };
+    }
+
+    private extractFilenameField(
+        fieldNode: XmlNode,
+        meta: OdooFieldMeta,
+        fieldsMeta: Record<string, OdooFieldMeta>,
+    ): string | undefined {
+        if (this.normalizeFieldType(meta.type, fieldNode['@_widget']) !== 'binary') {
+            return undefined;
+        }
+
+        const filenameField = this.firstNonEmptyString(fieldNode['@_filename']);
+        if (!filenameField) {
+            return undefined;
+        }
+
+        return fieldsMeta[filenameField] ? filenameField : undefined;
     }
 
     private buildFieldModifiers(

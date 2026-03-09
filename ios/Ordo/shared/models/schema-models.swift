@@ -135,6 +135,7 @@ struct FieldSchema: Codable, Hashable {
     let comodel: String?
     let selection: [[String]]?
     let currencyField: String?
+    let filenameField: String?
     let placeholder: String?
     let digits: [Int]?
     let subfields: [FieldSchema]?
@@ -154,6 +155,7 @@ struct FieldSchema: Codable, Hashable {
         comodel: String? = nil,
         selection: [[String]]? = nil,
         currencyField: String? = nil,
+        filenameField: String? = nil,
         placeholder: String? = nil,
         digits: [Int]? = nil,
         subfields: [FieldSchema]? = nil,
@@ -172,6 +174,7 @@ struct FieldSchema: Codable, Hashable {
         self.comodel = comodel
         self.selection = selection
         self.currencyField = currencyField
+        self.filenameField = filenameField
         self.placeholder = placeholder
         self.digits = digits
         self.subfields = subfields
@@ -220,6 +223,7 @@ struct MobileFormSchema: Codable, Hashable {
 
     var requestedFieldNames: [String] {
         var fields = allFields.map(\.name)
+        fields.append(contentsOf: allFields.compactMap(\.filenameField))
 
         if let statusField = header.statusbar?.field {
             fields.append(statusField)

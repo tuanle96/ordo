@@ -5,6 +5,7 @@ struct SchemaRendererView: View {
     let record: RecordData
     var draft: FormDraft? = nil
     var isEditing = false
+    var hiddenFieldNames: Set<String> = []
     var validationErrors: [String: String] = [:]
     var onFieldChange: ((FieldSchema, JSONValue?) -> Void)? = nil
 
@@ -15,6 +16,7 @@ struct SchemaRendererView: View {
                 record: record,
                 draft: draft,
                 isEditing: isEditing,
+                hiddenFieldNames: hiddenFieldNames,
                 validationErrors: validationErrors,
                 onFieldChange: onFieldChange,
                 title: section.label ?? "Details",
@@ -29,6 +31,7 @@ struct SchemaRendererView: View {
                     record: record,
                     draft: draft,
                     isEditing: isEditing,
+                    hiddenFieldNames: hiddenFieldNames,
                     validationErrors: validationErrors,
                     onFieldChange: onFieldChange,
                     title: section.label ?? tab.label,
@@ -44,6 +47,7 @@ private struct SchemaSectionView: View {
     let record: RecordData
     let draft: FormDraft?
     let isEditing: Bool
+    let hiddenFieldNames: Set<String>
     let validationErrors: [String: String]
     let onFieldChange: ((FieldSchema, JSONValue?) -> Void)?
     let title: String
@@ -54,7 +58,9 @@ private struct SchemaSectionView: View {
     }
 
     private var fields: [FieldSchema] {
-        section.fields.filter { !$0.isInvisible(in: values) }
+        section.fields.filter { field in
+            !hiddenFieldNames.contains(field.name) && !field.isInvisible(in: values)
+        }
     }
 
     private var rows: [FieldSchema] {
