@@ -18,8 +18,8 @@ struct FieldRowFactoryTests {
 
         let model = FieldRowFactory.model(for: field, rawValue: .string("<p>Hello</p>"))
 
-        #expect(model?.value == "<p>Hello</p>")
-        #expect(model?.style == .unsupported(.html))
+        #expect(model?.value == "Hello")
+        #expect(model?.style == .multiline)
     }
 
     @Test
@@ -76,6 +76,7 @@ struct FieldRowFactoryTests {
         let floatModel = EditableFieldFactory.model(for: float)
         let dateModel = EditableFieldFactory.model(for: date)
         let datetimeModel = EditableFieldFactory.model(for: datetime)
+        let htmlModel = EditableFieldFactory.model(for: html)
 
         if case .many2one(let comodel)? = many2oneModel?.style {
             #expect(comodel == "res.country")
@@ -125,7 +126,21 @@ struct FieldRowFactoryTests {
             Issue.record("Expected datetime field to stay editable.")
         }
 
-        #expect(EditableFieldFactory.model(for: html) == nil)
+        if case .multiline? = htmlModel?.style {
+            #expect(htmlModel != nil)
+        } else {
+            Issue.record("Expected html field to stay editable as multiline text.")
+        }
+    }
+
+    @Test
+    func htmlReadOnlyUsesPlainTextFallback() {
+        let field = FieldSchema(name: "terms", type: .html, label: "Terms", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .string("<div><strong>Pay</strong> now</div>"))
+
+        #expect(model?.value == "Pay now")
+        #expect(model?.style == .multiline)
     }
 
     @Test

@@ -314,6 +314,54 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func htmlFieldEditTriggersDebouncedOnchange() async throws {
+        var capturedRequest: OnchangeRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithHTMLOnchange)))
+            }
+
+            if path.contains("/records/res.partner/1") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailPartnerRecordWithHTML)))
+            }
+
+            if path.hasSuffix("/records/res.partner/onchange") && request.httpMethod == "POST" {
+                capturedRequest = try JSONDecoder().decode(OnchangeRequest.self, from: try #require(request.httpBody))
+                return (201, try JSONEncoder().encode(DetailEnvelope(data: OnchangeResult(
+                    values: ["comment": .string("Server summary")],
+                    warnings: [OnchangeWarning(title: "Updated", message: "Summary refreshed.", type: "warning")],
+                    domains: nil
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: 1)
+        await viewModel.load(using: appState)
+
+        let draft = try #require(viewModel.startEditing())
+        let bioField = try #require(viewModel.schema?.allFields.first(where: { $0.name == "bio" }))
+
+        viewModel.applyFieldEdit(.string("<p>Updated bio</p>"), for: bioField, draft: draft, using: appState)
+        await viewModel.waitForOnchangeToSettle()
+
+        #expect(capturedRequest?.triggerField == "bio")
+        #expect(capturedRequest?.recordId == 1)
+        #expect(capturedRequest?.values["bio"] == .string("<p>Updated bio</p>"))
+        #expect(draft.value(for: "comment", fallback: nil) == .string("Server summary"))
+        #expect(viewModel.onchangeWarnings.first?.message == "Summary refreshed.")
+    }
+
+    @Test
     func visibleWorkflowActionsRespectCurrentRecordState() async throws {
         DetailViewModelTestURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
@@ -432,11 +480,30 @@ private let partnerSchemaWithOnchange = MobileFormSchema(
     hasChatter: false
 )
 
+private let partnerSchemaWithHTMLOnchange = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "bio", type: .html, label: "Biography", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "bio", source: "view", dependencies: ["comment"], mergeReturnedValue: true), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "comment", type: .char, label: "Comment", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let detailPartnerRecord: RecordData = [
     "id": .number(1),
     "display_name": .string("Azure Interior"),
     "name": .string("Azure Interior"),
     "nickname": .string("VIP 1"),
+]
+
+private let detailPartnerRecordWithHTML: RecordData = [
+    "id": .number(1),
+    "display_name": .string("Azure Interior"),
+    "bio": .string("<p>Welcome</p>"),
+    "comment": .string("Initial summary"),
 ]
 
 private let detailCreatedPartnerRecord: RecordData = [

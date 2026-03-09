@@ -24,7 +24,7 @@ enum EditableFieldFactory {
         switch field.type {
         case .char:
             return .init(style: .text)
-        case .text:
+        case .text, .html:
             return .init(style: .multiline)
         case .integer:
             return .init(style: .integer)

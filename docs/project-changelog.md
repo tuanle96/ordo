@@ -6,6 +6,8 @@
 
 - **Narrow generic `one2many` foundation** on iOS record detail forms with read-only line-count display, inline local line editing, and Odoo command encoding for create/update/delete
 - **Generic `monetary` field support** on iOS with schema-driven decimal editing, required/invalid-value validation, and read-only currency-aware formatting via `currencyField`
+- **Generic `html` field support** on iOS with multiline editing, safe plain-text read-only fallback, and parity with debounced onchange handling
+- **Canonical mobile-safe field matrix** documented in shared contracts and locked by backend schema-builder regression coverage for supported and fallback-normalized Odoo field types
 - **Focused regression coverage** for `one2many` command encoding, required validation, read-only summaries, `monetary` normalization, `monetary` validation, and editability routing
 
 ### Changed
@@ -13,17 +15,25 @@
 - `FormDraft` now treats `one2many` and `monetary` as first-class generic field types instead of unsupported or partially-normalized values
 - Read-only schema rendering now receives full record context so `monetary` values can display the linked currency label when available
 - Editable field routing now recognizes `monetary` alongside the existing primitive, relation, and narrow `one2many` editors
+- Read-only HTML rendering now strips markup into a plain-text fallback instead of surfacing raw tags, while edit mode reuses the generic multiline editor
+- Monetary fields now use the same debounced onchange path as other typed text-entry fields, so server-backed recompute behavior stays consistent with normalized decimal draft values
+- HTML fields now use that same debounced onchange path, keeping text-heavy server recompute flows consistent without introducing a special editor path
 
 ### Verified
 
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused form-engine regression suite passes (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordDetailViewModelTests -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests test` — focused detail/onchange + form-engine suites pass, including monetary onchange debounce regression
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FieldRowFactoryTests test` — focused formatter/editability suite passes, including the new HTML plain-text fallback regression
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app builds cleanly after both generic field slices
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build` — iOS app still builds cleanly after adding generic HTML field support
+- `npm run build` — shared + backend compile cleanly after codifying the canonical field matrix in shared contracts
+- `npm test` — shared type-check and backend Jest suite pass after the new mobile schema-builder matrix regression (`13/13 suites`, `59/59 tests`)
 - Independent code review approved both slices for merge with no blocking findings; reports live under `plans/260309-0850-core-first-platform/reports/`
 
 ### Notes
 
 - This work stays intentionally **core-first**: no module-specific widgets, no `one2many` wizard parity, and no offline/sync expansion yet
-- Remaining Phase 01 work is still open: complete supported field matrix definition, any leftover renderer/editor gaps, payload normalization cleanup, and broader regression coverage
+- Remaining Phase 01 work is still open: close any leftover renderer/editor gaps, finish payload normalization cleanup, and broaden regression coverage beyond the current matrix + field-slice seams
 
 ## 2026-03-09 (Explicit Auth Logout)
 

@@ -18,7 +18,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
 }
 
 enum FieldRowFactory {
-    private static let multilineTypes: Set<FieldType> = [.text]
+    private static let multilineTypes: Set<FieldType> = [.text, .html]
     private static let supportedTypes: Set<FieldType> = [
         .char,
         .text,
@@ -32,6 +32,7 @@ enum FieldRowFactory {
         .one2many,
         .many2many,
         .monetary,
+        .html,
         .priority,
         .statusbar,
     ]
@@ -73,6 +74,10 @@ enum FieldRowFactory {
 
         if field.type == .monetary {
             return formattedMonetaryValue(for: field, rawValue: rawValue, record: record)
+        }
+
+        if field.type == .html {
+            return formattedHTMLValue(for: rawValue)
         }
 
         if field.type == .selection,
@@ -122,6 +127,24 @@ enum FieldRowFactory {
         }
 
         return "\(currencyLabel) \(formattedAmount)"
+    }
+
+    private static func formattedHTMLValue(for rawValue: JSONValue) -> String {
+        guard let html = rawValue.stringValue, !html.isEmpty else {
+            return rawValue.displayText
+        }
+
+        let plainText = html
+            .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return plainText.isEmpty ? "—" : plainText
     }
 
     private static func formattedManyRelationValue(for rawValue: JSONValue) -> String {
