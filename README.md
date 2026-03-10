@@ -125,10 +125,12 @@ For full details:
 - [`docs/project-roadmap.md`](docs/project-roadmap.md)
 - [`docs/project-changelog.md`](docs/project-changelog.md)
 - [`docs/system-architecture.md`](docs/system-architecture.md)
+- [`docs/add-odoo-community-module-support.md`](docs/add-odoo-community-module-support.md)
 
 ## Contributing
 
 PRs are welcome. Keep changes focused, run relevant validation, and use [Conventional Commits](https://www.conventionalcommits.org/).
+If you are onboarding support for a new Odoo app/module, start with [`docs/add-odoo-community-module-support.md`](docs/add-odoo-community-module-support.md).
 
 ## License
 

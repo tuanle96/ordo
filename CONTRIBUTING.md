@@ -26,12 +26,13 @@ By contributing to Ordo, you agree that your contributions will be licensed unde
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature`
 3. Make your changes following the coding standards below
-4. Write/update tests as needed
-5. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
+4. If you are adding support for a new Odoo Community module, follow [`docs/add-odoo-community-module-support.md`](docs/add-odoo-community-module-support.md)
+5. Write/update tests as needed
+6. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
    - `feat: add barcode scanner`
    - `fix: resolve login crash on iOS 17`
    - `docs: update API reference`
-6. Push and open a Pull Request
+7. Push and open a Pull Request
 
 ### Development Setup
 

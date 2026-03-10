@@ -1,5 +1,21 @@
 # Project Changelog
 
+## 2026-03-10 (Contributor Guide — Add Odoo Community Module Support)
+
+### Added
+
+- New contributor-facing technical guide at `docs/add-odoo-community-module-support.md` covering how to add support for any new Odoo Community module without breaking Ordo's model-agnostic architecture
+- Explicit guidance for choosing between registration-only changes, generic engine work, shared contract changes, and deliberate module-specific UX
+- Practical validation matrix and PR checklist for new module onboarding slices
+
+### Changed
+
+- `README.md` and `CONTRIBUTING.md` now point contributors to the new module-support guide instead of leaving module onboarding as tribal knowledge
+
+### Notes
+
+- The guide documents the current real seams contributors must check, including backend module gating in `backend/src/modules/module/module.service.ts`, iOS browse registration in `ios/Ordo/features/browse/model-registry.swift`, and browse-filter fallback behavior in `ios/Ordo/features/browse/filter-models.swift`
+
 ## 2026-03-10 (iOS Core-Engine Polish Slice)
 
 ### Added
