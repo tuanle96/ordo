@@ -1,7 +1,7 @@
 import { BadGatewayException, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 
-import { OdooRpcService } from '../src/odoo/rpc/odoo-rpc.service';
+import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
 
 describe('OdooRpcService', () => {
     it('falls back to group_ids when groups_id is invalid upstream', async () => {

@@ -17,7 +17,7 @@ The default assumption should be:
 
 ## Ownership map
 
-- `shared/` owns transport contracts shared across backend and clients
+- `backend/src/shared/` owns transport type contracts used by the backend
 - `backend/` owns Odoo normalization, schema parsing, record/chatter/action routes, and module detection
 - `ios/` owns browse registration, list/detail UX, and generic editor/renderer behavior
 - `docs/` owns the public support boundary and contributor guidance
@@ -61,14 +61,14 @@ If the gap is generic, fix it generically. Do not hardcode the new module unless
 
 ### Shared contract change
 
-Only widen `shared/` when the transport contract must change across layers.
+Only widen `backend/src/shared/` when the transport contract must change across layers.
 
 Examples:
 
-- new schema metadata needed by both backend and iOS
+- new schema metadata needed by the backend
 - new API response/request fields required by the client
 
-Do **not** change `shared/` just to avoid a small local refactor.
+Do **not** change `backend/src/shared/` just to avoid a small local refactor.
 
 ## Step-by-step workflow
 
@@ -171,7 +171,7 @@ Do this only to improve fallback behavior, not to replace working schema-driven 
 
 Potential owning areas:
 
-- `shared/src/` for transport metadata
+- `backend/src/shared/` for transport metadata
 - `backend/src/odoo/schema/` for schema extraction/parsing
 - `backend/src/modules/schema/` and `backend/src/modules/record/` for route behavior
 - `ios/Ordo/features/record-detail/` for generic read/edit/render logic
@@ -217,7 +217,7 @@ If the change affects contributor workflow, update:
 
 - Treating one successful model as proof that the whole module is supported
 - Adding module-specific UI before confirming the generic engine cannot represent the workflow
-- Changing `shared/` for convenience instead of necessity
+- Changing `backend/src/shared/` for convenience instead of necessity
 - Forgetting backend module gating while adding `requiredModule` on iOS
 - Relying on the current graceful-degradation path where failed module detection can temporarily expose all registered models
 - Claiming parity with unsupported Odoo widgets, wizard flows, or advanced x2many behavior

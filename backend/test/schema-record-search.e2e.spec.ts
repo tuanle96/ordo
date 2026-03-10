@@ -1,11 +1,11 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
-import { RecordService } from '../src/modules/record/record.service';
-import { SchemaService } from '../src/modules/schema/schema.service';
-import { odooFixtures } from './fixtures/odoo.fixtures';
-import { createAccessToken } from './helpers/create-access-token';
-import { createTestApp } from './helpers/create-test-app';
+import { RecordService } from '@app/modules/record/record.service';
+import { SchemaService } from '@app/modules/schema/schema.service';
+import { odooFixtures } from '@test/fixtures/odoo.fixtures';
+import { createAccessToken } from '@test/helpers/create-access-token';
+import { createTestApp } from '@test/helpers/create-test-app';
 
 describe('Schema, record, and search endpoints', () => {
     let app: INestApplication;

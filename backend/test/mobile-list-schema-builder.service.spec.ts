@@ -1,5 +1,5 @@
-import { ConditionParserService } from '../src/odoo/schema/condition-parser.service';
-import { MobileListSchemaBuilderService } from '../src/odoo/schema/mobile-list-schema-builder.service';
+import { ConditionParserService } from '@app/odoo/schema/condition-parser.service';
+import { MobileListSchemaBuilderService } from '@app/odoo/schema/mobile-list-schema-builder.service';
 
 describe('MobileListSchemaBuilderService', () => {
     it('maps a tree view into ordered list columns with widgets and visibility flags', () => {

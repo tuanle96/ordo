@@ -1,4 +1,4 @@
-import type { ApiError, ApiResponseMeta } from '../../shared';
+import type { ApiError, ApiResponseMeta } from '@app/shared';
 
 export class ApiResponseDto<T> {
     constructor(

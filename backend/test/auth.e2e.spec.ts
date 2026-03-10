@@ -1,10 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
-import { AuthService } from '../src/modules/auth/auth.service';
-import { odooFixtures } from './fixtures/odoo.fixtures';
-import { createAccessToken } from './helpers/create-access-token';
-import { createTestApp } from './helpers/create-test-app';
+import { AuthService } from '@app/modules/auth/auth.service';
+import { odooFixtures } from '@test/fixtures/odoo.fixtures';
+import { createAccessToken } from '@test/helpers/create-access-token';
+import { createTestApp } from '@test/helpers/create-test-app';
 
 describe('Auth endpoints', () => {
     let app: INestApplication;

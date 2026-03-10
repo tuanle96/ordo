@@ -2,7 +2,7 @@ import { Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pino, { type Logger } from 'pino';
 
-import { createPinoOptions } from './pino.config';
+import { createPinoOptions } from '@app/common/logging/pino.config';
 
 @Injectable()
 export class PinoLoggerService implements LoggerService {

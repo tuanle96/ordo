@@ -5,23 +5,19 @@ FROM node:22-alpine AS dev
 
 WORKDIR /app
 
-# Copy workspace root config
-COPY package.json package-lock.json tsconfig.base.json ./
-
-# Copy backend package
-COPY backend/package.json backend/tsconfig.json backend/tsconfig.build.json backend/nest-cli.json ./backend/
-
-# Install all dependencies (including devDependencies)
+# Copy package files and install dependencies
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy backend source (will be overridden by volume mount in dev)
-COPY backend/src ./backend/src
+# Copy config and source (will be overridden by volume mount in dev)
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
+COPY src ./src
 
 # Expose the dev port
 EXPOSE 38424
 
 # Start NestJS in watch mode
-CMD ["npm", "run", "start:dev", "--workspace", "backend"]
+CMD ["npm", "run", "start:dev"]
 
 # ============================================================
 # Stage 2: Build (compile TypeScript for production)
@@ -30,11 +26,12 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY backend/ ./backend/
+COPY package.json package-lock.json ./
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
+COPY src ./src
 
 RUN npm ci
-RUN npm run build --workspace backend
+RUN npm run build
 
 # Prune devDependencies
 RUN npm prune --production
@@ -47,13 +44,12 @@ FROM node:22-alpine AS production
 WORKDIR /app
 
 # Copy only what's needed to run
-COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/backend/package.json ./backend/package.json
-COPY --from=build /app/backend/dist ./backend/dist
+COPY --from=build /app/dist ./dist
 
 EXPOSE 38424
 
 ENV NODE_ENV=production
 
-CMD ["node", "backend/dist/main.js"]
+CMD ["node", "dist/main.js"]

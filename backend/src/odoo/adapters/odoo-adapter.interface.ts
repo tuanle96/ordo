@@ -11,11 +11,11 @@ import type {
     RecordData,
     RecordListQuery,
     RecordListResult,
-} from '../../shared';
+} from '@app/shared';
 
-import type { InstalledModuleInfo } from '../../modules/module/module.types';
+import type { InstalledModuleInfo } from '@app/modules/module/module.types';
 
-import type { OdooSessionContext } from '../session/odoo-session.types';
+import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
 export interface OdooAdapter {
     readonly version: string;

@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 
-import { OdooSessionStoreService } from '../src/odoo/session/odoo-session-store.service';
+import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.service';
 
 class FakeRedisService {
     private readonly store = new Map<string, { value: string; expiresAt: number }>();

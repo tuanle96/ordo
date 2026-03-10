@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { RecordData } from '../../shared';
+import type { RecordData } from '@app/shared';
 
 import type {
     DetectedOdooVersion,
@@ -22,8 +22,8 @@ import type {
     OdooOnchangeResponse,
     OdooRpcAuthRequest,
     OdooVersionInfo,
-} from './odoo-rpc.types';
-import type { OdooAuthenticatedSession } from '../session/odoo-session.types';
+} from '@app/odoo/rpc/odoo-rpc.types';
+import type { OdooAuthenticatedSession } from '@app/odoo/session/odoo-session.types';
 
 @Injectable()
 export class OdooRpcService {

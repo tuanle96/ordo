@@ -1,6 +1,6 @@
 import { BadGatewayException } from '@nestjs/common';
 
-import { OdooV17Adapter } from '../src/odoo/adapters/odoo-v17.adapter';
+import { OdooV17Adapter } from '@app/odoo/adapters/odoo-v17.adapter';
 
 describe('OdooV17Adapter onchange', () => {
     it('loads narrow default values through default_get', async () => {

@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
-import type { TokenPayload } from '../../src/shared';
+import type { TokenPayload } from '@app/shared';
 
 export async function createAccessToken(
     app: INestApplication,

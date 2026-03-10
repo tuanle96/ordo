@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import { OdooModule } from '../../odoo/odoo.module';
-import { RecordController } from './record.controller';
-import { RecordService } from './record.service';
-import { SearchController } from './search.controller';
+import { OdooModule } from '@app/odoo/odoo.module';
+import { RecordController } from '@app/modules/record/record.controller';
+import { RecordService } from '@app/modules/record/record.service';
+import { SearchController } from '@app/modules/record/search.controller';
 
 @Module({
     imports: [OdooModule],

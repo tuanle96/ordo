@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
-import { OdooModule } from '../../odoo/odoo.module';
-import { AuthController } from './auth.controller';
-import { JwtAuthGuard } from './auth.guard';
-import { AuthService } from './auth.service';
-import { JwtStrategy } from './jwt.strategy';
+import { OdooModule } from '@app/odoo/odoo.module';
+import { AuthController } from '@app/modules/auth/auth.controller';
+import { JwtAuthGuard } from '@app/modules/auth/auth.guard';
+import { AuthService } from '@app/modules/auth/auth.service';
+import { JwtStrategy } from '@app/modules/auth/jwt.strategy';
 
 @Module({
     imports: [

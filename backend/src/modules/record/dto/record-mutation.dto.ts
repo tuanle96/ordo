@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsArray, IsObject, IsOptional } from 'class-validator';
 
-import type { RecordData, RecordMutationRequest } from '../../../shared';
+import type { RecordData, RecordMutationRequest } from '@app/shared';
 
 export class RecordMutationDto implements RecordMutationRequest {
     @IsObject()

@@ -12,21 +12,21 @@ import type {
     RecordListResult,
     RecordMutationResult,
     TokenPayload,
-} from '../../shared';
+} from '@app/shared';
 
-import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
-import type { OdooAdapter } from '../../odoo/adapters/odoo-adapter.interface';
-import type { OdooSessionContext } from '../../odoo/session/odoo-session.types';
-import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';
-import { RecordActionDto } from './dto/record-action.dto';
-import { ChatterQueryDto } from './dto/chatter-query.dto';
-import { CompleteChatterActivityDto } from './dto/complete-chatter-activity.dto';
-import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
-import { ScheduleChatterActivityDto } from './dto/schedule-chatter-activity.dto';
-import { RecordMutationDto } from './dto/record-mutation.dto';
-import { RecordOnchangeDto } from './dto/record-onchange.dto';
-import { RecordQueryDto } from './dto/record-query.dto';
-import { SearchQueryDto } from './dto/search-query.dto';
+import { ChatterQueryDto } from '@app/modules/record/dto/chatter-query.dto';
+import { CompleteChatterActivityDto } from '@app/modules/record/dto/complete-chatter-activity.dto';
+import { PostChatterNoteDto } from '@app/modules/record/dto/post-chatter-note.dto';
+import { RecordActionDto } from '@app/modules/record/dto/record-action.dto';
+import { RecordMutationDto } from '@app/modules/record/dto/record-mutation.dto';
+import { RecordOnchangeDto } from '@app/modules/record/dto/record-onchange.dto';
+import { RecordQueryDto } from '@app/modules/record/dto/record-query.dto';
+import { ScheduleChatterActivityDto } from '@app/modules/record/dto/schedule-chatter-activity.dto';
+import { SearchQueryDto } from '@app/modules/record/dto/search-query.dto';
+import { AdapterFactoryService } from '@app/odoo/adapters/adapter-factory.service';
+import type { OdooAdapter } from '@app/odoo/adapters/odoo-adapter.interface';
+import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
+import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.service';
 
 @Injectable()
 export class RecordService {

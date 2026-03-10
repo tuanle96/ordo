@@ -14,12 +14,12 @@ import type {
     RefreshTokenRequest,
     TokenPayload,
     TokenResponse,
-} from '../../shared';
+} from '@app/shared';
 
-import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
-import { OdooRpcService } from '../../odoo/rpc/odoo-rpc.service';
-import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto } from '@app/modules/auth/dto/login.dto';
+import { AdapterFactoryService } from '@app/odoo/adapters/adapter-factory.service';
+import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
+import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.service';
 
 @Injectable()
 export class AuthService {

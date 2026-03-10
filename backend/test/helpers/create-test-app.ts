@@ -1,8 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
-import { AppModule } from '../../src/app.module';
-import { configureHttpApp } from '../../src/app.factory';
+import { configureHttpApp } from '@app/app.factory';
+import { AppModule } from '@app/app.module';
 
 interface ProviderOverride {
     token: Parameters<ReturnType<typeof Test.createTestingModule>['overrideProvider']>[0];

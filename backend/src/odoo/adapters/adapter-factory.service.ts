@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
-import type { OdooAdapter } from './odoo-adapter.interface';
-import { OdooV17Adapter } from './odoo-v17.adapter';
-import { OdooV18Adapter } from './odoo-v18.adapter';
-import { OdooV19Adapter } from './odoo-v19.adapter';
+import type { OdooAdapter } from '@app/odoo/adapters/odoo-adapter.interface';
+import { OdooV17Adapter } from '@app/odoo/adapters/odoo-v17.adapter';
+import { OdooV18Adapter } from '@app/odoo/adapters/odoo-v18.adapter';
+import { OdooV19Adapter } from '@app/odoo/adapters/odoo-v19.adapter';
 
 @Injectable()
 export class AdapterFactoryService {

@@ -1,6 +1,6 @@
-import type { LoginRequest, RecordData } from '../../shared';
+import type { LoginRequest, RecordData } from '@app/shared';
 
-import type { OdooSessionContext } from '../session/odoo-session.types';
+import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
 export interface OdooVersionInfo {
     server_version: string;

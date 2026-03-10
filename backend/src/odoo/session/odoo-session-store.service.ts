@@ -2,8 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 
-import { RedisService } from '../../common/redis/redis.service';
-import type { OdooSessionContext } from './odoo-session.types';
+import { RedisService } from '@app/common/redis/redis.service';
+import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
 @Injectable()
 export class OdooSessionStoreService {

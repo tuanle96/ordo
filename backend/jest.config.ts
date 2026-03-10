@@ -8,7 +8,10 @@ const config: Config = {
     transform: {
         '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
     },
-    moduleNameMapper: {},
+    moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/$1',
+        '^@test/(.*)$': '<rootDir>/test/$1',
+    },
     roots: ['<rootDir>/src', '<rootDir>/test'],
     collectCoverageFrom: ['src/**/*.ts', '!src/main.ts'],
     clearMocks: true,

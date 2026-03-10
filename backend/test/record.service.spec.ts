@@ -1,7 +1,7 @@
-import type { ChatterDetailsResult, ChatterMessage, ChatterThreadResult } from '../src/shared';
+import type { ChatterDetailsResult, ChatterMessage, ChatterThreadResult } from '@app/shared';
 
-import { RecordService } from '../src/modules/record/record.service';
-import { odooFixtures } from './fixtures/odoo.fixtures';
+import { RecordService } from '@app/modules/record/record.service';
+import { odooFixtures } from '@test/fixtures/odoo.fixtures';
 
 describe('RecordService chatter', () => {
     it('delegates chatter listing to the resolved adapter', async () => {

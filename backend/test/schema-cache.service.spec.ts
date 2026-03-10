@@ -1,8 +1,8 @@
 import type { ConfigService } from '@nestjs/config';
-import type { MobileFormSchema } from '../src/shared';
+import type { MobileFormSchema } from '@app/shared';
 
-import { odooFixtures } from './fixtures/odoo.fixtures';
-import { SchemaCacheService } from '../src/modules/schema/schema-cache.service';
+import { SchemaCacheService } from '@app/modules/schema/schema-cache.service';
+import { odooFixtures } from '@test/fixtures/odoo.fixtures';
 
 describe('SchemaCacheService', () => {
     const schema: MobileFormSchema = {

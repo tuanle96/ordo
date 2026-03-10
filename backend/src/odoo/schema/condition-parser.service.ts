@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { Condition, ConditionRule, ConditionValue } from '../../shared';
+import type { Condition, ConditionRule, ConditionValue } from '@app/shared';
 
 type TokenType =
     | 'identifier'

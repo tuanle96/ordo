@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import { OdooModule } from '../../odoo/odoo.module';
-import { SchemaController } from './schema.controller';
-import { SchemaCacheService } from './schema-cache.service';
-import { SchemaService } from './schema.service';
+import { OdooModule } from '@app/odoo/odoo.module';
+import { SchemaController } from '@app/modules/schema/schema.controller';
+import { SchemaCacheService } from '@app/modules/schema/schema-cache.service';
+import { SchemaService } from '@app/modules/schema/schema.service';
 
 @Module({
     imports: [OdooModule],

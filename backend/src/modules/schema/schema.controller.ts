@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 
-import type { MobileFormSchema, MobileListSchema, TokenPayload } from '../../shared';
+import type { MobileFormSchema, MobileListSchema, TokenPayload } from '@app/shared';
 
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/auth.guard';
-import { SchemaService } from './schema.service';
+import { CurrentUser } from '@app/common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@app/modules/auth/auth.guard';
+import { SchemaService } from '@app/modules/schema/schema.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('schema')

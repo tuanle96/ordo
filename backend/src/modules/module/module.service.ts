@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { TokenPayload } from '../../shared';
+import type { TokenPayload } from '@app/shared';
 
-import type { InstalledModulesResponse } from './module.types';
+import type { InstalledModulesResponse } from '@app/modules/module/module.types';
 
-import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
-import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';
+import { AdapterFactoryService } from '@app/odoo/adapters/adapter-factory.service';
+import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.service';
 
 const KNOWN_MODULES = ['contacts', 'crm', 'sale'];
 

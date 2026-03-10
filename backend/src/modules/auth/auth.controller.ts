@@ -6,13 +6,13 @@ import type {
     LogoutResponse,
     TokenPayload,
     TokenResponse,
-} from '../../shared';
+} from '@app/shared';
 
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { JwtAuthGuard } from './auth.guard';
+import { CurrentUser } from '@app/common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@app/modules/auth/auth.guard';
+import { AuthService } from '@app/modules/auth/auth.service';
+import { LoginDto } from '@app/modules/auth/dto/login.dto';
+import { RefreshTokenDto } from '@app/modules/auth/dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {

@@ -1,7 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import type { JwtService } from '@nestjs/jwt';
 
-import { AuthService } from '../src/modules/auth/auth.service';
+import { AuthService } from '@app/modules/auth/auth.service';
 
 describe('AuthService', () => {
     it('normalizes falsy optional user fields before issuing tokens and responses', async () => {

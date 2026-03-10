@@ -3,10 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { createHttpLogger } from './common/logging/pino.config';
-import { PinoLoggerService } from './common/logging/pino-logger.service';
+import { HttpExceptionFilter } from '@app/common/filters/http-exception.filter';
+import { TransformInterceptor } from '@app/common/interceptors/transform.interceptor';
+import { createHttpLogger } from '@app/common/logging/pino.config';
+import { PinoLoggerService } from '@app/common/logging/pino-logger.service';
 
 export function configureHttpApp(app: INestApplication): void {
     const configService = app.get(ConfigService);

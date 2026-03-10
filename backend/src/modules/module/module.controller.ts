@@ -1,11 +1,11 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 
-import type { TokenPayload } from '../../shared';
+import type { TokenPayload } from '@app/shared';
 
-import type { InstalledModulesResponse } from './module.types';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/auth.guard';
-import { ModuleService } from './module.service';
+import { CurrentUser } from '@app/common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@app/modules/auth/auth.guard';
+import type { InstalledModulesResponse } from '@app/modules/module/module.types';
+import { ModuleService } from '@app/modules/module/module.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('modules')

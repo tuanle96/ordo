@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { MobileFormSchema, MobileListSchema, TokenPayload } from '../../shared';
+import type { MobileFormSchema, MobileListSchema, TokenPayload } from '@app/shared';
 
-import { RedisService } from '../../common/redis/redis.service';
+import { RedisService } from '@app/common/redis/redis.service';
 
 @Injectable()
 export class SchemaCacheService {

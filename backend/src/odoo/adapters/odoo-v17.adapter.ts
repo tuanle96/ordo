@@ -15,16 +15,16 @@ import type {
     RecordData,
     RecordListQuery,
     RecordListResult,
-} from '../../shared';
+} from '@app/shared';
 
-import type { InstalledModuleInfo } from '../../modules/module/module.types';
+import type { InstalledModuleInfo } from '@app/modules/module/module.types';
 
-import { OdooAdapter } from './odoo-adapter.interface';
-import { OdooRpcService } from '../rpc/odoo-rpc.service';
-import { MobileListSchemaBuilderService } from '../schema/mobile-list-schema-builder.service';
-import { MobileSchemaBuilderService } from '../schema/mobile-schema-builder.service';
-import type { OdooFieldsSpec } from '../rpc/odoo-rpc.types';
-import type { OdooSessionContext } from '../session/odoo-session.types';
+import { OdooAdapter } from '@app/odoo/adapters/odoo-adapter.interface';
+import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
+import type { OdooFieldsSpec } from '@app/odoo/rpc/odoo-rpc.types';
+import { MobileListSchemaBuilderService } from '@app/odoo/schema/mobile-list-schema-builder.service';
+import { MobileSchemaBuilderService } from '@app/odoo/schema/mobile-schema-builder.service';
+import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
 @Injectable()
 export class OdooV17Adapter implements OdooAdapter {

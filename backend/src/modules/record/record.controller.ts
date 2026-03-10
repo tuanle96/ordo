@@ -22,19 +22,19 @@ import type {
     RecordListResult,
     RecordMutationResult,
     TokenPayload,
-} from '../../shared';
+} from '@app/shared';
 
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/auth.guard';
-import { ChatterQueryDto } from './dto/chatter-query.dto';
-import { CompleteChatterActivityDto } from './dto/complete-chatter-activity.dto';
-import { PostChatterNoteDto } from './dto/post-chatter-note.dto';
-import { RecordActionDto } from './dto/record-action.dto';
-import { RecordOnchangeDto } from './dto/record-onchange.dto';
-import { RecordMutationDto } from './dto/record-mutation.dto';
-import { RecordQueryDto } from './dto/record-query.dto';
-import { ScheduleChatterActivityDto } from './dto/schedule-chatter-activity.dto';
-import { RecordService } from './record.service';
+import { CurrentUser } from '@app/common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@app/modules/auth/auth.guard';
+import { ChatterQueryDto } from '@app/modules/record/dto/chatter-query.dto';
+import { CompleteChatterActivityDto } from '@app/modules/record/dto/complete-chatter-activity.dto';
+import { PostChatterNoteDto } from '@app/modules/record/dto/post-chatter-note.dto';
+import { RecordActionDto } from '@app/modules/record/dto/record-action.dto';
+import { RecordOnchangeDto } from '@app/modules/record/dto/record-onchange.dto';
+import { RecordMutationDto } from '@app/modules/record/dto/record-mutation.dto';
+import { RecordQueryDto } from '@app/modules/record/dto/record-query.dto';
+import { ScheduleChatterActivityDto } from '@app/modules/record/dto/schedule-chatter-activity.dto';
+import { RecordService } from '@app/modules/record/record.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('records')

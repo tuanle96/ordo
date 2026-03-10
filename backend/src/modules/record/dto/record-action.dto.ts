@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsArray, IsOptional } from 'class-validator';
 
-import type { RecordActionRequest } from '../../../shared';
+import type { RecordActionRequest } from '@app/shared';
 
 export class RecordActionDto implements RecordActionRequest {
     @IsOptional()

@@ -8,9 +8,9 @@ import type {
     SearchField,
     SearchFilter,
     SearchGroupBy,
-} from '../../shared';
+} from '@app/shared';
 
-import { ConditionParserService } from './condition-parser.service';
+import { ConditionParserService } from '@app/odoo/schema/condition-parser.service';
 
 @Injectable()
 export class MobileListSchemaBuilderService {

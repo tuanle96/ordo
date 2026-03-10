@@ -21,6 +21,15 @@
 - Use consistent response envelopes for all public endpoints
 - Prefer seams and interfaces before real Odoo business logic
 
+### Import conventions
+
+- Backend source code uses path aliases instead of relative imports:
+	- `@app/*` → `src/*`
+	- `@test/*` → `test/*`
+- Keep backend module, service, DTO, and test-helper imports on those aliases for readability and refactor safety.
+- Alias resolution is defined in `backend/tsconfig.json`, mirrored in `backend/jest.config.ts`, and rewritten for built runtime output by `tsc-alias` during `npm run build --workspace backend`.
+- Relative imports are not allowed in `backend/src` or `backend/test`; backend lint enforces this with ESLint `no-restricted-imports`, so use `@app/*` or `@test/*` instead.
+
 ## Swift / SwiftUI
 
 - Use Swift 5.x with SwiftUI as the primary UI framework

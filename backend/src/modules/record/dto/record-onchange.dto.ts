@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsArray, IsInt, IsObject, IsOptional, IsString } from 'class-validator';
 
-import type { OnchangeRequest, RecordData } from '../../../shared';
+import type { OnchangeRequest, RecordData } from '@app/shared';
 
 export class RecordOnchangeDto implements OnchangeRequest {
     @IsObject()

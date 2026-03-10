@@ -1,5 +1,5 @@
-import { ConditionParserService } from '../src/odoo/schema/condition-parser.service';
-import { MobileSchemaBuilderService } from '../src/odoo/schema/mobile-schema-builder.service';
+import { ConditionParserService } from '@app/odoo/schema/condition-parser.service';
+import { MobileSchemaBuilderService } from '@app/odoo/schema/mobile-schema-builder.service';
 
 describe('MobileSchemaBuilderService', () => {
     it('keeps the supported field matrix stable for canonical mobile-safe types', () => {

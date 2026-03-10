@@ -1,4 +1,4 @@
-import { ConditionParserService } from '../src/odoo/schema/condition-parser.service';
+import { ConditionParserService } from '@app/odoo/schema/condition-parser.service';
 
 describe('ConditionParserService', () => {
     const service = new ConditionParserService();

@@ -1,5 +1,5 @@
-import { odooFixtures } from './fixtures/odoo.fixtures';
-import { SchemaService } from '../src/modules/schema/schema.service';
+import { SchemaService } from '@app/modules/schema/schema.service';
+import { odooFixtures } from '@test/fixtures/odoo.fixtures';
 
 describe('SchemaService', () => {
     it('returns cached schema without hitting Odoo when Redis already has it', async () => {

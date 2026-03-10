@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
-import { createTestApp } from './helpers/create-test-app';
+import { createTestApp } from '@test/helpers/create-test-app';
 
 describe('HealthController', () => {
     let app: INestApplication;

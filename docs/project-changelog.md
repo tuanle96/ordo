@@ -8,6 +8,7 @@
 - `backend/tsconfig.json` now defines backend-local alias mappings for `@app/*` and `@test/*`
 - `backend/jest.config.ts` now mirrors those aliases through `moduleNameMapper` so Jest resolves imports the same way as TypeScript
 - `backend/package.json` now runs `tsc-alias` after `nest build` so emitted `dist/` JavaScript stays Node-runtime safe without unresolved alias specifiers
+- Backend lint now runs ESLint with a no-relative-import rule so new `backend/src` and `backend/test` code cannot drift back to `./` or `../` imports
 
 ### Verified
 
