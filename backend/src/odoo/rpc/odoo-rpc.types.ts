@@ -1,4 +1,4 @@
-import type { LoginRequest, RecordData } from '@ordo/shared';
+import type { LoginRequest, RecordData } from '../../shared';
 
 import type { OdooSessionContext } from '../session/odoo-session.types';
 

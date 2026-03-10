@@ -11,7 +11,7 @@ import type {
     RecordData,
     RecordListQuery,
     RecordListResult,
-} from '@ordo/shared';
+} from '../../shared';
 
 import type { InstalledModuleInfo } from '../../modules/module/module.types';
 

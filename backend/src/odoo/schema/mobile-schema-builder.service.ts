@@ -11,7 +11,7 @@ import type {
     FormSection,
     FormTab,
     MobileFormSchema,
-} from '@ordo/shared';
+} from '../../shared';
 
 import { ConditionParserService } from './condition-parser.service';
 

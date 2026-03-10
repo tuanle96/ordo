@@ -14,7 +14,7 @@ import type {
     RefreshTokenRequest,
     TokenPayload,
     TokenResponse,
-} from '@ordo/shared';
+} from '../../shared';
 
 import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
 import { OdooRpcService } from '../../odoo/rpc/odoo-rpc.service';

@@ -8,9 +8,7 @@ const config: Config = {
     transform: {
         '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
     },
-    moduleNameMapper: {
-        '^@ordo/shared$': '<rootDir>/../shared/src',
-    },
+    moduleNameMapper: {},
     roots: ['<rootDir>/src', '<rootDir>/test'],
     collectCoverageFrom: ['src/**/*.ts', '!src/main.ts'],
     clearMocks: true,

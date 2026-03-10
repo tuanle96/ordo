@@ -6,7 +6,7 @@ import type {
     LogoutResponse,
     TokenPayload,
     TokenResponse,
-} from '@ordo/shared';
+} from '../../shared';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';

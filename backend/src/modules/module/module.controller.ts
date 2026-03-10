@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 
-import type { TokenPayload } from '@ordo/shared';
+import type { TokenPayload } from '../../shared';
 
 import type { InstalledModulesResponse } from './module.types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

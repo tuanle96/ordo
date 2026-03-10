@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { MobileFormSchema, MobileListSchema, TokenPayload } from '@ordo/shared';
+import type { MobileFormSchema, MobileListSchema, TokenPayload } from '../../shared';
 
 import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
 import { OdooSessionStoreService } from '../../odoo/session/odoo-session-store.service';

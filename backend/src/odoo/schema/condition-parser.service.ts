@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { Condition, ConditionRule, ConditionValue } from '@ordo/shared';
+import type { Condition, ConditionRule, ConditionValue } from '../../shared';
 
 type TokenType =
     | 'identifier'

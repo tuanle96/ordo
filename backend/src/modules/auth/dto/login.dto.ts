@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString, IsUrl } from 'class-validator';
 
-import type { LoginRequest } from '@ordo/shared';
+import type { LoginRequest } from '../../../shared';
 
 export class LoginDto implements LoginRequest {
     @IsUrl({ require_tld: false }, { message: 'odooUrl must be a valid URL' })

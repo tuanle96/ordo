@@ -12,7 +12,7 @@ import type {
     RecordListResult,
     RecordMutationResult,
     TokenPayload,
-} from '@ordo/shared';
+} from '../../shared';
 
 import { AdapterFactoryService } from '../../odoo/adapters/adapter-factory.service';
 import type { OdooAdapter } from '../../odoo/adapters/odoo-adapter.interface';

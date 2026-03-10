@@ -1,4 +1,4 @@
-import type { ChatterDetailsResult, ChatterMessage, ChatterThreadResult } from '@ordo/shared';
+import type { ChatterDetailsResult, ChatterMessage, ChatterThreadResult } from '../src/shared';
 
 import { RecordService } from '../src/modules/record/record.service';
 import { odooFixtures } from './fixtures/odoo.fixtures';

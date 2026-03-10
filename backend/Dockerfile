@@ -8,18 +8,11 @@ WORKDIR /app
 # Copy workspace root config
 COPY package.json package-lock.json tsconfig.base.json ./
 
-# Copy shared package
-COPY shared/package.json shared/tsconfig.json ./shared/
-COPY shared/src ./shared/src
-
 # Copy backend package
 COPY backend/package.json backend/tsconfig.json backend/tsconfig.build.json backend/nest-cli.json ./backend/
 
 # Install all dependencies (including devDependencies)
 RUN npm ci
-
-# Build shared package (backend depends on it)
-RUN npm run build --workspace shared
 
 # Copy backend source (will be overridden by volume mount in dev)
 COPY backend/src ./backend/src
@@ -38,11 +31,9 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json tsconfig.base.json ./
-COPY shared/ ./shared/
 COPY backend/ ./backend/
 
 RUN npm ci
-RUN npm run build --workspace shared
 RUN npm run build --workspace backend
 
 # Prune devDependencies
@@ -58,8 +49,6 @@ WORKDIR /app
 # Copy only what's needed to run
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/shared/package.json ./shared/package.json
-COPY --from=build /app/shared/dist ./shared/dist
 COPY --from=build /app/backend/package.json ./backend/package.json
 COPY --from=build /app/backend/dist ./backend/dist
 

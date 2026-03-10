@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 
-import type { NameSearchResult, TokenPayload } from '@ordo/shared';
+import type { NameSearchResult, TokenPayload } from '../../shared';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/auth.guard';

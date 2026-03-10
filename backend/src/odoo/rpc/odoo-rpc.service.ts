@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { RecordData } from '@ordo/shared';
+import type { RecordData } from '../../shared';
 
 import type {
     DetectedOdooVersion,

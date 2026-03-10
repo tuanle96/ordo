@@ -22,7 +22,7 @@ import type {
     RecordListResult,
     RecordMutationResult,
     TokenPayload,
-} from '@ordo/shared';
+} from '../../shared';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/auth.guard';

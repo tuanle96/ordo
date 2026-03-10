@@ -8,7 +8,7 @@ import type {
     SearchField,
     SearchFilter,
     SearchGroupBy,
-} from '@ordo/shared';
+} from '../../shared';
 
 import { ConditionParserService } from './condition-parser.service';
 

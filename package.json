@@ -4,16 +4,15 @@
     "version": "0.1.0",
     "license": "AGPL-3.0-only",
     "workspaces": [
-        "backend",
-        "shared"
+        "backend"
     ],
     "engines": {
         "node": ">=22.0.0"
     },
     "scripts": {
-        "build": "npm run build --workspace shared && npm run build --workspace backend",
-        "test": "npm run test --workspace shared && npm run test --workspace backend",
-        "lint": "npm run lint --workspace shared && npm run lint --workspace backend",
+        "build": "npm run build --workspace backend",
+        "test": "npm run test --workspace backend",
+        "lint": "npm run lint --workspace backend",
         "dev:backend": "npm run start:dev --workspace backend"
     }
 }

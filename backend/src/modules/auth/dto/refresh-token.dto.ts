@@ -1,6 +1,6 @@
 import { IsJWT, IsString } from 'class-validator';
 
-import type { RefreshTokenRequest } from '@ordo/shared';
+import type { RefreshTokenRequest } from '../../../shared';
 
 export class RefreshTokenDto implements RefreshTokenRequest {
     @IsString()

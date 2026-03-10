@@ -1,4 +1,4 @@
-import type { ApiError, ApiResponseMeta } from '@ordo/shared';
+import type { ApiError, ApiResponseMeta } from '../../shared';
 
 export class ApiResponseDto<T> {
     constructor(

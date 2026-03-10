@@ -1,6 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-import type { TokenPayload } from '@ordo/shared';
+import type { TokenPayload } from '../../shared';
 
 export const CurrentUser = createParamDecorator(
     (_data: unknown, context: ExecutionContext): TokenPayload => {

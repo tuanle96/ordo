@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { TokenPayload } from '@ordo/shared';
+import type { TokenPayload } from '../../shared';
 
 import type { InstalledModulesResponse } from './module.types';
 

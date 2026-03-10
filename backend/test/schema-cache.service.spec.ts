@@ -1,5 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
-import type { MobileFormSchema } from '@ordo/shared';
+import type { MobileFormSchema } from '../src/shared';
 
 import { odooFixtures } from './fixtures/odoo.fixtures';
 import { SchemaCacheService } from '../src/modules/schema/schema-cache.service';
