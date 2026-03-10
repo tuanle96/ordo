@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Ordo
 
+@Suite(.serialized)
 @MainActor
 struct CacheStoreTests {
     private let scope = CacheScope(namespace: "test-scope")

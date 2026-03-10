@@ -13,6 +13,7 @@
 ### Changed
 
 - Browse cache keys now include the requested field set so schema-driven and descriptor-fallback list payloads do not collide locally
+- iOS list-page cache filenames now hash the full list identity (model, order, domain, requested fields, limit, offset) into a single token so complex browse combinations stay under simulator filesystem filename limits
 - `BrowseFilterRegistry` now prefers schema-provided search fields when available instead of relying only on hardcoded model presets
 - The list slice stays explicitly model-agnostic in the core path; `ModelRegistry` / `ModelDescriptor` remain fallback-only browse metadata when schema fetch fails
 
@@ -23,6 +24,7 @@
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/CacheStoreTests/listPageRoundTripAndClear test` — focused cache regression passes (`** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/SchemaModelsTests/mobileListSchemaDecodesVisibleColumnsAndRequestedFields test` — focused list-schema decode regression passes (`** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordListViewModelTests/loadUsesCachedPageWhenNetworkFails -only-testing:OrdoTests/RecordListViewModelTests/applyingSortUsesOrderQueryAndIsolatesCacheByOrder -only-testing:OrdoTests/RecordListViewModelTests/applyingFiltersUsesDomainQueryAndCachesByDomain test` — focused browse view-model regressions pass (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/SchemaModelsTests -only-testing:OrdoTests/CacheStoreTests -only-testing:OrdoTests/RecordListViewModelTests test` — grouped focused iOS list-schema/cache/view-model validation passes (`13/13 tests`, `** TEST SUCCEEDED **`)
 
 ### Notes
 

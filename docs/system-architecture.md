@@ -205,6 +205,7 @@ The dynamic list slice adds a separate browse-schema transport instead of wideni
 - **List responses now include authoritative totals** by pairing `search_read` with `search_count`, allowing iOS to display `X of Y` instead of guessing whether another page exists
 - **iOS browse stays fallback-safe**: `RecordListViewModel` prefers schema-derived requested fields, columns, and quick filters when list schema loads, but it falls back to the existing `ModelDescriptor` path if schema fetch fails
 - **Cache isolation widened deliberately**: list-page cache keys now include both the active domain and requested field set so schema-driven pages do not collide with descriptor-fallback cache entries
+- **Cache filenames are length-safe**: the iOS cache store hashes the full list-page identity into a single filename token instead of concatenating long per-part hashes, preventing simulator filesystem path-length failures on complex browse combinations
 
 ## Core-engine offline mutation queue foundation (2026-03-09)
 

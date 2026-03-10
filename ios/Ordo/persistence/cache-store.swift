@@ -180,7 +180,15 @@ private enum CacheKey {
         case .record(let model, let id):
             return "record-\(safe(model))-\(id).json"
         case .list(let model, let limit, let offset, let order, let domainKey, let fieldKey):
-            return "list-\(safe(model))-\(safe(order ?? "default"))-\(safe(domainKey ?? "domain-default"))-\(safe(fieldKey ?? "fields-default"))-\(limit)-\(offset).json"
+            let cacheIdentity = [
+                model,
+                order ?? "default",
+                domainKey ?? "domain-default",
+                fieldKey ?? "fields-default",
+                String(limit),
+                String(offset),
+            ].joined(separator: "|")
+            return "list-\(safe(cacheIdentity)).json"
         }
     }
 

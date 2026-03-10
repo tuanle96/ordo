@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Ordo
 
+@Suite(.serialized)
 @MainActor
 struct SchemaModelsTests {
         @Test
@@ -117,7 +118,7 @@ struct SchemaModelsTests {
                     { "name": "name", "label": "Name", "type": "char" }
                 ],
                 "filters": [
-                    { "name": "companies", "label": "Companies", "domain": "[[\"is_company\",\"=\",true]]" }
+                    { "name": "companies", "label": "Companies", "domain": "[[\\\"is_company\\\",\\\"=\\\",true]]" }
                 ],
                 "groupBy": [
                     { "name": "group_country", "label": "Country", "fieldName": "country_id" }
