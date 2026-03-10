@@ -658,7 +658,7 @@ export class OdooV17Adapter implements OdooAdapter {
         const rootMenuIDs = menuRecords
             .filter((menuRecord) => {
                 const parentID = this.extractParentMenuID(menuRecord.parent_id);
-                return parentID === undefined || !menuRecordsByID.has(parentID);
+                return parentID === undefined;
             })
             .map((menuRecord) => menuRecord.id);
 

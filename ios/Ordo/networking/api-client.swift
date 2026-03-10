@@ -235,13 +235,23 @@ final class APIClient {
 
         Self.logger.debug("→ \(method, privacy: .public) \(requestURL.absoluteString, privacy: .public)")
 
+        #if DEBUG
+        Self.logRequest(request, body: body)
+        #endif
+
+        let startTime = CFAbsoluteTimeGetCurrent()
         let (data, response) = try await session.data(for: request)
+        let duration = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIClientError.invalidResponse
         }
 
-        Self.logger.debug("← HTTP \(httpResponse.statusCode, privacy: .public) (\(data.count, privacy: .public) bytes) for \(route, privacy: .public)")
+        Self.logger.debug("← HTTP \(httpResponse.statusCode, privacy: .public) (\(data.count, privacy: .public) bytes) for \(route, privacy: .public) [\(String(format: "%.1f", duration), privacy: .public)ms]")
+
+        #if DEBUG
+        Self.logResponse(httpResponse, data: data, route: route)
+        #endif
 
         let decoder = JSONDecoder()
 
@@ -287,6 +297,81 @@ final class APIClient {
             throw APIClientError.decodingFailed(error.localizedDescription)
         }
     }
+
+    // MARK: - Debug Logging Helpers
+
+    #if DEBUG
+    private static func logRequest(_ request: URLRequest, body: Data?) {
+        var lines: [String] = ["┌─── REQUEST ───"]
+
+        // Headers (redact Authorization)
+        if let headers = request.allHTTPHeaderFields, !headers.isEmpty {
+            lines.append("│ Headers:")
+            for (key, value) in headers.sorted(by: { $0.key < $1.key }) {
+                let displayValue = key == "Authorization" ? "Bearer ••••••" : value
+                lines.append("│   \(key): \(displayValue)")
+            }
+        }
+
+        // Body
+        if let body, !body.isEmpty {
+            lines.append("│ Body (\(body.count) bytes):")
+            let bodyString = Self.prettyJSON(body) ?? String(data: body, encoding: .utf8) ?? "<binary>"
+            let truncated = bodyString.prefix(4000)
+            for line in truncated.split(separator: "\n", omittingEmptySubsequences: false) {
+                lines.append("│   \(line)")
+            }
+            if truncated.count < bodyString.count {
+                lines.append("│   ... (\(bodyString.count - truncated.count) chars truncated)")
+            }
+        }
+
+        lines.append("└───────────────")
+        let output = lines.joined(separator: "\n")
+        logger.debug("\(output, privacy: .public)")
+    }
+
+    private static func logResponse(_ response: HTTPURLResponse, data: Data, route: String) {
+        var lines: [String] = ["┌─── RESPONSE ───"]
+
+        // Headers
+        let headers = response.allHeaderFields
+        if !headers.isEmpty {
+            lines.append("│ Headers:")
+            for (key, value) in headers.sorted(by: { "\($0.key)" < "\($1.key)" }) {
+                lines.append("│   \(key): \(value)")
+            }
+        }
+
+        // Body
+        lines.append("│ Body (\(data.count) bytes):")
+        if data.isEmpty {
+            lines.append("│   <empty>")
+        } else {
+            let bodyString = Self.prettyJSON(data) ?? String(data: data.prefix(4000), encoding: .utf8) ?? "<binary>"
+            let truncated = bodyString.prefix(4000)
+            for line in truncated.split(separator: "\n", omittingEmptySubsequences: false) {
+                lines.append("│   \(line)")
+            }
+            if truncated.count < bodyString.count {
+                lines.append("│   ... (\(bodyString.count - truncated.count) chars truncated)")
+            }
+        }
+
+        lines.append("└────────────────")
+        let output = lines.joined(separator: "\n")
+        logger.debug("\(output, privacy: .public)")
+    }
+
+    private static func prettyJSON(_ data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
+              let string = String(data: pretty, encoding: .utf8) else {
+            return nil
+        }
+        return string
+    }
+    #endif
 
     private func url(for route: String, queryItems: [URLQueryItem]) -> URL? {
         var components = URLComponents(url: baseURL.appending(path: route), resolvingAgainstBaseURL: false)

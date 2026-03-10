@@ -135,6 +135,7 @@ final class AppState {
     }
 
     func signIn(with draft: LoginDraft) async throws {
+        statusMessage = nil
         let backendBaseURL = try config.resolveBackendURL(from: draft.backendBaseURL)
         apiClient.updateBaseURL(backendBaseURL)
 
