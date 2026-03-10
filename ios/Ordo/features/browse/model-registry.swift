@@ -105,13 +105,14 @@ enum ModelRegistry {
             nodes.flatMap { node in
                 var descriptors: [ModelDescriptor] = []
 
+                if let model = node.model, seenModels.insert(model).inserted {
+                    descriptors.append(descriptor(for: model, browseTitle: node.name))
+                }
+
                 if !node.children.isEmpty {
                     descriptors.append(contentsOf: traverse(nodes: node.children))
                 }
 
-                if let model = node.model, seenModels.insert(model).inserted {
-                    descriptors.append(descriptor(for: model, browseTitle: node.name))
-                }
                 return descriptors
             }
         }
