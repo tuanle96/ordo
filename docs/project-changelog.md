@@ -9,6 +9,8 @@
 - **Centralized temporal parsing/formatting helpers** via `TemporalFieldSupport`, reused by both `FormDraft` normalization and the date/datetime editor path
 - **Temporal text fallback** for non-empty unparseable server date/datetime strings, with an explicit action to normalize back onto the native picker path
 - **Monetary edit-prefix helper** that resolves common 3-letter currency codes like `USD` and `EUR` into symbols before falling back to the raw label
+- **Narrow nested `many2one` editor support inside generic `one2many`** using the existing authenticated relation search/select/clear path rather than widening backend or shared contracts
+- **Scoped pending-sync queue management UI** in Settings, showing queued mutation details, retry counts, and last-error hints for retryable offline writes
 - **Focused regression coverage** for schema retry after transient failure, group-by field requests plus grouped section building, ISO datetime normalization, temporal helper parsing, and monetary prefix lookup
 
 ### Changed
@@ -18,16 +20,26 @@
 - `FormDraft` now normalizes `date` and `datetime` values through the shared `TemporalFieldSupport` helpers instead of duplicating formatter logic locally
 - `TemporalFieldEditor` now preserves weird server values in a plain text field when they cannot be parsed, instead of immediately collapsing to an empty picker state
 - `EditableFieldFactory` now uses `MonetaryFieldSupport` so edit-mode monetary prefixes show `$` / `€` for known codes rather than always showing the raw code
+- `FormDraft` now skips validation for fields and supported `one2many` line subfields that are currently invisible or readonly under modifier rules, preventing false required errors on conditional UI states
+- `One2ManyFieldEditorSupport` now treats nested `many2one` as part of the shipped generic line-editor matrix, and `One2ManyFieldEditor` presents a narrow picker sheet for relation search/select/clear within line editing
+- `FormDraft` line-level validation and mutation normalization now keep the nested `many2one` `one2many` path on the same generic core engine instead of treating relation lines as unsupported holes
+- Create-mode record writes are now regression-locked to send only values changed from hydrated server defaults, avoiding unnecessary default re-posts during `POST /records/:model`
+- `AppState` now exposes scoped pending-mutation inspection plus manual retry/remove/clear operations, and Settings uses that narrow surface to manage the offline queue without inventing new sync contracts
+- `FileMutationQueueStore` now supports scoped queue clearing in addition to load/enqueue/update/remove, keeping the new queue-management UX on the existing file-backed store
 
 ### Verified
 
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/RecordListViewModelTests test` — focused regression slice passes (`57 tests`, `** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/RecordDetailViewModelTests test` — focused nested `many2one` `one2many` editor + validation regressions pass (`78 tests`, `** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/MutationQueueStoreTests -only-testing:OrdoTests/AppStateMutationReplayTests test` — focused queue inspection/manual retry/clear regressions pass (`6 tests`, `** TEST SUCCEEDED **`)
 - Independent code review verdict: **SHIP** with no blocking issues found
 
 ### Notes
 
 - This slice remains intentionally narrow: it adds grouped section rendering and persistence on top of the existing flat browse transport, but it does not introduce multi-level grouping, collapsed sections, or backend aggregate/group-count responses
 - Monetary symbol lookup currently uses a stable `en_US` locale to keep output deterministic for common ISO currency codes; broader locale-sensitive symbol behavior can be revisited later if needed
+- Nested `many2one` support inside `one2many` is also intentionally narrow: nested `many2many`, full x2many onchange parity, and wizard-style line flows remain deferred
+- Queue management also remains intentionally narrow: it adds settings-level inspect/retry/remove/clear controls on top of the shipped file-backed queue, but it does not add queued create replay, conflict policies, or background sync scheduling
 
 ## 2026-03-09 (Schema-Driven Dynamic List View Slice)
 

@@ -174,6 +174,8 @@ final class FormDraft {
 
     func validationErrors(for fields: [FieldSchema]) -> [String: String] {
         fields.reduce(into: [String: String]()) { errors, field in
+            guard shouldValidate(field, in: storage) else { return }
+
             if field.type == .one2many,
                let subfieldError = one2ManySubfieldValidationError(for: field, value: value(for: field.name, fallback: nil)) {
                 errors[field.name] = subfieldError
@@ -329,11 +331,16 @@ final class FormDraft {
 
     private func isLineLevelValidationSupported(for type: FieldType) -> Bool {
         switch type {
-        case .char, .text, .html, .integer, .float, .monetary, .boolean, .selection, .date, .datetime:
+        case .char, .text, .html, .integer, .float, .monetary, .boolean, .selection, .date, .datetime, .many2one:
             return true
         default:
             return false
         }
+    }
+
+    // Hidden or readonly fields should not block save, including nested one2many line subfields.
+    private func shouldValidate(_ field: FieldSchema, in values: RecordData) -> Bool {
+        !field.isInvisible(in: values) && !field.isReadOnly(in: values)
     }
 
     private func comparableValue(for field: FieldSchema, value: JSONValue?) -> JSONValue? {

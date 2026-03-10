@@ -245,6 +245,7 @@ struct FieldRowFactoryTests {
     func one2ManyEditorSupportKeepsHtmlAndMonetaryOnGenericPath() {
         #expect(One2ManyFieldEditorSupport.isEditable(.html) == true)
         #expect(One2ManyFieldEditorSupport.isEditable(.monetary) == true)
+        #expect(One2ManyFieldEditorSupport.isEditable(.many2one) == true)
         #expect(One2ManyFieldEditorSupport.usesMultilineInput(.html) == true)
         #expect(One2ManyFieldEditorSupport.keyboardType(for: .monetary) == .decimalPad)
     }

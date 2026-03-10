@@ -88,6 +88,9 @@ Handoff 6 Phase 03 adds iOS form save and validation:
 - **Refresh-aware auth retry** before authenticated record writes; `AppState.withAuthenticatedToken()` transparently refreshes expired tokens via `POST /auth/refresh`
 - **Dirty state tracking** via `FormDraft.isDirty()` comparing current field values to baseline; `FormDraft.changedValues()` extracts only modified fields for efficient PATCH payloads
 - **Required-field validation** for `char`, `text`, and `selection` types (required `boolean` always valid); validation errors collected before API call and displayed inline
+- **Modifier-aware validation skipping** now respects current draft visibility and readonly rules, so hidden or non-editable fields do not block save even when marked required by schema or recursive modifier trees
+- **Line-level one2many validation** now inherits that same modifier awareness for supported nested scalar subfields, keeping section headers / display-only rows from surfacing false required errors
+- **Create-mode diffing discipline** keeps `POST` payloads scoped to values the user actually changed relative to server defaults, instead of re-posting unchanged hydrated defaults
 - **Save/discard UX** with edit mode entering on button tap; `Save` and `Cancel` buttons visible only when form is in edit mode; discard confirmation dialog prevents accidental data loss
 - **Canonical record sync** after mutation response: record replaced, draft rebuilt from canonical response, cache updated, edit mode exited
 - **iOS unit + UI test coverage** (16/16 tests passing) for dirty state, validation, save success/failure, cancel/discard, and edit mode visibility rules
@@ -224,18 +227,18 @@ The first offline-write slice stays intentionally modest: it gives Ordo a real p
 
 - **Queue storage is file-backed and scope-aware**: pending record updates, deletes, and workflow actions persist per `CacheScope`, dedupe equivalent intents on the same record, and track retry counts plus the last surfaced error
 - **Replay is auth-driven, not background-magic**: `AppState` refreshes the pending count and attempts replay after authenticated restore/sign-in, reusing the existing authenticated API client, canonical post-write reads, and cache update path
-- **UI state stays honest**: Home and record detail surfaces show pending-sync state, while retryable offline save/action/delete failures can queue work and keep the user-facing state optimistic only inside the already-loaded record flow
-- **Scope discipline remains explicit**: there is still no conflict resolution, no background scheduler, no draft recovery after relaunch, and no generic sync dashboard beyond the lightweight pending-count/banner surface
+- **UI state stays honest**: Home and record detail surfaces show pending-sync state, while Settings now exposes scoped queue inspection plus manual retry/remove/clear controls for retryable offline save/action/delete failures without pretending to be a full sync engine
+- **Scope discipline remains explicit**: there is still no conflict resolution, no background scheduler, no draft recovery after relaunch, and no generic create-replay/dashboard parity beyond the lightweight pending-count plus settings-level queue-management surface
 
 ## Core-first generic form engine scope (2026-03-09)
 
 The current Phase 01 core-first slice completes the minimum reusable form-engine path without widening into module-specific UI:
 
 - **Canonical mobile-safe field matrix** now covers `char`, `text`, `html`, `integer`, `float`, `boolean`, `selection`, `date`, `datetime`, `many2one`, `many2many`, `monetary`, and a narrow `one2many` editor foundation
-- **Generic renderer/editor parity** on iOS now exists across that matrix, including multiline HTML editing, currency-aware monetary display, debounced onchange for text-like monetary/html fields, and narrow inline `one2many` editing for supported scalar subfields
+- **Generic renderer/editor parity** on iOS now exists across that matrix, including multiline HTML editing, currency-aware monetary display, debounced onchange for text-like monetary/html fields, and narrow inline `one2many` editing for supported scalar subfields plus follow-up nested `many2one` search/select/clear support
 - **Generic draft normalization** in `FormDraft` now unifies scalar parsing, relation mutation encoding, object-shaped relation tolerance (`{ id, display_name/name }`), and Odoo command generation for narrow `one2many` create/update/delete flows
-- **Line-level `one2many` validation** now catches missing required values for supported editable subfields before save while intentionally skipping collapsed existing lines that only carry `id`, preserving the current narrow server-record representation
-- **Scope discipline remains explicit**: nested `many2one` / `many2many` inside `one2many`, broad returned-domain application, full x2many onchange parity, and wizard-like line workflows are still deferred follow-up work
+- **Line-level `one2many` validation** now catches missing required values for supported editable subfields before save, including the shipped nested `many2one` line path, while intentionally skipping collapsed existing lines that only carry `id`, preserving the current narrow server-record representation
+- **Scope discipline remains explicit**: nested `many2many` inside `one2many`, broad returned-domain application, full x2many onchange parity, and wizard-like line workflows are still deferred follow-up work
 
 ## Core-first closeout foundations (2026-03-09)
 

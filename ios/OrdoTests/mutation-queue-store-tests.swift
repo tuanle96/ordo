@@ -35,4 +35,26 @@ struct MutationQueueStoreTests {
         #expect(loaded.count == 1)
         #expect(loaded.first?.values["name"] == .string("Second"))
     }
+
+    @Test
+    func clearRemovesAllQueuedMutationsForScope() async throws {
+        let store = FileMutationQueueStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let scope = CacheScope(namespace: "scope-c")
+
+        try await store.enqueue(
+            QueuedRecordMutation(model: "res.partner", recordID: 7, kind: .update, values: ["name": .string("Queued")], fields: ["name"]),
+            scope: scope
+        )
+        try await store.enqueue(
+            QueuedRecordMutation(model: "sale.order", recordID: 11, kind: .action, fields: ["state"], actionName: "action_confirm"),
+            scope: scope
+        )
+
+        #expect(await store.pendingCount(scope: scope) == 2)
+
+        try await store.clear(scope: scope)
+
+        #expect(await store.load(scope: scope).isEmpty)
+        #expect(await store.pendingCount(scope: scope) == 0)
+    }
 }

@@ -74,6 +74,8 @@ struct SettingsView: View {
                     }
                 }
 
+                PendingMutationQueueSection()
+
                 // MARK: - Storage
                 VStack(alignment: .leading, spacing: OrdoSpacing.sm) {
                     Text("STORAGE")

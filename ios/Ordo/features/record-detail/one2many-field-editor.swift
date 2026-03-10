@@ -3,7 +3,7 @@ import SwiftUI
 enum One2ManyFieldEditorSupport {
     static func isEditable(_ type: FieldType) -> Bool {
         switch type {
-        case .char, .text, .html, .integer, .float, .monetary, .boolean, .selection, .date, .datetime:
+        case .char, .text, .html, .integer, .float, .monetary, .boolean, .selection, .date, .datetime, .many2one:
             return true
         default:
             return false
@@ -32,12 +32,16 @@ enum One2ManyFieldEditorSupport {
 }
 
 struct One2ManyFieldEditor: View {
+    @Environment(AppState.self) private var appState
+
     let field: FieldSchema
     let subfields: [FieldSchema]
     @Bindable var draft: FormDraft
     let fallbackValue: JSONValue?
     let validationMessage: String?
     let onValueChange: ((FieldSchema, JSONValue?) -> Void)?
+
+    @State private var activeMany2OneContext: Many2OneSheetContext?
 
     private var editableSubfields: [FieldSchema] {
         subfields.filter { One2ManyFieldEditorSupport.isEditable($0.type) }
@@ -80,6 +84,18 @@ struct One2ManyFieldEditor: View {
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("field-error-\(field.name)")
             }
+        }
+        .sheet(item: $activeMany2OneContext) { context in
+            One2ManyMany2OnePickerSheet(
+                field: context.subfield,
+                comodel: context.comodel,
+                currentValue: context.currentValue,
+                searchDomain: context.subfield.domain,
+                appState: appState,
+                onSelect: { selectedValue in
+                    updateLine(at: context.lineIndex, fieldName: context.subfield.name, value: selectedValue)
+                }
+            )
         }
     }
 
@@ -152,6 +168,36 @@ struct One2ManyFieldEditor: View {
                 }
             }
             .accessibilityIdentifier("one2many-field-\(field.name)-\(lineIndex)-\(subfield.name)")
+        case .many2one:
+            if let comodel = subfield.comodel {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(subfield.label)
+                        .font(.caption.weight(.medium))
+
+                    Button {
+                        activeMany2OneContext = Many2OneSheetContext(
+                            lineIndex: lineIndex,
+                            subfield: subfield,
+                            comodel: comodel,
+                            currentValue: lineValues[subfield.name]
+                        )
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(relationButtonTitle(for: subfield, value: lineValues[subfield.name]))
+                                .foregroundStyle(lineValues[subfield.name]?.relationID == nil ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color(uiColor: .tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("one2many-field-\(field.name)-\(lineIndex)-\(subfield.name)")
+                }
+            }
         default:
             VStack(alignment: .leading, spacing: 4) {
                 Text(subfield.label)
@@ -182,6 +228,12 @@ struct One2ManyFieldEditor: View {
         default:
             return value?.displayText ?? ""
         }
+    }
+
+    private func relationButtonTitle(for subfield: FieldSchema, value: JSONValue?) -> String {
+        value?.relationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? (value?.relationLabel ?? "")
+            : (subfield.placeholder ?? "Select \(subfield.label)")
     }
 
     private func lineID(from value: JSONValue) -> Int? {
@@ -217,5 +269,146 @@ struct One2ManyFieldEditor: View {
         } else {
             draft.setValue(value, for: field.name)
         }
+    }
+}
+
+private struct Many2OneSheetContext: Identifiable {
+    let lineIndex: Int
+    let subfield: FieldSchema
+    let comodel: String
+    let currentValue: JSONValue?
+
+    var id: String {
+        "\(lineIndex)-\(subfield.name)"
+    }
+}
+
+private struct One2ManyMany2OnePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let field: FieldSchema
+    let comodel: String
+    let currentValue: JSONValue?
+    let searchDomain: JSONValue?
+    let appState: AppState
+    let onSelect: (JSONValue?) -> Void
+
+    @State private var query = ""
+    @State private var results: [NameSearchResult] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let currentLabel = currentValue?.relationLabel {
+                    Section("Current") {
+                        Button {
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(currentLabel)
+                                Spacer()
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
+                } else if query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 {
+                    Section {
+                        Text("Type at least 2 characters to search \(field.label.lowercased()).")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
+                } else if results.isEmpty {
+                    Section {
+                        Text("No matches found.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Section("Results") {
+                        ForEach(results) { result in
+                            Button {
+                                onSelect(.relation(id: result.id, label: result.name))
+                                dismiss()
+                            } label: {
+                                Text(result.name)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("one2many-many2one-option-\(field.name)-\(result.id)")
+                        }
+                    }
+                }
+            }
+            .navigationTitle(field.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, prompt: "Search \(field.label.lowercased())")
+            .task(id: query) {
+                await search()
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                if currentValue != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Clear") {
+                            onSelect(nil)
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("one2many-many2one-clear-\(field.name)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func search() async {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedQuery.count >= 2 else {
+            results = []
+            errorMessage = nil
+            isLoading = false
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+
+            let searchResults = try await appState.withAuthenticatedToken { token in
+                try await appState.apiClient.search(model: comodel, query: trimmedQuery, limit: 20, domain: searchDomain, token: token)
+            }
+
+            guard !Task.isCancelled else { return }
+            results = searchResults
+        } catch {
+            guard !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
+            results = []
+        }
+
+        isLoading = false
     }
 }

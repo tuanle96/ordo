@@ -123,6 +123,46 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func createFlowPostsOnlyValuesChangedFromServerDefaults() async throws {
+        var capturedRequest: RecordMutationRequest?
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithDefaults)))
+            }
+
+            if path.hasSuffix("/records/res.partner/defaults") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailCreateDefaultsRecord)))
+            }
+
+            if path.hasSuffix("/records/res.partner") && request.httpMethod == "POST" {
+                capturedRequest = try JSONDecoder().decode(RecordMutationRequest.self, from: try #require(request.httpBody))
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 99, record: detailCreatedPartnerRecord))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: nil)
+        await viewModel.load(using: appState)
+
+        let draft = FormDraft(record: try #require(viewModel.record))
+        draft.setValue(.string("New Customer"), for: "name")
+
+        let didSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(didSave == true)
+        #expect(capturedRequest?.values == ["name": .string("New Customer")])
+    }
+
+    @Test
     func createModeHydratesServerDefaultsBeforeEditing() async throws {
         var capturedDefaultsFields: [String] = []
 

@@ -229,6 +229,99 @@ struct FormDraftTests {
     }
 
     @Test
+    func requiredValidationSkipsInvisibleAndReadonlyModifierFields() {
+        let draft = FormDraft(record: [
+            "state": .string("draft"),
+            "toggle_required": .bool(false),
+        ])
+        let fields = [
+            FieldSchema(
+                name: "internal_note",
+                type: .text,
+                label: "Internal Note",
+                required: true,
+                readonly: nil,
+                invisible: nil,
+                modifiers: .init(
+                    invisible: .init(type: "condition", condition: .init(field: "state", op: "==", value: .string("draft"), values: nil), rules: nil, constant: nil),
+                    readonly: nil,
+                    required: .init(type: "condition", condition: .init(field: "toggle_required", op: "==", value: .bool(true), values: nil), rules: nil, constant: nil)
+                ),
+                domain: nil,
+                comodel: nil,
+                selection: nil,
+                currencyField: nil,
+                placeholder: nil,
+                digits: nil,
+                subfields: nil,
+                searchable: nil,
+                widget: nil
+            ),
+            FieldSchema(
+                name: "approval_note",
+                type: .text,
+                label: "Approval Note",
+                required: true,
+                readonly: true,
+                invisible: nil,
+                domain: nil,
+                comodel: nil,
+                selection: nil,
+                currencyField: nil,
+                placeholder: nil,
+                digits: nil,
+                subfields: nil,
+                searchable: nil,
+                widget: nil
+            ),
+        ]
+
+        let initialErrors = draft.validationErrors(for: fields)
+        #expect(initialErrors["internal_note"] == nil)
+        #expect(initialErrors["approval_note"] == nil)
+
+        draft.setValue(.string("open"), for: "state")
+        draft.setValue(.bool(true), for: "toggle_required")
+
+        let visibleErrors = draft.validationErrors(for: fields)
+        #expect(visibleErrors["internal_note"] == "Internal Note is required.")
+        #expect(visibleErrors["approval_note"] == nil)
+    }
+
+    @Test
+    func requiredValidationSkipsFieldWhenInvisibleAndReadonlyAreBothTrue() {
+        let draft = FormDraft(record: [
+            "state": .string("done"),
+        ])
+        let fields = [
+            FieldSchema(
+                name: "post_close_note",
+                type: .text,
+                label: "Post Close Note",
+                required: true,
+                readonly: nil,
+                invisible: nil,
+                modifiers: .init(
+                    invisible: .init(type: "condition", condition: .init(field: "state", op: "==", value: .string("done"), values: nil), rules: nil, constant: nil),
+                    readonly: .init(type: "condition", condition: .init(field: "state", op: "==", value: .string("done"), values: nil), rules: nil, constant: nil),
+                    required: .init(type: "constant", condition: nil, rules: nil, constant: true)
+                ),
+                domain: nil,
+                comodel: nil,
+                selection: nil,
+                currencyField: nil,
+                placeholder: nil,
+                digits: nil,
+                subfields: nil,
+                searchable: nil,
+                widget: nil
+            ),
+        ]
+
+        #expect(draft.validationErrors(for: fields)["post_close_note"] == nil)
+    }
+
+    @Test
     func clearingMany2OneProducesNullMutationValue() {
         let baseline: RecordData = [
             "country_id": .relation(id: 233, label: "United States"),
@@ -526,6 +619,94 @@ struct FormDraftTests {
             .object([
                 "name": .string("Consulting"),
                 "product_uom_qty": .string("2"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+    }
+
+    @Test
+    func one2manyRequiredSubfieldSkipsInvisibleModifierLine() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "display_type", type: .selection, label: "Display Type", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: [["line_section", "Section"], ["product", "Product"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "name", type: .char, label: "Description", required: true, readonly: nil, invisible: nil, modifiers: .init(invisible: .init(type: "condition", condition: .init(field: "display_type", op: "==", value: .string("line_section"), values: nil), rules: nil, constant: nil), readonly: nil, required: nil), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "display_type": .string("line_section"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+
+        draft.setValue(.array([
+            .object([
+                "display_type": .string("product"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == "Order Lines line 1: Description is required.")
+    }
+
+    @Test
+    func one2manyMany2OneSubfieldNormalizesWithinCommands() {
+        let baseline: RecordData = [:]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "name", type: .char, label: "Description", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "product_id", type: .many2one, label: "Product", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "product.product", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "name": .string("Installation"),
+                "product_id": .object([
+                    "id": .number(41),
+                    "display_name": .string("Desk Combination"),
+                ]),
+            ]),
+        ]), for: "order_line")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues == [
+            "order_line": .array([
+                .array([
+                    .number(0),
+                    .number(0),
+                    .object([
+                        "name": .string("Installation"),
+                        "product_id": .number(41),
+                    ]),
+                ]),
+            ]),
+        ])
+    }
+
+    @Test
+    func one2manyRequiredMany2OneSubfieldShowsLineLevelError() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "product_id", type: .many2one, label: "Product", required: true, readonly: nil, invisible: nil, domain: nil, comodel: "product.product", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([:]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == "Order Lines line 1: Product is required.")
+
+        draft.setValue(.array([
+            .object([
+                "product_id": .relation(id: 41, label: "Desk Combination"),
             ]),
         ]), for: "order_line")
 

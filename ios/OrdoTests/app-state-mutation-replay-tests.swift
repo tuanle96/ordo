@@ -67,6 +67,145 @@ struct AppStateMutationReplayTests {
         #expect(appState.pendingMutationCount == 0)
         #expect(appState.statusMessage?.contains("Synced 1 pending change") == true)
     }
+
+    @Test
+    func retryPendingMutationRemovesQueuedMutationAfterSuccessfulManualRetry() async throws {
+        let backendURL = URL(string: "http://127.0.0.1:35120")!
+        let validSession = StoredSession(
+            backendBaseURL: backendURL,
+            odooURL: "http://127.0.0.1:38950",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "access-token",
+            refreshToken: "refresh-token",
+            expiresAt: Date().addingTimeInterval(3600),
+            user: StoredSession.preview.user
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AppStateMutationReplayURLProtocol.self]
+
+        var patchRequestCount = 0
+        AppStateMutationReplayURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(AppStateReplayEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/modules/installed") {
+                return (200, try JSONEncoder().encode(AppStateReplayEnvelope(data: InstalledModulesResponse(modules: []))))
+            }
+
+            if path.contains("/records/res.partner/7") && request.httpMethod == "PATCH" {
+                patchRequestCount += 1
+                return (200, try JSONEncoder().encode(AppStateReplayEnvelope(data: RecordMutationResult(id: 7, record: ["id": .number(7), "name": .string("Retried")]))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let sessionStore = AppStateReplaySessionStore(session: validSession)
+        let apiClient = APIClient(baseURL: backendURL, session: URLSession(configuration: configuration))
+        let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let queueStore = FileMutationQueueStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let appState = AppState(
+            config: .preview,
+            sessionStore: sessionStore,
+            apiClient: apiClient,
+            cacheStore: cacheStore,
+            mutationQueueStore: queueStore
+        )
+
+        await appState.restoreSession()
+
+        let scope = try #require(appState.cacheScope)
+        let queuedMutation = QueuedRecordMutation(
+            model: "res.partner",
+            recordID: 7,
+            kind: .update,
+            values: ["name": .string("Retried")],
+            fields: ["name"]
+        )
+        try await queueStore.enqueue(queuedMutation, scope: scope)
+
+        #expect((await appState.pendingMutations()).count == 1)
+
+        await appState.retryPendingMutation(id: queuedMutation.id)
+
+        #expect(patchRequestCount == 1)
+        #expect(await queueStore.load(scope: scope).isEmpty)
+        #expect(appState.pendingMutationCount == 0)
+        #expect(appState.statusMessage == "Synced 1 pending change.")
+    }
+
+    @Test
+    func retryPendingMutationKeepsQueuedMutationAndCapturesLastErrorOnFailure() async throws {
+        let backendURL = URL(string: "http://127.0.0.1:35120")!
+        let validSession = StoredSession(
+            backendBaseURL: backendURL,
+            odooURL: "http://127.0.0.1:38950",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "access-token",
+            refreshToken: "refresh-token",
+            expiresAt: Date().addingTimeInterval(3600),
+            user: StoredSession.preview.user
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AppStateMutationReplayURLProtocol.self]
+
+        AppStateMutationReplayURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(AppStateReplayEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/modules/installed") {
+                return (200, try JSONEncoder().encode(AppStateReplayEnvelope(data: InstalledModulesResponse(modules: []))))
+            }
+
+            if path.contains("/records/res.partner/7") && request.httpMethod == "PATCH" {
+                throw URLError(.timedOut)
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let sessionStore = AppStateReplaySessionStore(session: validSession)
+        let apiClient = APIClient(baseURL: backendURL, session: URLSession(configuration: configuration))
+        let cacheStore = FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let queueStore = FileMutationQueueStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        let appState = AppState(
+            config: .preview,
+            sessionStore: sessionStore,
+            apiClient: apiClient,
+            cacheStore: cacheStore,
+            mutationQueueStore: queueStore
+        )
+
+        await appState.restoreSession()
+
+        let scope = try #require(appState.cacheScope)
+        let queuedMutation = QueuedRecordMutation(
+            model: "res.partner",
+            recordID: 7,
+            kind: .update,
+            values: ["name": .string("Retried")],
+            fields: ["name"]
+        )
+        try await queueStore.enqueue(queuedMutation, scope: scope)
+
+        await appState.retryPendingMutation(id: queuedMutation.id)
+
+        let storedMutation = try #require(await queueStore.load(scope: scope).first)
+        #expect(storedMutation.retryCount == 1)
+        #expect(storedMutation.lastError?.isEmpty == false)
+        #expect(appState.pendingMutationCount == 1)
+        #expect(appState.statusMessage == "Still couldn’t sync that pending change. It remains queued for a later retry.")
+    }
 }
 
 private final class AppStateReplaySessionStore: SessionStoring {

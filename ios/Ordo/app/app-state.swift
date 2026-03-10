@@ -237,6 +237,11 @@ final class AppState {
         try await cacheStore.clear(scope: cacheScope)
     }
 
+    func pendingMutations() async -> [QueuedRecordMutation] {
+        guard let scope = cacheScope else { return [] }
+        return await mutationQueueStore.load(scope: scope)
+    }
+
     func enqueuePendingMutation(_ mutation: QueuedRecordMutation) async throws {
         guard let scope = cacheScope else {
             throw APIClientError.unauthorized
@@ -244,7 +249,44 @@ final class AppState {
 
         try await mutationQueueStore.enqueue(mutation, scope: scope)
         await refreshPendingMutationCount()
-        statusMessage = pendingMutationCount == 1 ? "1 change is pending sync." : "\(pendingMutationCount) changes are pending sync."
+        statusMessage = pendingSyncMessage
+    }
+
+    func retryPendingMutation(id: UUID) async {
+        guard let scope = cacheScope, phase == .authenticated else { return }
+
+        let queuedMutations = await mutationQueueStore.load(scope: scope)
+        guard let mutation = queuedMutations.first(where: { $0.id == id }) else {
+            await refreshPendingMutationCount()
+            return
+        }
+
+        await retryQueuedMutation(mutation, scope: scope)
+    }
+
+    func clearPendingMutations() async throws {
+        guard let scope = cacheScope else {
+            throw APIClientError.unauthorized
+        }
+
+        let clearedCount = await mutationQueueStore.load(scope: scope).count
+        try await mutationQueueStore.clear(scope: scope)
+        await refreshPendingMutationCount()
+        statusMessage = clearedCount == 0
+            ? nil
+            : "Cleared \(clearedCount) pending change\(clearedCount == 1 ? "" : "s") from the local sync queue."
+    }
+
+    func removePendingMutation(id: UUID) async throws {
+        guard let scope = cacheScope else {
+            throw APIClientError.unauthorized
+        }
+
+        try await mutationQueueStore.remove(id: id, scope: scope)
+        await refreshPendingMutationCount()
+        statusMessage = pendingMutationCount > 0
+            ? pendingSyncMessage
+            : "Removed the pending change from the local sync queue."
     }
 
     func replayPendingMutations() async {
@@ -283,7 +325,7 @@ final class AppState {
                 ? "Synced \(replayedCount) pending change\(replayedCount == 1 ? "" : "s")."
                 : "Synced \(replayedCount) pending change\(replayedCount == 1 ? "" : "s"). \(pendingMutationCount) still pending."
         } else if pendingMutationCount > 0 {
-            statusMessage = pendingMutationCount == 1 ? "1 change is pending sync." : "\(pendingMutationCount) changes are pending sync."
+            statusMessage = pendingSyncMessage
         }
     }
 
@@ -358,6 +400,33 @@ final class AppState {
 
     private func refreshPendingMutationCount() async {
         pendingMutationCount = await mutationQueueStore.pendingCount(scope: cacheScope)
+    }
+
+    private var pendingSyncMessage: String {
+        pendingMutationCount == 1 ? "1 change is pending sync." : "\(pendingMutationCount) changes are pending sync."
+    }
+
+    private func retryQueuedMutation(_ mutation: QueuedRecordMutation, scope: CacheScope) async {
+        do {
+            try await replay(mutation, scope: scope)
+            try await mutationQueueStore.remove(id: mutation.id, scope: scope)
+            await refreshPendingMutationCount()
+            statusMessage = pendingMutationCount == 0
+                ? "Synced 1 pending change."
+                : "Synced 1 pending change. \(pendingMutationCount) still pending."
+        } catch {
+            guard case APIClientError.unauthorized = error else {
+                var failedMutation = mutation
+                failedMutation.retryCount += 1
+                failedMutation.lastError = error.localizedDescription
+                try? await mutationQueueStore.update(failedMutation, scope: scope)
+                await refreshPendingMutationCount()
+                statusMessage = "Still couldn’t sync that pending change. It remains queued for a later retry."
+                return
+            }
+
+            statusMessage = pendingMutationCount > 0 ? pendingSyncMessage : statusMessage
+        }
     }
 
     private func replay(_ mutation: QueuedRecordMutation, scope: CacheScope) async throws {

@@ -5,6 +5,7 @@ protocol MutationQueueStoring {
     func enqueue(_ mutation: QueuedRecordMutation, scope: CacheScope) async throws
     func update(_ mutation: QueuedRecordMutation, scope: CacheScope) async throws
     func remove(id: UUID, scope: CacheScope) async throws
+    func clear(scope: CacheScope) async throws
     func pendingCount(scope: CacheScope?) async -> Int
 }
 
@@ -89,6 +90,9 @@ actor FileMutationQueueStore: MutationQueueStoring {
 
     func enqueue(_ mutation: QueuedRecordMutation, scope: CacheScope) async throws {
         var mutations = await load(scope: scope)
+        // Keep only the most recent queued intent for the same record + operation shape.
+        // This stays intentionally narrow: it avoids stacking duplicate retries without
+        // pretending to merge different mutation kinds or action names into one smart sync plan.
         mutations.removeAll { existing in
             existing.model == mutation.model
                 && existing.recordID == mutation.recordID
@@ -113,6 +117,10 @@ actor FileMutationQueueStore: MutationQueueStoring {
     func remove(id: UUID, scope: CacheScope) async throws {
         let mutations = await load(scope: scope).filter { $0.id != id }
         try save(mutations, scope: scope)
+    }
+
+    func clear(scope: CacheScope) async throws {
+        try save([], scope: scope)
     }
 
     func pendingCount(scope: CacheScope?) async -> Int {
