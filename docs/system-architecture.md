@@ -196,6 +196,17 @@ The remaining core-engine browse slice closes the honest list-filtering gap with
 - **Persistence is local and scoped**: filter state is stored in `UserDefaults` per browse surface, while cached list pages are keyed by model, order, offset, and a hashed domain key so filtered pages never collide with the unfiltered cache
 - **The slice intentionally stops at filtering**: sorting and pagination reuse the current list machinery, while grouped browse sections / `group by` stay explicitly deferred because they likely need a different backend/list response shape
 
+## iOS core-engine polish scope (2026-03-10)
+
+The polish slice closes a narrow set of honest iOS gaps without widening schema or transport surface:
+
+- **Grouped browse stays client-side**: `RecordListViewModel` interprets `MobileListSchema.search.groupBy` metadata, persists the active group choice locally, includes the active group field in requested list fields, and derives grouped `DisplaySection` values from the existing flat browse payload
+- **List-schema loading is retry-safe**: transient schema fetch failures no longer permanently lock the client onto descriptor fallback, because the one-time schema-attempt guard now flips only after a successful schema load
+- **Temporal parsing is shared**: `TemporalFieldSupport` owns date/datetime parsing and formatting so draft normalization and editor UI stay aligned on standard, short, and ISO-style datetime inputs
+- **Temporal fallback stays conservative**: when a server value is non-empty but unparseable, the editor preserves it in a plain text field and offers an explicit action to move back onto the native picker path instead of silently discarding the value
+- **Monetary edit fidelity is better but still narrow**: edit-mode prefixes now map common ISO currency codes to symbols through a small helper and still fall back to the raw currency label when the code is unknown
+- **Scope discipline remains explicit**: grouping still uses the current flat list response and does not claim aggregate/group-count parity, while richer locale-specific currency behavior remains follow-up polish rather than a platform gap
+
 ## Schema-driven dynamic list browse (2026-03-09)
 
 The dynamic list slice adds a separate browse-schema transport instead of widening form schema, so list behavior can stay model-agnostic and Odoo-driven.

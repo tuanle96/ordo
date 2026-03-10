@@ -1,5 +1,34 @@
 # Project Changelog
 
+## 2026-03-10 (iOS Core-Engine Polish Slice)
+
+### Added
+
+- **Client-side grouped browse** on iOS using the existing `MobileListSchema.search.groupBy` metadata, with grouped sections derived locally from the flat record payload instead of widening the backend contract
+- **Persisted group-by selection** per browse model through `UserDefaults`, matching the existing local persistence pattern used for browse filters
+- **Centralized temporal parsing/formatting helpers** via `TemporalFieldSupport`, reused by both `FormDraft` normalization and the date/datetime editor path
+- **Temporal text fallback** for non-empty unparseable server date/datetime strings, with an explicit action to normalize back onto the native picker path
+- **Monetary edit-prefix helper** that resolves common 3-letter currency codes like `USD` and `EUR` into symbols before falling back to the raw label
+- **Focused regression coverage** for schema retry after transient failure, group-by field requests plus grouped section building, ISO datetime normalization, temporal helper parsing, and monetary prefix lookup
+
+### Changed
+
+- `RecordListViewModel` now appends the active group-by field to `requestedFields`, persists the current group-by choice, retries list-schema fetches after transient failures, and builds grouped `DisplaySection` values client-side
+- `RecordListView` now exposes a `Group By` picker in browse options and renders grouped list sections when a group is active
+- `FormDraft` now normalizes `date` and `datetime` values through the shared `TemporalFieldSupport` helpers instead of duplicating formatter logic locally
+- `TemporalFieldEditor` now preserves weird server values in a plain text field when they cannot be parsed, instead of immediately collapsing to an empty picker state
+- `EditableFieldFactory` now uses `MonetaryFieldSupport` so edit-mode monetary prefixes show `$` / `€` for known codes rather than always showing the raw code
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/RecordListViewModelTests test` — focused regression slice passes (`57 tests`, `** TEST SUCCEEDED **`)
+- Independent code review verdict: **SHIP** with no blocking issues found
+
+### Notes
+
+- This slice remains intentionally narrow: it adds grouped section rendering and persistence on top of the existing flat browse transport, but it does not introduce multi-level grouping, collapsed sections, or backend aggregate/group-count responses
+- Monetary symbol lookup currently uses a stable `en_US` locale to keep output deterministic for common ISO currency codes; broader locale-sensitive symbol behavior can be revisited later if needed
+
 ## 2026-03-09 (Schema-Driven Dynamic List View Slice)
 
 ### Added

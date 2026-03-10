@@ -9,6 +9,9 @@ CLAUDE.md
 prd.md
 codebase-evaluation.md.resolved
 .github/prompts/
+.github/agents/
+.github/instructions/
+.github/copilot-instructions.md
 
 # Xcode user data
 **/xcuserdata/

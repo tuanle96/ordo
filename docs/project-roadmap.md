@@ -37,6 +37,7 @@
 | Core engine remaining real work — Phase 04 offline mutation queue foundation | ✅ Complete | iOS now persists queued record updates/actions/deletes, replays them after authenticated restore/sign-in, keeps optimistic record state for retryable offline save failures, and surfaces pending-sync state on Home + record detail |
 | Core engine remaining real work — Phase 05 release hardening and scope freeze | ✅ Complete | Broad `OrdoTests` unit validation is green after the new browse/onchange/read-fidelity/offline queue slices; docs now reflect the shipped boundary and remaining follow-up work stays explicitly deferred |
 | Core platform — Schema-driven dynamic list browse | ✅ Complete | Separate `GET /schema/:model/list` transport now parses Odoo `<tree>` / `<search>`, browse list responses include `total` from `search_count`, and iOS browse prefers schema-driven columns/filters/totals with descriptor fallback |
+| iOS core-engine polish | ✅ Complete | Browse lists now support persisted client-side grouping on top of existing list-schema metadata, list schema retries after transient failures, date/datetime normalization shares one temporal helper path with text fallback for weird server values, and edit-mode monetary prefixes resolve common currency symbols; focused iOS validation passed (`57 tests`) |
 
 ## Scope reminders
 
