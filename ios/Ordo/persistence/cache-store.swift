@@ -32,14 +32,14 @@ private struct CacheEnvelope<Value: Codable>: Codable {
 }
 
 actor FileCacheStore: CacheStoring {
-    private let baseDirectoryURL: URL
+    private nonisolated(unsafe) let baseDirectoryURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    private let fileManager: FileManager
-    private let dateProvider: @Sendable () -> Date
+    private nonisolated(unsafe) let fileManager: FileManager
+    private nonisolated(unsafe) let dateProvider: @Sendable () -> Date
     private let logger = Logger(subsystem: "com.ordo.app", category: "cache-store")
 
-    nonisolated init() {
+    init() {
         let fileManager = FileManager.default
         self.fileManager = fileManager
         self.dateProvider = Date.init
@@ -47,25 +47,25 @@ actor FileCacheStore: CacheStoring {
             .appending(path: "OrdoCache", directoryHint: .isDirectory)
     }
 
-    nonisolated init(baseDirectoryURL: URL) {
+    init(baseDirectoryURL: URL) {
         self.fileManager = .default
         self.dateProvider = Date.init
         self.baseDirectoryURL = baseDirectoryURL
     }
 
-    nonisolated init(baseDirectoryURL: URL, fileManager: FileManager) {
+    init(baseDirectoryURL: URL, fileManager: FileManager) {
         self.fileManager = fileManager
         self.dateProvider = Date.init
         self.baseDirectoryURL = baseDirectoryURL
     }
 
-    nonisolated init(baseDirectoryURL: URL, dateProvider: @escaping @Sendable () -> Date) {
+    init(baseDirectoryURL: URL, dateProvider: @escaping @Sendable () -> Date) {
         self.fileManager = .default
         self.dateProvider = dateProvider
         self.baseDirectoryURL = baseDirectoryURL
     }
 
-    nonisolated init(
+    init(
         baseDirectoryURL: URL,
         fileManager: FileManager,
         dateProvider: @escaping @Sendable () -> Date
@@ -75,20 +75,20 @@ actor FileCacheStore: CacheStoring {
         self.baseDirectoryURL = baseDirectoryURL
     }
 
-    func loadSchema(for model: String, scope: CacheScope) async -> CachedValue<MobileFormSchema>? {
-        await loadValue(at: fileURL(for: .schema(model), scope: scope), lifetime: .schema)
+    func loadSchema(for model: String, scope: CacheScope) -> CachedValue<MobileFormSchema>? {
+        loadValue(at: fileURL(for: .schema(model), scope: scope), lifetime: .schema)
     }
 
-    func saveSchema(_ schema: MobileFormSchema, for model: String, scope: CacheScope) async throws {
-        try await saveValue(schema, at: fileURL(for: .schema(model), scope: scope))
+    func saveSchema(_ schema: MobileFormSchema, for model: String, scope: CacheScope) throws {
+        try saveValue(schema, at: fileURL(for: .schema(model), scope: scope))
     }
 
-    func loadRecord(for model: String, id: Int, scope: CacheScope) async -> CachedValue<RecordData>? {
-        await loadValue(at: fileURL(for: .record(model: model, id: id), scope: scope), lifetime: .record)
+    func loadRecord(for model: String, id: Int, scope: CacheScope) -> CachedValue<RecordData>? {
+        loadValue(at: fileURL(for: .record(model: model, id: id), scope: scope), lifetime: .record)
     }
 
-    func saveRecord(_ record: RecordData, for model: String, id: Int, scope: CacheScope) async throws {
-        try await saveValue(record, at: fileURL(for: .record(model: model, id: id), scope: scope))
+    func saveRecord(_ record: RecordData, for model: String, id: Int, scope: CacheScope) throws {
+        try saveValue(record, at: fileURL(for: .record(model: model, id: id), scope: scope))
     }
 
     func deleteRecord(for model: String, id: Int, scope: CacheScope) async throws {
@@ -97,28 +97,28 @@ actor FileCacheStore: CacheStoring {
         try fileManager.removeItem(at: url)
     }
 
-    func loadListPage(for model: String, limit: Int, offset: Int, order: String? = nil, domainKey: String? = nil, fieldKey: String? = nil, scope: CacheScope) async -> CachedValue<RecordListResult>? {
-        await loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order, domainKey: domainKey, fieldKey: fieldKey), scope: scope), lifetime: .list)
+    func loadListPage(for model: String, limit: Int, offset: Int, order: String? = nil, domainKey: String? = nil, fieldKey: String? = nil, scope: CacheScope) -> CachedValue<RecordListResult>? {
+        loadValue(at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order, domainKey: domainKey, fieldKey: fieldKey), scope: scope), lifetime: .list)
     }
 
-    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String? = nil, domainKey: String? = nil, fieldKey: String? = nil, scope: CacheScope) async throws {
-        try await saveValue(result, at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order, domainKey: domainKey, fieldKey: fieldKey), scope: scope))
+    func saveListPage(_ result: RecordListResult, for model: String, limit: Int, offset: Int, order: String? = nil, domainKey: String? = nil, fieldKey: String? = nil, scope: CacheScope) throws {
+        try saveValue(result, at: fileURL(for: .list(model: model, limit: limit, offset: offset, order: order, domainKey: domainKey, fieldKey: fieldKey), scope: scope))
     }
 
-    func clear(scope: CacheScope? = nil) async throws {
+    func clear(scope: CacheScope? = nil) throws {
         let targetURL = scope.map { scopedDirectoryURL(for: $0) } ?? baseDirectoryURL
         guard fileManager.fileExists(atPath: targetURL.path()) else { return }
         try fileManager.removeItem(at: targetURL)
     }
 
-    private func saveValue<Value: Codable>(_ value: Value, at url: URL) async throws {
+    private func saveValue<Value: Codable>(_ value: Value, at url: URL) throws {
         try ensureDirectoryExists(for: url.deletingLastPathComponent())
         let envelope = CacheEnvelope(cachedAt: dateProvider(), value: value)
         let data = try encoder.encode(envelope)
         try data.write(to: url, options: .atomic)
     }
 
-    private func loadValue<Value: Codable>(at url: URL, lifetime: CacheLifetime) async -> CachedValue<Value>? {
+    private func loadValue<Value: Codable>(at url: URL, lifetime: CacheLifetime) -> CachedValue<Value>? {
         guard fileManager.fileExists(atPath: url.path()) else { return nil }
 
         do {
@@ -144,11 +144,11 @@ actor FileCacheStore: CacheStoring {
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
     }
 
-    private func fileURL(for key: CacheKey, scope: CacheScope) -> URL {
+    private nonisolated func fileURL(for key: CacheKey, scope: CacheScope) -> URL {
         scopedDirectoryURL(for: scope).appending(path: key.filename)
     }
 
-    private func scopedDirectoryURL(for scope: CacheScope) -> URL {
+    private nonisolated func scopedDirectoryURL(for scope: CacheScope) -> URL {
         baseDirectoryURL.appending(path: scope.namespace, directoryHint: .isDirectory)
     }
 }

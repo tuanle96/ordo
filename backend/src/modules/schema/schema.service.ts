@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { MobileFormSchema, MobileListSchema, TokenPayload } from '@app/shared';
+import type { MobileFormSchema, MobileKanbanSchema, MobileListSchema, TokenPayload } from '@app/shared';
 
 import { SchemaCacheService } from '@app/modules/schema/schema-cache.service';
 import { AdapterFactoryService } from '@app/odoo/adapters/adapter-factory.service';
@@ -42,6 +42,25 @@ export class SchemaService {
         const adapter = this.adapterFactory.getAdapter(currentUser.version);
         const schema = await adapter.getListSchema(session, model);
         await this.schemaCache.set(currentUser, 'list', model, schema);
+
+        return schema;
+    }
+
+    async getKanbanSchema(currentUser: TokenPayload, model: string, fresh = false): Promise<MobileKanbanSchema | null> {
+        if (!fresh) {
+            const cachedSchema = await this.schemaCache.get<MobileKanbanSchema>(currentUser, 'kanban', model);
+            if (cachedSchema) {
+                return cachedSchema;
+            }
+        }
+
+        const session = await this.sessionStore.getOrThrow(currentUser.sessionHandle);
+        const adapter = this.adapterFactory.getAdapter(currentUser.version);
+        const schema = await adapter.getKanbanSchema(session, model);
+
+        if (schema) {
+            await this.schemaCache.set(currentUser, 'kanban', model, schema);
+        }
 
         return schema;
     }

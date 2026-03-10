@@ -370,13 +370,20 @@ export class ConditionParserService {
     }
 
     private parseListValue(tokens: Token[], index: number): [ConditionValue[] | undefined, number] {
-        if (tokens[index]?.type !== 'lbracket') {
+        // Accept both [list] and (tuple) syntax for Python 'in' operator
+        const openType = tokens[index]?.type;
+        let closeType: TokenType;
+        if (openType === 'lbracket') {
+            closeType = 'rbracket';
+        } else if (openType === 'lparen') {
+            closeType = 'rparen';
+        } else {
             return [undefined, index];
         }
 
         const values: ConditionValue[] = [];
         let nextIndex = index + 1;
-        while (tokens[nextIndex] && tokens[nextIndex].type !== 'rbracket') {
+        while (tokens[nextIndex] && tokens[nextIndex].type !== closeType) {
             const [value, valueIndex] = this.parseScalarValue(tokens, nextIndex);
             if (value === undefined) {
                 return [undefined, index];
@@ -390,7 +397,7 @@ export class ConditionParserService {
             }
         }
 
-        return tokens[nextIndex]?.type === 'rbracket' ? [values, nextIndex + 1] : [undefined, index];
+        return tokens[nextIndex]?.type === closeType ? [values, nextIndex + 1] : [undefined, index];
     }
 
     private parsePythonLiteral(tokens: Token[], index: number): [PythonLiteral | undefined, number] {

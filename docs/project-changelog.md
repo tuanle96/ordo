@@ -1,5 +1,34 @@
 # Project Changelog
 
+## 2026-03-10 (Read-Only Kanban Browse MVP)
+
+### Added
+
+- **Separate `MobileKanbanSchema` transport** across backend and iOS for schema-driven kanban browse, including grouped board metadata, card field definitions, optional color field, and narrow search/filter metadata
+- **Backend `GET /api/v1/mobile/schema/:model/kanban` endpoint** backed by Odoo `<kanban>` and optional `<search>` parsing through a dedicated mobile kanban-schema builder
+- **Browse discovery preferred-view hinting** via `BrowseMenuNode.preferredViewMode`, derived from window-action `view_mode` ordering so kanban-first Odoo menu entries can open in kanban when supported
+- **iOS read-only kanban board runtime** with schema decode, preferred-mode auto-selection, grouped columns derived from the existing flat record payload, and dedicated board/card views
+- **Focused regression coverage** for kanban schema parsing, schema cache/service/controller behavior, browse preferred-view propagation, kanban decode, and kanban auto-select/fallback behavior on iOS
+
+### Changed
+
+- `SchemaCacheService` now isolates cached kanban schema payloads under their own cache segment instead of mixing them with form/list keys
+- `OdooV17Adapter` now fetches optional kanban/search view arches, builds `MobileKanbanSchema`, and carries a narrow `preferredViewMode` hint on browse-menu leaves while still filtering modal/non-browse actions
+- iOS `RecordListViewModel` now loads list and kanban schemas independently so kanban lookup failure cannot break existing list-schema retries or list-only browse behavior
+- `RecordListView` now offers a third layout mode only when kanban schema is available, and browse navigation threads menu-level preferred-view hints into the record list screen
+
+### Verified
+
+- `cd backend && npx jest mobile-kanban-schema-builder --runInBand` — focused backend kanban parser coverage passes
+- `cd backend && npx jest --runInBand` — backend regression suite passes (`17 suites`, `96 tests`)
+- `cd backend && npm run build` — NestJS backend build passes
+- `cd ios && xcodebuild test -project Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:OrdoTests/SchemaModelsTests -only-testing:OrdoTests/RecordListViewModelTests -quiet` — targeted iOS kanban/schema browse regressions pass
+
+### Notes
+
+- Scope stays deliberately narrow: this ships read-only kanban browsing only, with tap-through to existing record detail; drag-and-drop stage changes, grouped server aggregates, and richer Odoo kanban widget/template parity remain deferred
+- Kanban columns are still derived client-side from the existing flat record list payload, so this slice does not widen the generic record-list transport or claim Odoo web parity
+
 ## 2026-03-10 (Honest Discovery Capability Gating)
 
 ### Added

@@ -45,7 +45,10 @@ struct BrowseMenuRowLink: View {
     @ViewBuilder
     private func destination(for node: BrowseMenuNode) -> some View {
         if let directNode = directRecordListNode(for: node), let model = directNode.model {
-            RecordListView(descriptor: appState.modelDescriptor(for: model, fallbackTitle: directNode.name))
+            RecordListView(
+                descriptor: appState.modelDescriptor(for: model, fallbackTitle: directNode.name),
+                preferredViewMode: directNode.preferredViewMode ?? node.preferredViewMode
+            )
         } else {
             BrowseMenuListView(title: node.name, nodes: node.children)
         }

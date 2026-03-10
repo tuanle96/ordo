@@ -173,7 +173,7 @@ struct RecordDetailView: View {
                             viewModel.applyFieldEdit(value, for: field, draft: draft, using: appState)
                         }
                     )
-                    .id("schema-\(viewModel.recordID)-\(isEditing ? "editing" : "readonly")")
+                    .id("schema-\(viewModel.recordID.map(String.init) ?? "new")-\(isEditing ? "editing" : "readonly")")
 
                     if schema.hasChatter, !isCreating, viewModel.recordID != nil {
                         ChatterSectionView(viewModel: chatterViewModel, isShowingScheduleSheet: $isShowingScheduleSheet)

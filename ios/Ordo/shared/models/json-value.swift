@@ -64,12 +64,12 @@ enum InlineFilePayloadSupport {
     }
 }
 
-struct RelationValue: Hashable, Identifiable {
+struct RelationValue: Hashable, Identifiable, Sendable {
     let id: Int
     let label: String
 }
 
-enum JSONValue: Codable, Hashable {
+enum JSONValue: Codable, Hashable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -123,6 +123,16 @@ enum JSONValue: Codable, Hashable {
 
     var stringValue: String? {
         guard case .string(let value) = self else { return nil }
+        return value
+    }
+
+    var boolValue: Bool? {
+        guard case .bool(let value) = self else { return nil }
+        return value
+    }
+
+    var doubleValue: Double? {
+        guard case .number(let value) = self else { return nil }
         return value
     }
 

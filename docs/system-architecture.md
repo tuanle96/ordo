@@ -221,13 +221,24 @@ The dynamic list slice adds a separate browse-schema transport instead of wideni
 - **Cache isolation widened deliberately**: list-page cache keys now include both the active domain and requested field set so schema-driven pages do not collide with descriptor-fallback cache entries
 - **Cache filenames are length-safe**: the iOS cache store hashes the full list-page identity into a single filename token instead of concatenating long per-part hashes, preventing simulator filesystem path-length failures on complex browse combinations
 
+## Read-only kanban browse MVP (2026-03-10)
+
+The kanban slice adds a second browse-schema transport for grouped board presentation without widening the flat list/search record contract.
+
+- **Separate `MobileKanbanSchema` transport** carries kanban card fields, `groupByField`, optional selection labels, optional `colorField`, and narrow search metadata from backend to iOS without mutating `MobileListSchema` or `MobileFormSchema`
+- **Backend kanban-schema generation** uses Odoo `fields_get` plus `<kanban>` / optional `<search>` XML parsing through `MobileKanbanSchemaBuilderService` and exposes the result at `GET /schema/:model/kanban`
+- **Kanban availability stays honest**: backend returns `null` when a model has no usable kanban view or no supported `default_group_by`, and the schema cache stores only real kanban payloads rather than negative/null results
+- **Browse discovery now hints preferred layout**: `BrowseMenuNode.preferredViewMode` is derived narrowly from the first supported action `view_mode` (`kanban` vs `tree/list`) so iOS can honor kanban-first menu entries without treating the hint as a guarantee
+- **iOS view selection is schema-gated**: `RecordListViewModel` loads list and kanban schema independently, auto-selects `.kanban` only when the browse node prefers kanban and kanban schema exists, and otherwise degrades cleanly to cards/table without breaking existing browse filters, sorting, grouping, or cache keys
+- **Grouped columns stay client-derived**: iOS builds kanban columns locally from the existing flat `GET /records/:model` payload using `groupByField`; this slice intentionally does not add drag-and-drop writes, backend aggregate/group-count responses, or full Odoo web kanban template parity
+
 ## Dynamic module discovery and browse exposure (2026-03-10)
 
 The discovery slice removes the last major static browse bottleneck without inventing a new model-specific transport layer.
 
 - **Backend discovery is now additive and dynamic**: `GET /api/v1/mobile/modules/installed` returns both installed Odoo application modules and `browseMenuTree`, where menu-tree roots are derived from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
 - **Browseability is menu/action-backed, not raw-model-backed**: the backend intentionally derives candidates from live menu/action exposure, filters out non-browse targets like modal `target='new'` actions, preserves app/category/leaf hierarchy, and prunes empty branches so the mobile app receives a realistic browse surface instead of every technical model in `ir.model`
-- **The menu-tree contract stays deliberately narrow**: each `BrowseMenuNode` carries only `id`, `name`, `kind`, optional `model`, and `children`; this slice explicitly defers Odoo web parity for `xmlid`, icons, action domains, and action contexts
+- **The menu-tree contract stays deliberately narrow**: each `BrowseMenuNode` carries only `id`, `name`, `kind`, optional `model`, optional `preferredViewMode`, and `children`; this slice explicitly defers Odoo web parity for `xmlid`, icons, action domains, and action contexts
 - **Top-level app semantics mirror Odoo narrowly**: when a root app has no direct browseable action but its first actionable descendant is browseable, the backend carries that resolved `model` on the app node so the mobile UI can preserve the app grouping without losing the practical entry target
 - **The modules endpoint remains discovery-focused**: it is not a permission boundary and does not claim to represent every Odoo capability; it simply advertises which installed application modules and browseable menu paths the current authenticated user can plausibly enter through the shipped mobile browse surface
 - **iOS now stores the tree and flattens it only for metadata lookup**: `AppState.browseRoots` renders the menu tree directly, while `AppState.availableModels` flattens it through `ModelRegistry` so known models still get curated titles/icons and unknown models still get generic descriptors

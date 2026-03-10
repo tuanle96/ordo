@@ -5,8 +5,8 @@ struct RecordListView: View {
     @State private var viewModel: RecordListViewModel
     @State private var isShowingFilterSheet = false
 
-    init(descriptor: ModelDescriptor) {
-        _viewModel = State(initialValue: RecordListViewModel(descriptor: descriptor))
+    init(descriptor: ModelDescriptor, preferredViewMode: BrowsePreferredViewMode? = nil) {
+        _viewModel = State(initialValue: RecordListViewModel(descriptor: descriptor, preferredViewMode: preferredViewMode))
     }
 
     var body: some View {
@@ -58,18 +58,78 @@ struct RecordListView: View {
         }
     }
 
+    @ViewBuilder
     private var listContent: some View {
-        List {
-            cacheBannerSection
-            filterSummarySection
-            quickFiltersSection
-            totalCountSection
-            searchResultsSection
-            recordsSection
+        if viewModel.viewMode == .kanban {
+            // Kanban uses ScrollView instead of List to prevent
+            // SwiftUI List from managing NavigationLinks inside KanbanBoardView,
+            // which causes multiple detail views to be pushed onto the stack.
+            ScrollView {
+                VStack(spacing: 0) {
+                    listHeaderSections
+                    kanbanSection
+                }
+            }
+            .accessibilityIdentifier("record-list-screen")
+            .refreshable {
+                await viewModel.load(using: appState)
+            }
+        } else {
+            List {
+                cacheBannerSection
+                filterSummarySection
+                quickFiltersSection
+                totalCountSection
+                searchResultsSection
+                recordsSection
+            }
+            .accessibilityIdentifier("record-list-screen")
+            .refreshable {
+                await viewModel.load(using: appState)
+            }
         }
-        .accessibilityIdentifier("record-list-screen")
-        .refreshable {
-            await viewModel.load(using: appState)
+    }
+
+    /// Header sections displayed in both List and ScrollView layouts
+    @ViewBuilder
+    private var listHeaderSections: some View {
+        if let cacheMessage = viewModel.cacheMessage {
+            OfflineStateBanner(title: "Showing saved data", message: cacheMessage)
+                .padding(.horizontal, OrdoSpacing.lg)
+                .padding(.vertical, OrdoSpacing.sm)
+        }
+
+        if let filterSummary = viewModel.filterSummary {
+            Label(filterSummary, systemImage: "line.3.horizontal.decrease.circle.fill")
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, OrdoSpacing.lg)
+                .padding(.vertical, OrdoSpacing.sm)
+        }
+
+        if !viewModel.quickFilters.isEmpty {
+            VStack(alignment: .leading, spacing: OrdoSpacing.xs) {
+                Text("Quick Filters")
+                    .font(OrdoTypography.caption)
+                    .foregroundStyle(OrdoColors.textTertiary)
+                    .fontWeight(.semibold)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: OrdoSpacing.sm) {
+                        ForEach(viewModel.quickFilters) { filter in
+                            quickFilterChip(filter)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, OrdoSpacing.lg)
+            .padding(.vertical, OrdoSpacing.sm)
+        }
+
+        if let totalDisplayText = viewModel.totalDisplayText, viewModel.query.isEmpty {
+            Label(totalDisplayText, systemImage: "number")
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, OrdoSpacing.lg)
+                .padding(.vertical, OrdoSpacing.sm)
         }
     }
 
@@ -114,15 +174,26 @@ struct RecordListView: View {
     }
 
     private var browseOptionsIcon: String {
-        viewModel.viewMode == .cards ? "rectangle.grid.1x2" : "tablecells"
+        switch viewModel.viewMode {
+        case .cards:
+            return "rectangle.grid.1x2"
+        case .kanban:
+            return "square.grid.3x2"
+        case .table:
+            return "tablecells"
+        }
     }
 
     private var layoutPicker: some View {
         Picker("Layout", selection: Binding(
             get: { viewModel.viewMode },
-            set: { viewModel.viewMode = $0 }
+            set: { newValue in
+                Task {
+                    await viewModel.select(viewMode: newValue, using: appState)
+                }
+            }
         )) {
-            ForEach(RecordListViewModel.ViewMode.allCases) { mode in
+            ForEach(viewModel.availableViewModes) { mode in
                 Text(mode.title).tag(mode)
             }
         }
@@ -145,7 +216,7 @@ struct RecordListView: View {
 
     @ViewBuilder
     private var groupByPicker: some View {
-        if !viewModel.availableGroupBys.isEmpty {
+        if viewModel.viewMode != .kanban && !viewModel.availableGroupBys.isEmpty {
             Picker("Group By", selection: Binding(
                 get: { viewModel.activeGroupByName ?? "" },
                 set: { newValue in
@@ -300,6 +371,23 @@ struct RecordListView: View {
         }
     }
 
+    private var kanbanSection: some View {
+        VStack(alignment: .leading, spacing: OrdoSpacing.sm) {
+            Text(recordsSectionTitle)
+                .font(OrdoTypography.caption)
+                .foregroundStyle(OrdoColors.textTertiary)
+                .fontWeight(.semibold)
+                .padding(.horizontal, OrdoSpacing.lg)
+
+            KanbanBoardView(descriptor: viewModel.descriptor, sections: viewModel.kanbanSections) { button, recordId in
+                Task {
+                    await viewModel.executeKanbanAction(button: button, recordId: recordId, using: appState)
+                }
+            }
+        }
+        .padding(.vertical, OrdoSpacing.sm)
+    }
+
     private func recordRow(_ row: RecordListViewModel.DisplayRow) -> some View {
         NavigationLink {
             RecordDetailView(descriptor: viewModel.descriptor, recordID: row.id)
@@ -317,7 +405,11 @@ struct RecordListView: View {
         if viewModel.viewMode == .table {
             RecordTableRow(summary: row.summary, record: row.record, columns: viewModel.tableColumns)
         } else {
-            RecordCardRow(summary: row.summary, columns: viewModel.tableColumns)
+            RecordCardRow(summary: row.summary, columns: viewModel.tableColumns, buttons: row.buttons) { button in
+                Task {
+                    await viewModel.executeKanbanAction(button: button, recordId: row.id, using: appState)
+                }
+            }
         }
     }
 

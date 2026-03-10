@@ -339,6 +339,160 @@ describe('MobileSchemaBuilderService', () => {
         });
     });
 
+    it('finds notebook nested inside a div container', () => {
+        const service = new MobileSchemaBuilderService(new ConditionParserService());
+        const xml = `
+            <form string="Settings">
+              <sheet>
+                <group>
+                  <field name="title" />
+                </group>
+                <div class="o_settings_container">
+                  <notebook>
+                    <page string="General">
+                      <group>
+                        <field name="option_a" />
+                      </group>
+                    </page>
+                    <page string="Advanced">
+                      <group>
+                        <field name="option_b" />
+                      </group>
+                    </page>
+                  </notebook>
+                </div>
+              </sheet>
+            </form>
+        `;
+
+        const schema = service.build('res.config.settings', xml, {
+            title: { type: 'char', string: 'Title' },
+            option_a: { type: 'boolean', string: 'Option A' },
+            option_b: { type: 'boolean', string: 'Option B' },
+        });
+
+        expect(schema.sections).toHaveLength(1);
+        expect(schema.sections[0]?.fields).toEqual([
+            expect.objectContaining({ name: 'title', type: 'char' }),
+        ]);
+        expect(schema.tabs).toHaveLength(2);
+        expect(schema.tabs[0]).toEqual({
+            label: 'General',
+            content: {
+                sections: [{ label: null, fields: [expect.objectContaining({ name: 'option_a' })] }],
+            },
+        });
+        expect(schema.tabs[1]).toEqual({
+            label: 'Advanced',
+            content: {
+                sections: [{ label: null, fields: [expect.objectContaining({ name: 'option_b' })] }],
+            },
+        });
+    });
+
+    it('parses a realistic res.users form with inherited tabs and additional fields', () => {
+        const service = new MobileSchemaBuilderService(new ConditionParserService());
+        // Simulates the combined arch after module inheritance (auth_totp, mail, etc.)
+        const xml = `
+            <form string="Users">
+              <sheet>
+                <field name="id" invisible="1" />
+                <field name="image_1920" widget="image" />
+                <div class="oe_title">
+                  <h1><field name="name" required="1" /></h1>
+                  <field name="email" invisible="1" />
+                  <h2><field name="login" /></h2>
+                </div>
+                <field name="partner_id" invisible="1" />
+                <group name="phone_numbers">
+                  <field name="phone" widget="phone" />
+                  <field name="mobile" widget="phone" />
+                </group>
+                <notebook>
+                  <page string="Access Rights" name="access_rights">
+                    <group string="User Type">
+                      <field name="groups_id" />
+                    </group>
+                    <group string="Administration" invisible="share">
+                      <field name="in_group_base_group_erp_manager" />
+                    </group>
+                    <group string="Extra Rights">
+                      <field name="in_group_base_group_allow_export" />
+                      <field name="in_group_base_group_multi_company" />
+                    </group>
+                  </page>
+                  <page string="Preferences" name="preferences">
+                    <group>
+                      <field name="lang" />
+                      <field name="tz" />
+                      <field name="company_id" />
+                    </group>
+                    <group>
+                      <field name="notification_type" />
+                    </group>
+                  </page>
+                  <page string="Account Security" name="account_security">
+                    <group>
+                      <field name="totp_enabled" />
+                    </group>
+                  </page>
+                </notebook>
+              </sheet>
+              <chatter />
+            </form>
+        `;
+
+        const schema = service.build('res.users', xml, {
+            id: { type: 'integer', string: 'ID', readonly: true },
+            image_1920: { type: 'image', string: 'Image' },
+            name: { type: 'char', string: 'Name', required: true },
+            email: { type: 'char', string: 'Email' },
+            login: { type: 'char', string: 'Login' },
+            partner_id: { type: 'many2one', string: 'Related Partner', relation: 'res.partner' },
+            phone: { type: 'char', string: 'Phone' },
+            mobile: { type: 'char', string: 'Mobile' },
+            groups_id: { type: 'many2many', string: 'Groups', relation: 'res.groups' },
+            share: { type: 'boolean', string: 'Share User' },
+            in_group_base_group_erp_manager: { type: 'boolean', string: 'Access to Export Feature' },
+            in_group_base_group_allow_export: { type: 'boolean', string: 'Contact Creation' },
+            in_group_base_group_multi_company: { type: 'boolean', string: 'Multi Companies' },
+            lang: { type: 'selection', string: 'Language', selection: [['en_US', 'English (US)']] },
+            tz: { type: 'selection', string: 'Timezone', selection: [['UTC', 'UTC']] },
+            company_id: { type: 'many2one', string: 'Company', relation: 'res.company' },
+            notification_type: { type: 'selection', string: 'Notification', selection: [['email', 'Email'], ['inbox', 'Inbox']] },
+            totp_enabled: { type: 'boolean', string: 'Two-Factor Authentication' },
+        });
+
+        // Verify sections include the pre-group fields
+        const allSectionFieldNames = schema.sections.flatMap((section) => section.fields.map((field) => field.name));
+        expect(allSectionFieldNames).toContain('name');
+        expect(allSectionFieldNames).toContain('login');
+        expect(allSectionFieldNames).toContain('phone');
+        expect(allSectionFieldNames).toContain('mobile');
+
+        // Verify tabs are extracted correctly
+        expect(schema.tabs).toHaveLength(3);
+        expect(schema.tabs.map((tab) => tab.label)).toEqual(['Access Rights', 'Preferences', 'Account Security']);
+
+        // Check Access Rights tab content
+        const accessRightsTab = schema.tabs[0];
+        const accessRightsSections = accessRightsTab.content.sections as Array<{ label: string | null; fields: Array<{ name: string }> }>;
+        const accessRightsFieldNames = accessRightsSections.flatMap((section) => section.fields.map((field) => field.name));
+        expect(accessRightsFieldNames).toContain('groups_id');
+        expect(accessRightsFieldNames).toContain('in_group_base_group_erp_manager');
+
+        // Check Preferences tab content
+        const prefsTab = schema.tabs[1];
+        const prefsSections = prefsTab.content.sections as Array<{ label: string | null; fields: Array<{ name: string }> }>;
+        const prefsFieldNames = prefsSections.flatMap((section) => section.fields.map((field) => field.name));
+        expect(prefsFieldNames).toContain('lang');
+        expect(prefsFieldNames).toContain('tz');
+        expect(prefsFieldNames).toContain('company_id');
+
+        // Check chatter
+        expect(schema.hasChatter).toBe(true);
+    });
+
     it('detects Odoo 17 chatter declared as <div class="oe_chatter">', () => {
         const service = new MobileSchemaBuilderService(new ConditionParserService());
         const xml = `

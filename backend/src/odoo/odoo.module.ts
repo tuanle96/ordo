@@ -7,6 +7,7 @@ import { OdooV18Adapter } from '@app/odoo/adapters/odoo-v18.adapter';
 import { OdooV19Adapter } from '@app/odoo/adapters/odoo-v19.adapter';
 import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
 import { ConditionParserService } from '@app/odoo/schema/condition-parser.service';
+import { MobileKanbanSchemaBuilderService } from '@app/odoo/schema/mobile-kanban-schema-builder.service';
 import { MobileListSchemaBuilderService } from '@app/odoo/schema/mobile-list-schema-builder.service';
 import { MobileSchemaBuilderService } from '@app/odoo/schema/mobile-schema-builder.service';
 import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.service';
@@ -17,6 +18,7 @@ import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.se
         OdooRpcService,
         OdooSessionStoreService,
         ConditionParserService,
+        MobileKanbanSchemaBuilderService,
         MobileListSchemaBuilderService,
         MobileSchemaBuilderService,
         OdooV17Adapter,

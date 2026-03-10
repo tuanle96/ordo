@@ -4,6 +4,7 @@ import type {
     ChatterMessage,
     ChatterThreadResult,
     MobileFormSchema,
+    MobileKanbanSchema,
     MobileListSchema,
     NameSearchResult,
     OnchangeRequest,
@@ -21,6 +22,7 @@ export interface OdooAdapter {
     readonly version: string;
     isModelAvailable(session: OdooSessionContext, model: string): Promise<boolean>;
     getFormSchema(session: OdooSessionContext, model: string): Promise<MobileFormSchema>;
+    getKanbanSchema(session: OdooSessionContext, model: string): Promise<MobileKanbanSchema | null>;
     getListSchema(session: OdooSessionContext, model: string): Promise<MobileListSchema>;
     getDefaultValues(
         session: OdooSessionContext,

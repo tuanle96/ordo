@@ -5,9 +5,27 @@ import OSLog
 @MainActor
 @Observable
 final class RecordListViewModel {
+    struct KanbanCardModel: Identifiable {
+        let summary: RecordRowSummary
+        let record: RecordData
+        let accentValue: String?
+        let buttons: [KanbanCardButton]
+
+        var id: Int { summary.id }
+    }
+
+    struct KanbanSection: Identifiable {
+        let key: String
+        let title: String
+        let rows: [KanbanCardModel]
+
+        var id: String { key }
+    }
+
     struct DisplayRow: Identifiable {
         let summary: RecordRowSummary
         let record: RecordData
+        let buttons: [KanbanCardButton]
 
         var id: Int { summary.id }
     }
@@ -21,6 +39,7 @@ final class RecordListViewModel {
 
     enum ViewMode: String, CaseIterable, Identifiable {
         case cards
+        case kanban
         case table
 
         var id: String { rawValue }
@@ -29,6 +48,8 @@ final class RecordListViewModel {
             switch self {
             case .cards:
                 return "Cards"
+            case .kanban:
+                return "Kanban"
             case .table:
                 return "Table"
             }
@@ -85,6 +106,7 @@ final class RecordListViewModel {
     private(set) var isLoadingMore = false
     private(set) var canLoadMore = true
     private(set) var totalCount: Int?
+    private(set) var kanbanSchema: MobileKanbanSchema?
     private(set) var listSchema: MobileListSchema?
     private(set) var activeQuickFilterName: String?
     private(set) var activeGroupByName: String?
@@ -101,19 +123,30 @@ final class RecordListViewModel {
     private var loadedOffsets = Set<Int>()
     private var nextOffset = 0
     private var didAttemptListSchemaLoad = false
+    private var didAttemptKanbanSchemaLoad = false
     private var filterFields: [BrowseFilterField]
+    private let preferredViewMode: BrowsePreferredViewMode?
     private let userDefaults: UserDefaults
 
-    init(descriptor: ModelDescriptor, userDefaults: UserDefaults = .standard) {
+    init(
+        descriptor: ModelDescriptor,
+        preferredViewMode: BrowsePreferredViewMode? = nil,
+        userDefaults: UserDefaults = .standard
+    ) {
         let initialFilterFields = BrowseFilterRegistry.fields(for: descriptor, listSchema: nil)
         let initialFilterState = BrowseFilterStore.load(model: descriptor.model, userDefaults: userDefaults)
             .normalized(with: initialFilterFields)
 
         self.descriptor = descriptor
+        self.preferredViewMode = preferredViewMode
         self.userDefaults = userDefaults
         self.filterFields = initialFilterFields
         self.filterState = initialFilterState
         self.activeGroupByName = BrowseGroupByStore.load(model: descriptor.model, userDefaults: userDefaults)
+    }
+
+    var availableViewModes: [ViewMode] {
+        kanbanSchema == nil ? [.cards, .table] : [.cards, .kanban, .table]
     }
 
     var availableFilterFields: [BrowseFilterField] {
@@ -125,7 +158,7 @@ final class RecordListViewModel {
     }
 
     var quickFilters: [SearchFilter] {
-        listSchema?.search.filters ?? []
+        kanbanSchema?.search.filters ?? listSchema?.search.filters ?? []
     }
 
     var availableGroupBys: [SearchGroupBy] {
@@ -189,11 +222,17 @@ final class RecordListViewModel {
             baseFields = ["id", "display_name", "name"] + descriptor.titleFields + descriptor.subtitleFields + descriptor.footnoteFields
         }
 
-        if let activeGroupField = activeGroupBy?.fieldName {
-            return orderedUnique(baseFields + [activeGroupField])
+        var requested = baseFields
+
+        if let kanbanSchema {
+            requested += kanbanSchema.requestedFieldNames
         }
 
-        return orderedUnique(baseFields)
+        if let activeGroupField = activeGroupBy?.fieldName {
+            requested.append(activeGroupField)
+        }
+
+        return orderedUnique(requested)
     }
 
     func apply(sortOption: SortOption, using appState: AppState) async {
@@ -207,7 +246,7 @@ final class RecordListViewModel {
     }
 
     func apply(filterState: BrowseFilterState, using appState: AppState) async {
-        await loadListSchemaIfNeeded(using: appState)
+        await loadSchemasIfNeeded(using: appState)
         let normalizedState = filterState.normalized(with: filterFields)
         guard normalizedState != self.filterState else { return }
         self.filterState = normalizedState
@@ -250,7 +289,7 @@ final class RecordListViewModel {
         }
 
         if replacing {
-            await loadListSchemaIfNeeded(using: appState)
+            await loadSchemasIfNeeded(using: appState)
         }
 
         let order = sortOption.order(for: descriptor)
@@ -318,27 +357,55 @@ final class RecordListViewModel {
         isLoadingMore = false
     }
 
-    private func loadListSchemaIfNeeded(using appState: AppState) async {
-        guard !didAttemptListSchemaLoad else { return }
+    private func loadSchemasIfNeeded(using appState: AppState) async {
+        guard !didAttemptListSchemaLoad || !didAttemptKanbanSchemaLoad else { return }
 
-        do {
-            let schema = try await appState.withAuthenticatedToken { [descriptor] token in
-                try await appState.apiClient.listSchema(model: descriptor.model, token: token)
+        if !didAttemptListSchemaLoad {
+            do {
+                let listSchema = try await appState.withAuthenticatedToken { [descriptor] token in
+                    try await appState.apiClient.listSchema(model: descriptor.model, token: token)
+                }
+
+                didAttemptListSchemaLoad = true
+                self.listSchema = listSchema
+                filterFields = BrowseFilterRegistry.fields(for: descriptor, listSchema: listSchema)
+                filterState = filterState.normalized(with: filterFields)
+                activeGroupByName = normalizedGroupByName(activeGroupByName, available: listSchema.search.groupBy)
+                BrowseGroupByStore.save(activeGroupByName, model: descriptor.model, userDefaults: userDefaults)
+            } catch {
+                if case APIClientError.unauthorized = error {
+                    appState.signOut()
+                    return
+                }
+
+                Self.logger.info("ℹ️ Falling back to descriptor browse config for \(self.descriptor.model, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
+        }
 
-            didAttemptListSchemaLoad = true
-            listSchema = schema
-            filterFields = BrowseFilterRegistry.fields(for: descriptor, listSchema: schema)
-            filterState = filterState.normalized(with: filterFields)
-            activeGroupByName = normalizedGroupByName(activeGroupByName, available: schema.search.groupBy)
-            BrowseGroupByStore.save(activeGroupByName, model: descriptor.model, userDefaults: userDefaults)
-        } catch {
-            if case APIClientError.unauthorized = error {
-                appState.signOut()
-                return
+        if !didAttemptKanbanSchemaLoad {
+            do {
+                let kanbanSchema = try await appState.withAuthenticatedToken { [descriptor] token in
+                    try await appState.apiClient.kanbanSchema(model: descriptor.model, token: token)
+                }
+
+                didAttemptKanbanSchemaLoad = true
+                self.kanbanSchema = kanbanSchema
+            } catch {
+                if case APIClientError.unauthorized = error {
+                    appState.signOut()
+                    return
+                }
+
+                didAttemptKanbanSchemaLoad = true
+                self.kanbanSchema = nil
+                Self.logger.info("ℹ️ Kanban schema unavailable for \(self.descriptor.model, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
+        }
 
-            Self.logger.info("ℹ️ Falling back to descriptor browse config for \(self.descriptor.model, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        if preferredViewMode == .kanban, kanbanSchema != nil {
+            viewMode = .kanban
+        } else if viewMode == .kanban, kanbanSchema == nil {
+            viewMode = .cards
         }
     }
 
@@ -401,7 +468,8 @@ final class RecordListViewModel {
     var displayRows: [DisplayRow] {
         items.compactMap { record in
             guard let summary = summary(for: record) else { return nil }
-            return DisplayRow(summary: summary, record: record)
+            let buttons = kanbanSchema?.visibleButtons(for: record) ?? []
+            return DisplayRow(summary: summary, record: record, buttons: buttons)
         }
     }
 
@@ -419,6 +487,116 @@ final class RecordListViewModel {
 
     var isGroupingActive: Bool {
         activeGroupBy != nil
+    }
+
+    var kanbanSections: [KanbanSection] {
+        guard let kanbanSchema else { return [] }
+
+        // Flat kanban — no group-by field, return all cards in a single section
+        if kanbanSchema.groupByField == nil {
+            let rows = items.compactMap { record -> KanbanCardModel? in
+                guard let summary = kanbanSummary(for: record, schema: kanbanSchema) else { return nil }
+                return KanbanCardModel(
+                    summary: summary,
+                    record: record,
+                    accentValue: kanbanAccentValue(for: record, schema: kanbanSchema),
+                    buttons: kanbanSchema.visibleButtons(for: record)
+                )
+            }
+            return rows.isEmpty ? [] : [KanbanSection(key: "__flat__", title: kanbanSchema.title, rows: rows)]
+        }
+
+        let groupedRows = Dictionary(grouping: items.compactMap { record -> (String, String, KanbanCardModel)? in
+            guard let summary = kanbanSummary(for: record, schema: kanbanSchema) else { return nil }
+            let group = kanbanGroupIdentity(for: record, schema: kanbanSchema)
+            return (
+                group.key,
+                group.title,
+                KanbanCardModel(
+                    summary: summary,
+                    record: record,
+                    accentValue: kanbanAccentValue(for: record, schema: kanbanSchema),
+                    buttons: kanbanSchema.visibleButtons(for: record)
+                )
+            )
+        }) { $0.0 }
+
+        let fallbackTitlesByKey = groupedRows.reduce(into: [String: String]()) { partialResult, element in
+            guard let title = element.value.first?.1 else { return }
+            partialResult[element.key] = title
+        }
+
+        var orderedKeys = kanbanSchema.groupBySelection?.compactMap { selection in
+            selection.count >= 2 ? selection[0] : nil
+        } ?? []
+
+        for key in items.compactMap({ kanbanGroupIdentity(for: $0, schema: kanbanSchema).key }) where !orderedKeys.contains(key) {
+            orderedKeys.append(key)
+        }
+
+        if kanbanSchema.groupBySelection == nil {
+            orderedKeys.sort {
+                let leftTitle = fallbackTitlesByKey[$0] ?? $0
+                let rightTitle = fallbackTitlesByKey[$1] ?? $1
+                return leftTitle.localizedCaseInsensitiveCompare(rightTitle) == .orderedAscending
+            }
+        }
+
+        return orderedKeys.compactMap { key in
+            let rows = groupedRows[key]?.map(\.2) ?? []
+            let title = groupedRows[key]?.first?.1
+                ?? kanbanSchema.groupBySelection?.first(where: { $0.count >= 2 && $0[0] == key })?[1]
+                ?? key
+
+            return KanbanSection(key: key, title: title, rows: rows)
+        }
+    }
+
+    func select(viewMode: ViewMode, using appState: AppState) async {
+        guard viewMode != self.viewMode else { return }
+
+        if viewMode == .kanban {
+            await loadSchemasIfNeeded(using: appState)
+            guard kanbanSchema != nil else { return }
+        }
+
+        self.viewMode = viewMode
+    }
+
+    func executeKanbanAction(button: KanbanCardButton, recordId: Int, using appState: AppState) async {
+        Self.logger.info("🔘 Executing kanban action \(button.name, privacy: .public) on \(self.descriptor.model, privacy: .public)#\(recordId)")
+
+        do {
+            let result = try await appState.withAuthenticatedToken { [self] token in
+                try await appState.apiClient.runRecordAction(
+                    model: self.descriptor.model,
+                    id: recordId,
+                    actionName: button.name,
+                    fields: self.requestedFields,
+                    token: token
+                )
+            }
+
+            Self.logger.info("✅ Kanban action \(button.name, privacy: .public) completed, changed=\(result.changed)")
+
+            // If the action returned an updated record, merge it in place
+            if let updatedRecord = result.record {
+                if let index = items.firstIndex(where: { $0["id"]?.intValue == recordId }) {
+                    items[index] = updatedRecord
+                }
+            } else if result.changed {
+                // Reload all items to reflect changes
+                await load(using: appState)
+            }
+        } catch {
+            Self.logger.error("❌ Kanban action \(button.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+
+            if case APIClientError.unauthorized = error {
+                appState.signOut()
+            } else {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func summary(for record: RecordData) -> RecordRowSummary? {
@@ -446,6 +624,47 @@ final class RecordListViewModel {
             id: id,
             title: title,
             subtitle: subtitle.isEmpty ? nil : subtitle,
+            footnote: footnote.isEmpty ? nil : footnote
+        )
+    }
+
+    private func kanbanSummary(for record: RecordData, schema: MobileKanbanSchema) -> RecordRowSummary? {
+        guard let id = record["id"]?.intValue else { return nil }
+
+        // Always use display_name as the title — it's the human-readable label
+        let displayName = record["display_name"]?.displayText
+        let fallbackTitle = descriptor.summary(from: record)?.title ?? "Record #\(id)"
+        let title = (displayName == nil || displayName == "—" || displayName?.isEmpty == true)
+            ? fallbackTitle
+            : displayName!
+
+        // Show the technical name (field 'name') as subtitle — matches Odoo web's green technical name
+        let technicalName = record["name"]?.stringValue
+
+        // Field types that are not useful as summary text
+        let excludedFieldTypes: Set<String> = ["binary", "image", "html", "one2many", "many2many", "signature"]
+
+        // Use remaining cardFields for footnote (e.g., summary, author)
+        let detailValues = schema.cardFields
+            .filter { field in
+                guard field.name != "display_name" && field.name != "name" else { return false }
+                guard !excludedFieldTypes.contains(field.type.rawValue) else { return false }
+                return true
+            }
+            .compactMap { field -> String? in
+                let value = record[field.name]?.displayText
+                guard let value, value != "—", !value.isEmpty else { return nil }
+                guard !value.hasPrefix("/") && !value.hasPrefix("http") else { return nil }
+                guard value.count < 100 else { return nil }
+                return value
+            }
+
+        let footnote = detailValues.prefix(2).joined(separator: " · ")
+
+        return RecordRowSummary(
+            id: id,
+            title: title,
+            subtitle: technicalName,
             footnote: footnote.isEmpty ? nil : footnote
         )
     }
@@ -497,6 +716,34 @@ final class RecordListViewModel {
     private func normalizedGroupByName(_ groupByName: String?, available: [SearchGroupBy]) -> String? {
         guard let groupByName else { return nil }
         return available.contains(where: { $0.name == groupByName }) ? groupByName : nil
+    }
+
+    private func kanbanAccentValue(for record: RecordData, schema: MobileKanbanSchema) -> String? {
+        guard let colorField = schema.colorField else { return nil }
+        return record[colorField]?.stringValue ?? record[colorField]?.displayText
+    }
+
+    private func kanbanGroupIdentity(for record: RecordData, schema: MobileKanbanSchema) -> (key: String, title: String) {
+        guard let groupByField = schema.groupByField,
+              let value = record[groupByField], !value.isVisuallyEmpty else {
+            return ("__empty__", "No Group")
+        }
+
+        if let relationID = value.relationID {
+            let title = value.relationLabel ?? value.displayText
+            return ("relation:\(relationID)", title)
+        }
+
+        if let rawValue = value.stringValue, !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if let selectionLabel = schema.groupBySelection?.first(where: { $0.count >= 2 && $0[0] == rawValue })?[1] {
+                return (rawValue, selectionLabel)
+            }
+
+            return (rawValue, rawValue)
+        }
+
+        let fallback = value.displayText
+        return (fallback, fallback)
     }
 
     private func orderedUnique(_ values: [String]) -> [String] {

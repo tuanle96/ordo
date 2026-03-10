@@ -85,7 +85,7 @@ describe('SchemaCacheService', () => {
         ).resolves.toBeUndefined();
     });
 
-    it('builds separate keys for form and list schema segments', () => {
+    it('builds separate keys for form, list, and kanban schema segments', () => {
         const configService = {
             get: jest.fn((key: string, fallback?: string) => (key === 'REDIS_KEY_PREFIX' ? 'ordo' : fallback)),
         } as unknown as ConfigService;
@@ -97,9 +97,12 @@ describe('SchemaCacheService', () => {
 
         const formKey = service.buildKey(odooFixtures.tokenPayload, 'form', 'res.partner');
         const listKey = service.buildKey(odooFixtures.tokenPayload, 'list', 'res.partner');
+        const kanbanKey = service.buildKey(odooFixtures.tokenPayload, 'kanban', 'crm.lead');
 
         expect(formKey).not.toBe(listKey);
+        expect(listKey).not.toBe(kanbanKey);
         expect(formKey).toContain(':form:');
         expect(listKey).toContain(':list:');
+        expect(kanbanKey).toContain(':kanban:');
     });
 });

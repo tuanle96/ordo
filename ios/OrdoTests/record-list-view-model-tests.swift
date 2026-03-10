@@ -456,6 +456,84 @@ struct RecordListViewModelTests {
         #expect(viewModel.displaySections.last?.rows.map(\.summary.title) == ["Azure Interior", "Northwind"])
     }
 
+    @Test
+    func preferredKanbanModeAutoSelectsWhenSchemaLoads() async throws {
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchema)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/kanban") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleKanbanSchema)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let payload = RecordListResult(
+                    items: [
+                        ["id": .number(1), "name": .string("Azure Interior"), "email": .string("azure@example.com"), "country_id": .relation(id: 233, label: "United States")],
+                        ["id": .number(2), "name": .string("Deco Addict"), "email": .string("deco@example.com"), "country_id": .relation(id: 124, label: "Canada")],
+                    ],
+                    limit: 30,
+                    offset: 0,
+                    total: 2
+                )
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults(), preferredViewMode: .kanban)
+
+        await viewModel.load(using: appState)
+
+        #expect(viewModel.viewMode == .kanban)
+        #expect(viewModel.availableViewModes.contains(.kanban))
+        #expect(viewModel.kanbanSections.map(\.title) == ["Canada", "United States"])
+    }
+
+    @Test
+    func preferredKanbanModeFallsBackWhenSchemaIsUnavailable() async throws {
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchema)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/kanban") {
+                return (200, try JSONEncoder().encode(TestEnvelope<MobileKanbanSchema?>(data: nil)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let payload = RecordListResult(items: [["id": .number(1), "name": .string("Azure Interior"), "email": .string("azure@example.com")]], limit: 30, offset: 0, total: 1)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults(), preferredViewMode: .kanban)
+
+        await viewModel.load(using: appState)
+
+        #expect(viewModel.viewMode == .cards)
+        #expect(viewModel.availableViewModes == [.cards, .table])
+        #expect(viewModel.kanbanSections.isEmpty)
+    }
+
     private func makeRestoredAppState() async throws -> AppState {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ListViewModelTestURLProtocol.self]
@@ -473,9 +551,13 @@ struct RecordListViewModelTests {
         return appState
     }
 
-    private func makeViewModel(userDefaults: UserDefaults) throws -> RecordListViewModel {
+    private func makeViewModel(
+        userDefaults: UserDefaults,
+        preferredViewMode: BrowsePreferredViewMode? = nil
+    ) throws -> RecordListViewModel {
         RecordListViewModel(
             descriptor: try #require(ModelRegistry.supported.first),
+            preferredViewMode: preferredViewMode,
             userDefaults: userDefaults
         )
     }
@@ -570,4 +652,17 @@ private let sampleListSchemaWithFilterDomain = MobileListSchema(
         ],
         groupBy: []
     )
+)
+
+private let sampleKanbanSchema = MobileKanbanSchema(
+    model: "res.partner",
+    title: "Customers",
+    groupByField: "country_id",
+    groupBySelection: nil,
+    cardFields: [
+        KanbanCardField(name: "name", type: .char, label: "Name", widget: nil, comodel: nil),
+        KanbanCardField(name: "email", type: .char, label: "Email", widget: nil, comodel: nil),
+    ],
+    colorField: nil,
+    search: .init(fields: [], filters: [])
 )

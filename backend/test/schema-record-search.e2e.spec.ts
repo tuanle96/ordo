@@ -15,6 +15,13 @@ describe('Schema, record, and search endpoints', () => {
 
     const schemaServiceMock = {
         getFormSchema: jest.fn().mockResolvedValue(odooFixtures.schema),
+        getKanbanSchema: jest.fn().mockResolvedValue({
+            model: 'crm.lead',
+            title: 'Leads',
+            groupByField: 'stage_id',
+            cardFields: [{ name: 'name', type: 'char', label: 'Name' }],
+            search: { fields: [], filters: [] },
+        }),
         getListSchema: jest.fn().mockResolvedValue({
             model: 'res.partner',
             title: 'Partners',
@@ -96,6 +103,26 @@ describe('Schema, record, and search endpoints', () => {
             title: 'Partners',
             columns: [{ name: 'name', type: 'char', label: 'Name' }],
             search: { fields: [], filters: [], groupBy: [] },
+        });
+    });
+
+    it('returns kanban schema envelope for /schema/:model/kanban', async () => {
+        const response = await request(protectedApp.getHttpServer())
+            .get('/api/v1/mobile/schema/crm.lead/kanban')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+
+        expect(schemaServiceMock.getKanbanSchema).toHaveBeenCalledWith(
+            expect.objectContaining({ uid: 2 }),
+            'crm.lead',
+            false,
+        );
+        expect(response.body.data).toEqual({
+            model: 'crm.lead',
+            title: 'Leads',
+            groupByField: 'stage_id',
+            cardFields: [{ name: 'name', type: 'char', label: 'Name' }],
+            search: { fields: [], filters: [] },
         });
     });
 

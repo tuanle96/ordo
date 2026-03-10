@@ -29,7 +29,8 @@ enum UITestAppStateFactory {
             config: config,
             sessionStore: sessionStore,
             apiClient: apiClient,
-            cacheStore: cacheStore
+            cacheStore: cacheStore,
+            mutationQueueStore: FileMutationQueueStore(baseDirectoryURL: cacheDirectory.deletingLastPathComponent().appending(path: "OrdoUITestMutationQueue", directoryHint: .isDirectory))
         )
     }
 

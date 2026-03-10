@@ -13,8 +13,8 @@ struct RecentItem: Codable, Identifiable, Hashable {
 @MainActor
 @Observable
 final class RecentItemsStore {
-    private nonisolated(unsafe) static let defaultStorageKey = "ordo.recentItems"
-    private nonisolated(unsafe) static let defaultMaxItems = 10
+    private static let defaultStorageKey = "ordo.recentItems"
+    private static let defaultMaxItems = 10
 
     private let defaults: UserDefaults
     private let storageKey: String

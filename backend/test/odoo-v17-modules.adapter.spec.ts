@@ -10,7 +10,7 @@ describe('OdooV17Adapter getInstalledModules', () => {
                 { name: 'sale', shortdesc: 'Sales' },
             ]),
         };
-        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never, {} as never);
 
         await expect(adapter.getInstalledModules(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
@@ -38,7 +38,7 @@ describe('OdooV17Adapter getInstalledModules', () => {
         const odooRpcService = {
             callKwWithSession: jest.fn().mockResolvedValue([]),
         };
-        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never, {} as never);
 
         await expect(adapter.getInstalledModules(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
@@ -51,7 +51,7 @@ describe('OdooV17Adapter isModelAvailable', () => {
         const odooRpcService = {
             callKwWithSession: jest.fn().mockRejectedValue(new NotFoundException('missing model')),
         };
-        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never, {} as never);
 
         await expect(adapter.isModelAvailable(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
@@ -63,7 +63,7 @@ describe('OdooV17Adapter isModelAvailable', () => {
         const odooRpcService = {
             callKwWithSession: jest.fn().mockRejectedValue(new Error('timeout')),
         };
-        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never, {} as never);
 
         await expect(adapter.isModelAvailable(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
@@ -92,7 +92,7 @@ describe('OdooV17Adapter getBrowseMenuTree', () => {
                     { id: 23, name: 'Wizard', res_model: 'crm.merge.opportunity', view_mode: 'form', target: 'new' },
                 ]),
         };
-        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never, {} as never);
 
         await expect(adapter.getBrowseMenuTree(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
@@ -103,7 +103,7 @@ describe('OdooV17Adapter getBrowseMenuTree', () => {
                 kind: 'app',
                 model: 'res.partner',
                 children: [
-                    { id: 11, name: 'Contacts', kind: 'leaf', model: 'res.partner', children: [] },
+                    { id: 11, name: 'Contacts', kind: 'leaf', model: 'res.partner', preferredViewMode: 'list', children: [] },
                 ],
             },
             {
@@ -117,7 +117,7 @@ describe('OdooV17Adapter getBrowseMenuTree', () => {
                         name: 'Sales',
                         kind: 'category',
                         children: [
-                            { id: 22, name: 'Leads', kind: 'leaf', model: 'crm.lead', children: [] },
+                            { id: 22, name: 'Leads', kind: 'leaf', model: 'crm.lead', preferredViewMode: 'kanban', children: [] },
                         ],
                     },
                 ],
@@ -149,7 +149,7 @@ describe('OdooV17Adapter getBrowseMenuTree', () => {
         const odooRpcService = {
             callKwWithSession: jest.fn().mockResolvedValue([]),
         };
-        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never, {} as never);
 
         await expect(adapter.getBrowseMenuTree(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,

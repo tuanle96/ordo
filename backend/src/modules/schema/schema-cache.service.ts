@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { MobileFormSchema, MobileListSchema, TokenPayload } from '@app/shared';
+import type { MobileFormSchema, MobileKanbanSchema, MobileListSchema, TokenPayload } from '@app/shared';
 
 import { RedisService } from '@app/common/redis/redis.service';
 
@@ -20,7 +20,7 @@ export class SchemaCacheService {
         this.shouldLog = this.configService.get<string>('NODE_ENV', process.env.NODE_ENV ?? 'development') !== 'test';
     }
 
-    buildKey(currentUser: TokenPayload, segment: 'form' | 'list', model: string): string {
+    buildKey(currentUser: TokenPayload, segment: 'form' | 'kanban' | 'list', model: string): string {
         const normalizedUrl = new URL(currentUser.odooUrl).toString().replace(/\/$/, '');
 
         return [
@@ -36,9 +36,9 @@ export class SchemaCacheService {
         ].join(':');
     }
 
-    async get<T extends MobileFormSchema | MobileListSchema>(
+    async get<T extends MobileFormSchema | MobileKanbanSchema | MobileListSchema>(
         currentUser: TokenPayload,
-        segment: 'form' | 'list',
+        segment: 'form' | 'kanban' | 'list',
         model: string,
     ): Promise<T | null> {
         try {
@@ -56,9 +56,9 @@ export class SchemaCacheService {
         }
     }
 
-    async set<T extends MobileFormSchema | MobileListSchema>(
+    async set<T extends MobileFormSchema | MobileKanbanSchema | MobileListSchema>(
         currentUser: TokenPayload,
-        segment: 'form' | 'list',
+        segment: 'form' | 'kanban' | 'list',
         model: string,
         schema: T,
     ): Promise<void> {

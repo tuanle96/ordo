@@ -166,6 +166,54 @@ struct SchemaModelsTests {
         #expect(schema.search.fields.first?.filterDomain == "[\"|\",[\"display_name\",\"ilike\",\"self\"],[\"name\",\"ilike\",\"self\"]]")
     }
 
+    @Test
+    func mobileKanbanSchemaDecodesRequestedFields() throws {
+        let json = """
+        {
+            "model": "crm.lead",
+            "title": "Leads",
+            "groupByField": "stage_id",
+            "groupBySelection": [["new", "New"]],
+            "cardFields": [
+                { "name": "name", "type": "char", "label": "Name" },
+                { "name": "partner_name", "type": "char", "label": "Customer" }
+            ],
+            "colorField": "color",
+            "search": {
+                "fields": [],
+                "filters": []
+            }
+        }
+        """.data(using: .utf8)!
+
+        let schema = try JSONDecoder().decode(MobileKanbanSchema.self, from: json)
+
+        #expect(Set(schema.requestedFieldNames).isSuperset(of: ["id", "display_name", "name", "partner_name", "stage_id", "color"]))
+    }
+
+    @Test
+    func browseMenuNodeDecodesPreferredViewMode() throws {
+        let json = """
+        {
+            "modules": [],
+            "browseMenuTree": [
+                {
+                    "id": 22,
+                    "name": "Leads",
+                    "kind": "leaf",
+                    "model": "crm.lead",
+                    "preferredViewMode": "kanban",
+                    "children": []
+                }
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(InstalledModulesResponse.self, from: json)
+
+        #expect(response.browseMenuTree.first?.preferredViewMode == .kanban)
+    }
+
     private func encodedJSONValue<T: Encodable>(from value: T) throws -> JSONValue {
         let data = try JSONEncoder().encode(value)
         return try JSONDecoder().decode(JSONValue.self, from: data)

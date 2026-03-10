@@ -9,13 +9,13 @@ protocol MutationQueueStoring {
     func pendingCount(scope: CacheScope?) async -> Int
 }
 
-enum QueuedRecordMutationKind: String, Codable {
+enum QueuedRecordMutationKind: String, Codable, Sendable {
     case update
     case delete
     case action
 }
 
-struct QueuedRecordMutation: Codable, Identifiable, Hashable {
+struct QueuedRecordMutation: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let model: String
     let recordID: Int
@@ -54,23 +54,23 @@ struct QueuedRecordMutation: Codable, Identifiable, Hashable {
 
 actor FileMutationQueueStore: MutationQueueStoring {
     private let baseDirectoryURL: URL
-    private let fileManager: FileManager
+    private nonisolated(unsafe) let fileManager: FileManager
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    nonisolated init() {
+    init() {
         let fileManager = FileManager.default
         self.fileManager = fileManager
         self.baseDirectoryURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appending(path: "OrdoMutationQueue", directoryHint: .isDirectory)
     }
 
-    nonisolated init(baseDirectoryURL: URL) {
+    init(baseDirectoryURL: URL) {
         self.fileManager = .default
         self.baseDirectoryURL = baseDirectoryURL
     }
 
-    nonisolated init(baseDirectoryURL: URL, fileManager: FileManager) {
+    init(baseDirectoryURL: URL, fileManager: FileManager) {
         self.fileManager = fileManager
         self.baseDirectoryURL = baseDirectoryURL
     }

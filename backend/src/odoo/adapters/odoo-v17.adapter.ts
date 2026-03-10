@@ -8,6 +8,7 @@ import type {
     ChatterMessage,
     ChatterThreadResult,
     MobileFormSchema,
+    MobileKanbanSchema,
     MobileListSchema,
     NameSearchResult,
     OnchangeRequest,
@@ -17,11 +18,12 @@ import type {
     RecordListResult,
 } from '@app/shared';
 
-import type { BrowseMenuNode, InstalledModuleInfo } from '@app/modules/module/module.types';
+import type { BrowseMenuNode, BrowsePreferredViewMode, InstalledModuleInfo } from '@app/modules/module/module.types';
 
 import { OdooAdapter } from '@app/odoo/adapters/odoo-adapter.interface';
 import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
 import type { OdooFieldsSpec } from '@app/odoo/rpc/odoo-rpc.types';
+import { MobileKanbanSchemaBuilderService } from '@app/odoo/schema/mobile-kanban-schema-builder.service';
 import { MobileListSchemaBuilderService } from '@app/odoo/schema/mobile-list-schema-builder.service';
 import { MobileSchemaBuilderService } from '@app/odoo/schema/mobile-schema-builder.service';
 import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
@@ -33,6 +35,7 @@ export class OdooV17Adapter implements OdooAdapter {
     constructor(
         private readonly odooRpcService: OdooRpcService,
         private readonly schemaBuilder: MobileSchemaBuilderService,
+        private readonly kanbanSchemaBuilder: MobileKanbanSchemaBuilderService,
         private readonly listSchemaBuilder: MobileListSchemaBuilderService,
     ) { }
 
@@ -58,24 +61,102 @@ export class OdooV17Adapter implements OdooAdapter {
     }
 
     async getFormSchema(session: OdooSessionContext, model: string): Promise<MobileFormSchema> {
-        const fieldsMeta = await this.odooRpcService.callKwWithSession<Record<string, OdooFieldMeta>>({
-            session,
-            model,
-            method: 'fields_get',
-            kwargs: {
-                attributes: ['string', 'type', 'readonly', 'required', 'relation', 'selection', 'domain', 'digits', 'currency_field'],
-            },
-        });
+        const [fieldsMeta, formViewId] = await Promise.all([
+            this.odooRpcService.callKwWithSession<Record<string, OdooFieldMeta>>({
+                session,
+                model,
+                method: 'fields_get',
+                kwargs: {
+                    attributes: ['string', 'type', 'readonly', 'required', 'relation', 'selection', 'domain', 'digits', 'currency_field'],
+                },
+            }),
+            this.resolveRichestFormViewId(session, model),
+        ]);
         const view = await this.odooRpcService.callKwWithSession<{ arch: string }>({
             session,
             model,
             method: 'get_view',
             kwargs: {
                 view_type: 'form',
+                ...(formViewId ? { view_id: formViewId } : {}),
             },
         });
 
         return this.schemaBuilder.build(model, view.arch, fieldsMeta);
+    }
+
+    /**
+     * When a model has multiple non-inherited form views (e.g. res.users has a
+     * simplified form at priority 1 and a full admin form at priority 16),
+     * Odoo's `get_view()` without a view_id returns the one with the **lowest**
+     * priority number — which is often a stripped-down version.
+     *
+     * This method resolves the **richest** form view by picking the one with
+     * the highest priority number (most complete), skipping settings forms.
+     * Returns undefined when there is only one form view (safe to use Odoo's default).
+     */
+    private async resolveRichestFormViewId(
+        session: OdooSessionContext,
+        model: string,
+    ): Promise<number | undefined> {
+        try {
+            const views = await this.odooRpcService.callKwWithSession<
+                Array<{ id: number; name: string; priority: number }>
+            >({
+                session,
+                model: 'ir.ui.view',
+                method: 'search_read',
+                kwargs: {
+                    domain: [
+                        ['model', '=', model],
+                        ['type', '=', 'form'],
+                        ['inherit_id', '=', false],
+                    ],
+                    fields: ['id', 'name', 'priority'],
+                    order: 'priority desc, id desc',
+                },
+            });
+
+            if (views.length <= 1) {
+                return undefined;
+            }
+
+            // Skip settings/config views (oe_form_configuration / base_settings)
+            // and the "simplified" form (lowest priority) by picking the first
+            // non-settings form with the highest priority number.
+            const best = views.find(
+                (view) => !view.name.toLowerCase().includes('settings') && !view.name.toLowerCase().includes('config'),
+            );
+
+            if (!best) {
+                return undefined;
+            }
+
+            // Only override if the best view is different from the default
+            // (default = lowest priority = last in desc order)
+            const defaultView = views[views.length - 1];
+            return best.id !== defaultView?.id ? best.id : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
+    async getKanbanSchema(session: OdooSessionContext, model: string): Promise<MobileKanbanSchema | null> {
+        const fieldsMeta = await this.odooRpcService.callKwWithSession<Record<string, OdooFieldMeta>>({
+            session,
+            model,
+            method: 'fields_get',
+            kwargs: {
+                attributes: ['string', 'type', 'relation', 'selection'],
+            },
+        });
+        const kanbanArch = await this.getOptionalViewArch(session, model, 'kanban');
+        if (!kanbanArch) {
+            return null;
+        }
+
+        const searchArch = await this.getOptionalViewArch(session, model, 'search');
+        return this.kanbanSchemaBuilder.build(model, kanbanArch, searchArch, fieldsMeta);
     }
 
     async getListSchema(session: OdooSessionContext, model: string): Promise<MobileListSchema> {
@@ -105,6 +186,29 @@ export class OdooV17Adapter implements OdooAdapter {
         });
 
         return this.listSchemaBuilder.build(model, treeView.arch, searchView.arch, fieldsMeta);
+    }
+
+    private async getOptionalViewArch(
+        session: OdooSessionContext,
+        model: string,
+        viewType: 'kanban' | 'search',
+    ): Promise<string | undefined> {
+        try {
+            const view = await this.odooRpcService.callKwWithSession<{ arch: string }>({
+                session,
+                model,
+                method: 'get_view',
+                kwargs: {
+                    view_type: viewType,
+                },
+            });
+
+            return typeof view.arch === 'string' && view.arch.trim().length > 0
+                ? view.arch
+                : undefined;
+        } catch {
+            return undefined;
+        }
     }
 
     async getDefaultValues(
@@ -646,10 +750,11 @@ export class OdooV17Adapter implements OdooAdapter {
         actionsByID: Map<number, OdooWindowActionRecord>,
     ): BrowseMenuNode[] {
         const menuRecordsByID = new Map(menuRecords.map((menuRecord) => [menuRecord.id, menuRecord]));
+        const menuRecordsByName = new Map(menuRecords.map((menuRecord) => [menuRecord.name?.trim(), menuRecord]));
         const childMenuIDsByParentID = new Map<number | undefined, number[]>();
 
         for (const menuRecord of menuRecords) {
-            const parentID = this.extractParentMenuID(menuRecord.parent_id);
+            const parentID = this.resolveEffectiveParentID(menuRecord, menuRecordsByID, menuRecordsByName);
             const existingChildren = childMenuIDsByParentID.get(parentID) ?? [];
             existingChildren.push(menuRecord.id);
             childMenuIDsByParentID.set(parentID, existingChildren);
@@ -665,6 +770,41 @@ export class OdooV17Adapter implements OdooAdapter {
         return rootMenuIDs
             .map((menuID) => this.buildBrowseMenuNode(menuID, true, menuRecordsByID, childMenuIDsByParentID, actionsByID))
             .filter((menuNode): menuNode is BrowseMenuNode => menuNode !== undefined);
+    }
+
+    private resolveEffectiveParentID(
+        menuRecord: OdooMenuRecord,
+        menuRecordsByID: Map<number, OdooMenuRecord>,
+        menuRecordsByName: Map<string | undefined, OdooMenuRecord>,
+    ): number | undefined {
+        const parentID = this.extractParentMenuID(menuRecord.parent_id);
+        if (parentID === undefined || menuRecordsByID.has(parentID)) {
+            return parentID;
+        }
+
+        const parentPath = this.extractParentMenuPath(menuRecord.parent_id);
+        if (!parentPath) {
+            return undefined;
+        }
+
+        const segments = parentPath.split('/').map((segment) => segment.trim());
+        for (let i = segments.length - 1; i >= 0; i--) {
+            const ancestorName = segments[i];
+            const ancestor = menuRecordsByName.get(ancestorName);
+            if (ancestor && ancestor.id !== menuRecord.id) {
+                return ancestor.id;
+            }
+        }
+
+        return undefined;
+    }
+
+    private extractParentMenuPath(parent: OdooMenuParentReference): string | undefined {
+        if (Array.isArray(parent) && typeof parent[1] === 'string' && parent[1].trim().length > 0) {
+            return parent[1].trim();
+        }
+
+        return undefined;
     }
 
     private buildBrowseMenuNode(
@@ -683,18 +823,19 @@ export class OdooV17Adapter implements OdooAdapter {
             .map((childMenuID) => this.buildBrowseMenuNode(childMenuID, false, menuRecordsByID, childMenuIDsByParentID, actionsByID))
             .filter((menuNode): menuNode is BrowseMenuNode => menuNode !== undefined);
 
-        const model = this.resolveBrowseableModel(menuRecord.action, actionsByID);
-        if (!model && children.length === 0) {
+        const browseAction = this.resolveBrowseableAction(menuRecord.action, actionsByID);
+        if (!browseAction?.model && children.length === 0) {
             return undefined;
         }
 
-        const resolvedModel = model ?? (isRoot ? this.findFirstBrowseableModel(children) : undefined);
+        const resolvedModel = browseAction?.model ?? (isRoot ? this.findFirstBrowseableModel(children) : undefined);
 
         return {
             id: menuRecord.id,
             name: this.normalizeBrowseTitle(menuRecord.name ?? resolvedModel ?? `Menu ${menuRecord.id}`),
             kind: isRoot ? 'app' : children.length === 0 ? 'leaf' : 'category',
             model: resolvedModel,
+            preferredViewMode: browseAction?.preferredViewMode,
             children,
         };
     }
@@ -714,10 +855,10 @@ export class OdooV17Adapter implements OdooAdapter {
         return undefined;
     }
 
-    private resolveBrowseableModel(
+    private resolveBrowseableAction(
         action: OdooMenuActionReference,
         actionsByID: Map<number, OdooWindowActionRecord>,
-    ): string | undefined {
+    ): { model: string; preferredViewMode?: BrowsePreferredViewMode } | undefined {
         const actionID = this.parseWindowActionID(action);
         if (!actionID) {
             return undefined;
@@ -728,7 +869,10 @@ export class OdooV17Adapter implements OdooAdapter {
             return undefined;
         }
 
-        return actionRecord.res_model.trim();
+        return {
+            model: actionRecord.res_model.trim(),
+            preferredViewMode: this.resolvePreferredBrowseViewMode(actionRecord),
+        };
     }
 
     private extractParentMenuID(parent: OdooMenuParentReference): number | undefined {
@@ -775,6 +919,30 @@ export class OdooV17Adapter implements OdooAdapter {
             .split(',')
             .map((viewMode) => viewMode.trim())
             .some((viewMode) => supportedViewModes.has(viewMode));
+    }
+
+    private resolvePreferredBrowseViewMode(action: OdooWindowActionRecord): BrowsePreferredViewMode {
+        if (typeof action.view_mode !== 'string' || action.view_mode.trim().length === 0) {
+            return 'list';
+        }
+
+        const firstSupportedMode = action.view_mode
+            .split(',')
+            .map((viewMode) => viewMode.trim())
+            .map((viewMode) => {
+                if (viewMode === 'kanban') {
+                    return 'kanban';
+                }
+
+                if (viewMode === 'tree' || viewMode === 'list') {
+                    return 'list';
+                }
+
+                return undefined;
+            })
+            .find((viewMode): viewMode is BrowsePreferredViewMode => viewMode !== undefined);
+
+        return firstSupportedMode ?? 'list';
     }
 
     private normalizeBrowseTitle(title: string): string {

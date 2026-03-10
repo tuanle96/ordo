@@ -135,4 +135,99 @@ describe('SchemaService', () => {
             listSchema,
         );
     });
+
+    it('returns cached kanban schema without hitting Odoo when Redis already has it', async () => {
+        const kanbanSchema = {
+            model: 'crm.lead',
+            title: 'Leads',
+            groupByField: 'stage_id',
+            cardFields: [{ name: 'name', type: 'char', label: 'Name' }],
+            search: { fields: [], filters: [] },
+        };
+        const adapterFactory = {
+            getAdapter: jest.fn(),
+        };
+        const sessionStore = {
+            getOrThrow: jest.fn(),
+        };
+        const schemaCache = {
+            get: jest.fn().mockResolvedValue(kanbanSchema),
+            set: jest.fn(),
+        };
+        const service = new SchemaService(
+            adapterFactory as never,
+            sessionStore as never,
+            schemaCache as never,
+        );
+
+        await expect(service.getKanbanSchema(odooFixtures.tokenPayload, 'crm.lead')).resolves.toEqual(kanbanSchema);
+        expect(schemaCache.get).toHaveBeenCalledWith(odooFixtures.tokenPayload, 'kanban', 'crm.lead');
+        expect(sessionStore.getOrThrow).not.toHaveBeenCalled();
+        expect(adapterFactory.getAdapter).not.toHaveBeenCalled();
+        expect(schemaCache.set).not.toHaveBeenCalled();
+    });
+
+    it('reads kanban schema from Odoo on cache miss and stores it when available', async () => {
+        const kanbanSchema = {
+            model: 'crm.lead',
+            title: 'Leads',
+            groupByField: 'stage_id',
+            cardFields: [{ name: 'name', type: 'char', label: 'Name' }],
+            search: { fields: [], filters: [] },
+        };
+        const adapter = {
+            getKanbanSchema: jest.fn().mockResolvedValue(kanbanSchema),
+        };
+        const adapterFactory = {
+            getAdapter: jest.fn().mockReturnValue(adapter),
+        };
+        const sessionStore = {
+            getOrThrow: jest.fn().mockResolvedValue({ cookieHeader: 'session_id=abc123' }),
+        };
+        const schemaCache = {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+        };
+        const service = new SchemaService(
+            adapterFactory as never,
+            sessionStore as never,
+            schemaCache as never,
+        );
+
+        await expect(service.getKanbanSchema(odooFixtures.tokenPayload, 'crm.lead')).resolves.toEqual(kanbanSchema);
+        expect(adapter.getKanbanSchema).toHaveBeenCalledWith(
+            { cookieHeader: 'session_id=abc123' },
+            'crm.lead',
+        );
+        expect(schemaCache.set).toHaveBeenCalledWith(
+            odooFixtures.tokenPayload,
+            'kanban',
+            'crm.lead',
+            kanbanSchema,
+        );
+    });
+
+    it('does not cache null kanban schemas', async () => {
+        const adapter = {
+            getKanbanSchema: jest.fn().mockResolvedValue(null),
+        };
+        const adapterFactory = {
+            getAdapter: jest.fn().mockReturnValue(adapter),
+        };
+        const sessionStore = {
+            getOrThrow: jest.fn().mockResolvedValue({ cookieHeader: 'session_id=abc123' }),
+        };
+        const schemaCache = {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+        };
+        const service = new SchemaService(
+            adapterFactory as never,
+            sessionStore as never,
+            schemaCache as never,
+        );
+
+        await expect(service.getKanbanSchema(odooFixtures.tokenPayload, 'res.partner')).resolves.toBeNull();
+        expect(schemaCache.set).not.toHaveBeenCalled();
+    });
 });

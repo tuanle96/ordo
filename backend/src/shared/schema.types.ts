@@ -135,6 +135,36 @@ export interface SearchField {
     selection?: [string, string][];
 }
 
+export interface KanbanCardField {
+    name: string;
+    type: FieldType;
+    label: string;
+    widget?: string;
+    comodel?: string;
+}
+
+export interface KanbanCardButton {
+    name: string;
+    label: string;
+    type: 'object' | 'action';
+    style: 'primary' | 'secondary' | 'link';
+    invisible?: ConditionRule;
+}
+
+export interface MobileKanbanSchema {
+    model: string;
+    title: string;
+    groupByField?: string;
+    groupBySelection?: [string, string][];
+    cardFields: KanbanCardField[];
+    cardButtons: KanbanCardButton[];
+    colorField?: string;
+    search: {
+        fields: SearchField[];
+        filters: SearchFilter[];
+    };
+}
+
 export interface MobileListSchema {
     model: string;
     title: string;

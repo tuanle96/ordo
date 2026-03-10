@@ -77,8 +77,11 @@ export class MobileSchemaBuilderService {
             title: String(form['@_string'] ?? model),
             header: this.buildHeader(form.header, fieldsMeta),
             sections: this.buildSections(form.sheet ?? form, fieldsMeta, inheritedInvisible),
-            tabs: this.buildTabs(form.sheet?.notebook ?? form.notebook, fieldsMeta, inheritedInvisible),
-            hasChatter: Boolean(form.chatter ?? form.sheet?.chatter ?? this.hasOeChatterDiv(form)),
+            tabs: this.buildTabs(this.findNotebook(form.sheet ?? form), fieldsMeta, inheritedInvisible),
+            hasChatter:
+                form.chatter !== undefined ||
+                form.sheet?.chatter !== undefined ||
+                this.hasOeChatterDiv(form),
         };
     }
 
@@ -431,6 +434,40 @@ export class MobileSchemaBuilderService {
             default:
                 return 'text';
         }
+    }
+
+    /**
+     * Walk the XML tree depth-first looking for the first `<notebook>` node.
+     * Odoo forms usually place `<notebook>` directly under `<sheet>`, but some
+     * models (especially settings forms or heavily inherited views) may nest it
+     * inside `<div>`, `<group>`, or other wrapper elements.
+     */
+    private findNotebook(container: XmlNode | undefined, depth = 0): XmlNode | undefined {
+        if (!container || depth > 10) {
+            return undefined;
+        }
+
+        if (container.notebook !== undefined) {
+            return container.notebook;
+        }
+
+        for (const key of this.layoutContainerKeys) {
+            for (const child of this.asArray(container[key])) {
+                const found = this.findNotebook(child, depth + 1);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+
+        for (const group of this.asArray(container.group)) {
+            const found = this.findNotebook(group, depth + 1);
+            if (found) {
+                return found;
+            }
+        }
+
+        return undefined;
     }
 
     /** Detect Odoo 17 chatter pattern: <div class="oe_chatter"> placed after </sheet>. */

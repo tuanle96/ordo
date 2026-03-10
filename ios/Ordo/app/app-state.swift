@@ -35,7 +35,7 @@ final class AppState {
         sessionStore: SessionStoring,
         apiClient: APIClient,
         cacheStore: CacheStoring,
-        mutationQueueStore: MutationQueueStoring = FileMutationQueueStore()
+        mutationQueueStore: MutationQueueStoring
     ) {
         self.config = config
         self.sessionStore = sessionStore
@@ -515,7 +515,7 @@ extension AppState {
         )
     }
 
-    static let preview: AppState = {
+    @MainActor static let preview: AppState = {
         let state = AppState(
             config: .preview,
             sessionStore: InMemorySessionStore(),

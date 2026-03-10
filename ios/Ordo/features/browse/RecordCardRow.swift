@@ -3,36 +3,75 @@ import SwiftUI
 struct RecordCardRow: View {
     let summary: RecordRowSummary
     let columns: [ListColumn]?
+    var buttons: [KanbanCardButton] = []
+    var onAction: ((KanbanCardButton) -> Void)?
 
     var body: some View {
-        HStack(spacing: OrdoSpacing.md) {
-            AvatarView(name: summary.title, size: 44)
+        VStack(alignment: .leading, spacing: OrdoSpacing.sm) {
+            HStack(spacing: OrdoSpacing.md) {
+                AvatarView(name: summary.title, size: 44)
 
-            VStack(alignment: .leading, spacing: OrdoSpacing.xs) {
-                Text(summary.title)
-                    .font(OrdoTypography.headline)
-                    .foregroundStyle(OrdoColors.textPrimary)
-                    .lineLimit(1)
-
-                if let subtitle = summary.subtitle {
-                    Text(subtitle)
-                        .font(OrdoTypography.subheadline)
-                        .foregroundStyle(OrdoColors.textSecondary)
+                VStack(alignment: .leading, spacing: OrdoSpacing.xs) {
+                    Text(summary.title)
+                        .font(OrdoTypography.headline)
+                        .foregroundStyle(OrdoColors.textPrimary)
                         .lineLimit(1)
+
+                    if let subtitle = summary.subtitle {
+                        Text(subtitle)
+                            .font(OrdoTypography.subheadline)
+                            .foregroundStyle(OrdoColors.textSecondary)
+                            .lineLimit(1)
+                    }
+
+                    if let footnote = summary.footnote {
+                        Text(footnote)
+                            .font(OrdoTypography.caption)
+                            .foregroundStyle(OrdoColors.textTertiary)
+                            .lineLimit(1)
+                    }
                 }
 
-                if let footnote = summary.footnote {
-                    Text(footnote)
-                        .font(OrdoTypography.caption)
-                        .foregroundStyle(OrdoColors.textTertiary)
-                        .lineLimit(1)
-                }
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 0)
+            if !buttons.isEmpty {
+                HStack(spacing: OrdoSpacing.sm) {
+                    ForEach(buttons) { button in
+                        cardActionButton(button)
+                    }
+                }
+            }
         }
         .padding(.vertical, OrdoSpacing.xs)
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func cardActionButton(_ button: KanbanCardButton) -> some View {
+        if button.isPrimary {
+            Button {
+                onAction?(button)
+            } label: {
+                Text(button.label)
+                    .font(OrdoTypography.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .accessibilityIdentifier("card-action-\(button.name)")
+        } else {
+            Button {
+                onAction?(button)
+            } label: {
+                Text(button.label)
+                    .font(OrdoTypography.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityIdentifier("card-action-\(button.name)")
+        }
     }
 }
 

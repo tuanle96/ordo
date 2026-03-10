@@ -43,6 +43,11 @@ final class APIClient {
         return try await perform(route: "schema/\(model)/list", queryItems: queryItems, token: token)
     }
 
+    func kanbanSchema(model: String, fresh: Bool = false, token: String) async throws -> MobileKanbanSchema? {
+        let queryItems = fresh ? [URLQueryItem(name: "fresh", value: "true")] : []
+        return try await performNullable(route: "schema/\(model)/kanban", queryItems: queryItems, token: token)
+    }
+
     func installedModules(token: String) async throws -> InstalledModulesResponse {
         try await perform(route: "modules/installed", token: token)
     }
@@ -294,6 +299,58 @@ final class APIClient {
             if let envelope = try? decoder.decode(APIEnvelope<JSONValue>.self, from: data), !envelope.errors.isEmpty {
                 throw APIClientError.server(statusCode: httpResponse.statusCode, errors: envelope.errors)
             }
+            throw APIClientError.decodingFailed(error.localizedDescription)
+        }
+    }
+
+    private func performNullable<T: Decodable>(
+        route: String,
+        method: String = "GET",
+        queryItems: [URLQueryItem] = [],
+        token: String? = nil,
+        body: Data? = nil
+    ) async throws -> T? {
+        guard let requestURL = url(for: route, queryItems: queryItems) else {
+            throw APIClientError.invalidURL
+        }
+
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIClientError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw APIClientError.unauthorized
+        }
+
+        let decoder = JSONDecoder()
+
+        do {
+            let envelope = try decoder.decode(APIEnvelope<T?>.self, from: data)
+            guard httpResponse.statusCode < 400 else {
+                throw APIClientError.server(statusCode: httpResponse.statusCode, errors: envelope.errors)
+            }
+
+            return envelope.data ?? nil
+        } catch {
+            if let envelope = try? decoder.decode(APIEnvelope<JSONValue>.self, from: data), !envelope.errors.isEmpty {
+                throw APIClientError.server(statusCode: httpResponse.statusCode, errors: envelope.errors)
+            }
+
             throw APIClientError.decodingFailed(error.localizedDescription)
         }
     }

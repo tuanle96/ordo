@@ -1,6 +1,6 @@
 import Foundation
 
-enum FieldType: String, Codable {
+enum FieldType: String, Codable, Sendable {
     case char
     case text
     case integer
@@ -33,14 +33,14 @@ enum FieldType: String, Codable {
     }
 }
 
-struct Condition: Codable, Hashable {
+struct Condition: Codable, Hashable, Sendable {
     let field: String
     let op: String
     let value: ConditionValue?
     let values: [ConditionValue]?
 }
 
-enum ConditionValue: Codable, Hashable {
+enum ConditionValue: Codable, Hashable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -74,27 +74,27 @@ enum ConditionValue: Codable, Hashable {
     }
 }
 
-struct ModifierRule: Codable, Hashable {
+struct ModifierRule: Codable, Hashable, Sendable {
     let type: String
     let condition: Condition?
     let rules: [ModifierRule]?
     let constant: Bool?
 }
 
-struct FieldModifiers: Codable, Hashable {
+struct FieldModifiers: Codable, Hashable, Sendable {
     let invisible: ModifierRule?
     let readonly: ModifierRule?
     let required: ModifierRule?
 }
 
-struct OnchangeFieldMeta: Codable, Hashable {
+struct OnchangeFieldMeta: Codable, Hashable, Sendable {
     let trigger: String
     let source: String?
     let dependencies: [String]?
     let mergeReturnedValue: Bool?
 }
 
-struct ActionButton: Codable, Hashable {
+struct ActionButton: Codable, Hashable, Sendable {
     let name: String
     let label: String
     let type: String
@@ -122,7 +122,7 @@ struct ActionButton: Codable, Hashable {
     }
 }
 
-struct FieldSchema: Codable, Hashable {
+struct FieldSchema: Codable, Hashable, Sendable {
     let name: String
     let type: FieldType
     let label: String
@@ -183,8 +183,8 @@ struct FieldSchema: Codable, Hashable {
     }
 }
 
-struct FormHeader: Codable, Hashable {
-    struct StatusBar: Codable, Hashable {
+struct FormHeader: Codable, Hashable, Sendable {
+    struct StatusBar: Codable, Hashable, Sendable {
         let field: String
         let visibleStates: [String]?
     }
@@ -193,12 +193,12 @@ struct FormHeader: Codable, Hashable {
     let actions: [ActionButton]
 }
 
-struct FormSection: Codable, Hashable {
+struct FormSection: Codable, Hashable, Sendable {
     let label: String?
     let fields: [FieldSchema]
 }
 
-struct FormTab: Codable, Hashable, Identifiable {
+struct FormTab: Codable, Hashable, Identifiable, Sendable {
     let label: String
     let content: [String: JSONValue]
 
@@ -209,7 +209,7 @@ struct FormTab: Codable, Hashable, Identifiable {
     }
 }
 
-struct MobileFormSchema: Codable, Hashable {
+struct MobileFormSchema: Codable, Hashable, Sendable {
     let model: String
     let title: String
     let header: FormHeader
