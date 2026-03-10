@@ -256,3 +256,25 @@ enum BrowseFilterStore {
         "\(keyPrefix).\(model)"
     }
 }
+
+enum BrowseGroupByStore {
+    private static let keyPrefix = "browse-group-by"
+
+    static func load(model: String, userDefaults: UserDefaults = .standard) -> String? {
+        let value = userDefaults.string(forKey: key(for: model))?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value : nil
+    }
+
+    static func save(_ groupByName: String?, model: String, userDefaults: UserDefaults = .standard) {
+        guard let groupByName = groupByName?.trimmingCharacters(in: .whitespacesAndNewlines), !groupByName.isEmpty else {
+            userDefaults.removeObject(forKey: key(for: model))
+            return
+        }
+
+        userDefaults.set(groupByName, forKey: key(for: model))
+    }
+
+    private static func key(for model: String) -> String {
+        "\(keyPrefix).\(model)"
+    }
+}

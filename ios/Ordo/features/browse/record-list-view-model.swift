@@ -12,6 +12,13 @@ final class RecordListViewModel {
         var id: Int { summary.id }
     }
 
+    struct DisplaySection: Identifiable {
+        let title: String
+        let rows: [DisplayRow]
+
+        var id: String { title }
+    }
+
     enum ViewMode: String, CaseIterable, Identifiable {
         case cards
         case table
@@ -80,6 +87,7 @@ final class RecordListViewModel {
     private(set) var totalCount: Int?
     private(set) var listSchema: MobileListSchema?
     private(set) var activeQuickFilterName: String?
+    private(set) var activeGroupByName: String?
     var viewMode: ViewMode = .cards
     private(set) var sortOption: SortOption = .serverDefault
     private(set) var filterState: BrowseFilterState
@@ -105,6 +113,7 @@ final class RecordListViewModel {
         self.userDefaults = userDefaults
         self.filterFields = initialFilterFields
         self.filterState = initialFilterState
+        self.activeGroupByName = BrowseGroupByStore.load(model: descriptor.model, userDefaults: userDefaults)
     }
 
     var availableFilterFields: [BrowseFilterField] {
@@ -117,6 +126,14 @@ final class RecordListViewModel {
 
     var quickFilters: [SearchFilter] {
         listSchema?.search.filters ?? []
+    }
+
+    var availableGroupBys: [SearchGroupBy] {
+        listSchema?.search.groupBy ?? []
+    }
+
+    var activeGroupBy: SearchGroupBy? {
+        availableGroupBys.first(where: { $0.name == activeGroupByName })
     }
 
     var tableColumns: [ListColumn] {
@@ -162,15 +179,21 @@ final class RecordListViewModel {
     }
 
     private var requestedFields: [String] {
+        let baseFields: [String]
+
         if let listSchema, !listSchema.requestedFieldNames.isEmpty {
-            return listSchema.requestedFieldNames
+            baseFields = listSchema.requestedFieldNames
+        } else if let descriptorFields = descriptor.listFields, !descriptorFields.isEmpty {
+            baseFields = descriptorFields
+        } else {
+            baseFields = ["id", "display_name", "name"] + descriptor.titleFields + descriptor.subtitleFields + descriptor.footnoteFields
         }
 
-        if let descriptorFields = descriptor.listFields, !descriptorFields.isEmpty {
-            return descriptorFields
+        if let activeGroupField = activeGroupBy?.fieldName {
+            return orderedUnique(baseFields + [activeGroupField])
         }
 
-        return Array(Set(["id", "display_name", "name"] + descriptor.titleFields + descriptor.subtitleFields + descriptor.footnoteFields))
+        return orderedUnique(baseFields)
     }
 
     func apply(sortOption: SortOption, using appState: AppState) async {
@@ -199,6 +222,14 @@ final class RecordListViewModel {
         let resolvedFilterName = activeQuickFilterName == filterName ? nil : filterName
         guard resolvedFilterName != activeQuickFilterName else { return }
         activeQuickFilterName = resolvedFilterName
+        await load(using: appState)
+    }
+
+    func applyGroupBy(named groupByName: String?, using appState: AppState) async {
+        let normalizedName = normalizedGroupByName(groupByName, available: availableGroupBys)
+        guard normalizedName != activeGroupByName else { return }
+        activeGroupByName = normalizedName
+        BrowseGroupByStore.save(normalizedName, model: descriptor.model, userDefaults: userDefaults)
         await load(using: appState)
     }
 
@@ -288,16 +319,18 @@ final class RecordListViewModel {
 
     private func loadListSchemaIfNeeded(using appState: AppState) async {
         guard !didAttemptListSchemaLoad else { return }
-        didAttemptListSchemaLoad = true
 
         do {
             let schema = try await appState.withAuthenticatedToken { [descriptor] token in
                 try await appState.apiClient.listSchema(model: descriptor.model, token: token)
             }
 
+            didAttemptListSchemaLoad = true
             listSchema = schema
             filterFields = BrowseFilterRegistry.fields(for: descriptor, listSchema: schema)
             filterState = filterState.normalized(with: filterFields)
+            activeGroupByName = normalizedGroupByName(activeGroupByName, available: schema.search.groupBy)
+            BrowseGroupByStore.save(activeGroupByName, model: descriptor.model, userDefaults: userDefaults)
         } catch {
             if case APIClientError.unauthorized = error {
                 appState.signOut()
@@ -371,6 +404,22 @@ final class RecordListViewModel {
         }
     }
 
+    var displaySections: [DisplaySection] {
+        guard let activeGroupBy else { return [] }
+
+        let groupedRows = Dictionary(grouping: displayRows) { row in
+            groupTitle(for: row.record, groupBy: activeGroupBy)
+        }
+
+        return groupedRows.keys.sorted().map { title in
+            DisplaySection(title: title, rows: groupedRows[title] ?? [])
+        }
+    }
+
+    var isGroupingActive: Bool {
+        activeGroupBy != nil
+    }
+
     private func summary(for record: RecordData) -> RecordRowSummary? {
         if let listSchema, !listSchema.visibleColumns.isEmpty {
             return schemaSummary(for: record, columns: listSchema.visibleColumns)
@@ -433,5 +482,24 @@ final class RecordListViewModel {
         }
 
         return merged
+    }
+
+    private func groupTitle(for record: RecordData, groupBy: SearchGroupBy) -> String {
+        guard let value = record[groupBy.fieldName], !value.isVisuallyEmpty else {
+            return "No \(groupBy.label)"
+        }
+
+        let title = value.relationLabel ?? value.stringValue ?? value.displayText
+        return title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No \(groupBy.label)" : title
+    }
+
+    private func normalizedGroupByName(_ groupByName: String?, available: [SearchGroupBy]) -> String? {
+        guard let groupByName else { return nil }
+        return available.contains(where: { $0.name == groupByName }) ? groupByName : nil
+    }
+
+    private func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 }

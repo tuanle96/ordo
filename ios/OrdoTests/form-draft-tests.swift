@@ -641,6 +641,21 @@ struct FormDraftTests {
     }
 
     @Test
+    func isoDateTimeStringsNormalizeForMutations() {
+        let baseline: RecordData = [:]
+        let draft = FormDraft(record: baseline)
+        let fields = [
+            FieldSchema(name: "write_date", type: .datetime, label: "Updated", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.string("2026-03-08T14:30:00Z"), for: "write_date")
+
+        let changedValues = draft.changedValues(comparedTo: baseline, fields: fields)
+
+        #expect(changedValues["write_date"] == .string("2026-03-08 14:30:00"))
+    }
+
+    @Test
     func onchangeValuesNormalizeCurrentDraftState() {
         let baseline: RecordData = [
             "name": .string("Azure Interior"),

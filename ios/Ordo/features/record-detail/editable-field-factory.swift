@@ -71,6 +71,24 @@ enum EditableFieldFactory {
     }
 }
 
+enum MonetaryFieldSupport {
+    static func prefix(for currencyValue: JSONValue?) -> String? {
+        let rawValue = currencyValue?.relationLabel ?? currencyValue?.stringValue
+        guard let rawValue else { return nil }
+
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        guard trimmed.count == 3 else { return trimmed }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = trimmed.uppercased()
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter.currencySymbol ?? trimmed
+    }
+}
+
 struct EditableFieldRow: View {
     @Environment(AppState.self) private var appState
 
@@ -421,7 +439,7 @@ struct EditableFieldRow: View {
     private func monetaryPrefix(currencyField: String?) -> String? {
         guard let currencyField else { return nil }
         let currencyValue = draft.values[currencyField]
-        return currencyValue?.relationLabel ?? currencyValue?.stringValue
+        return MonetaryFieldSupport.prefix(for: currencyValue)
     }
 
     private var relationLabel: String? {
@@ -1072,7 +1090,17 @@ private struct TemporalFieldEditor: View {
             Text(field.label)
                 .font(.subheadline.weight(.medium))
 
-            if let currentDate = resolvedDate {
+            if usesTextFallback {
+                TextField(field.placeholder ?? fallbackTitle, text: fallbackText)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("field-editor-\(field.name)")
+
+                Button(includeTime ? "Use Date Picker" : "Use Date") {
+                    applyChange(.string(TemporalFieldSupport.string(from: Date(), includeTime: includeTime)))
+                }
+                .font(.subheadline.weight(.medium))
+                .accessibilityIdentifier("field-temporal-normalize-\(field.name)")
+            } else if let currentDate = resolvedDate {
                 DatePicker(
                     field.label,
                     selection: dateBinding(currentDate),
@@ -1090,7 +1118,7 @@ private struct TemporalFieldEditor: View {
                 .accessibilityIdentifier("field-clear-\(field.name)")
             } else {
                 Button(includeTime ? "Set Date & Time" : "Set Date") {
-                    applyChange(.string(Self.string(from: Date(), includeTime: includeTime)))
+                    applyChange(.string(TemporalFieldSupport.string(from: Date(), includeTime: includeTime)))
                 }
                 .accessibilityIdentifier("field-editor-\(field.name)")
             }
@@ -1106,14 +1134,37 @@ private struct TemporalFieldEditor: View {
 
     private var resolvedDate: Date? {
         let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
-        return Self.date(from: value, includeTime: includeTime)
+        return TemporalFieldSupport.date(from: value, includeTime: includeTime)
+    }
+
+    private var rawTemporalString: String {
+        let value = draft.value(for: field.name, fallback: fallbackValue) ?? fallbackValue
+        return value?.stringValue ?? ""
+    }
+
+    private var fallbackText: Binding<String> {
+        Binding(
+            get: { rawTemporalString },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                applyChange(trimmed.isEmpty ? nil : .string(trimmed))
+            }
+        )
+    }
+
+    private var usesTextFallback: Bool {
+        resolvedDate == nil && !rawTemporalString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var fallbackTitle: String {
+        includeTime ? "YYYY-MM-DD HH:MM" : "YYYY-MM-DD"
     }
 
     private func dateBinding(_ fallbackDate: Date) -> Binding<Date> {
         Binding(
             get: { resolvedDate ?? fallbackDate },
             set: { newValue in
-                applyChange(.string(Self.string(from: newValue, includeTime: includeTime)))
+                applyChange(.string(TemporalFieldSupport.string(from: newValue, includeTime: includeTime)))
             }
         )
     }
@@ -1124,51 +1175,6 @@ private struct TemporalFieldEditor: View {
         } else {
             draft.setValue(value, for: field.name)
         }
-    }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    private static let dateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter
-    }()
-
-    private static let shortDateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }()
-
-    private static func date(from value: JSONValue?, includeTime: Bool) -> Date? {
-        guard case .string(let rawString)? = value else { return nil }
-        let trimmed = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        if includeTime {
-            return dateTimeFormatter.date(from: trimmed)
-                ?? shortDateTimeFormatter.date(from: trimmed)
-                ?? ISO8601DateFormatter().date(from: trimmed)
-        }
-
-        return dateFormatter.date(from: trimmed)
-    }
-
-    private static func string(from date: Date, includeTime: Bool) -> String {
-        includeTime ? dateTimeFormatter.string(from: date) : dateFormatter.string(from: date)
     }
 }
 

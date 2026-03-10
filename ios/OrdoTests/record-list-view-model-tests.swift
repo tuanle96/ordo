@@ -243,6 +243,92 @@ struct RecordListViewModelTests {
         #expect(viewModel.totalDisplayText == "1 of 7")
     }
 
+    @Test
+    func retriesListSchemaAfterTransientFailure() async throws {
+        var schemaRequestCount = 0
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                schemaRequestCount += 1
+                if schemaRequestCount == 1 {
+                    throw URLError(.timedOut)
+                }
+
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchema)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let payload = RecordListResult(items: [["id": .number(9), "name": .string("Retry Customer"), "email": .string("retry@example.com")]], limit: 30, offset: 0, total: 1)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
+
+        await viewModel.load(using: appState)
+        await viewModel.load(using: appState)
+
+        #expect(schemaRequestCount == 2)
+        #expect(viewModel.tableColumns.map(\.name) == ["name", "email"])
+    }
+
+    @Test
+    func applyingGroupByRequestsGroupedFieldAndBuildsSections() async throws {
+        var requestedFields: [String?] = []
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchema)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let components = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)
+                requestedFields.append(components?.queryItems?.first(where: { $0.name == "fields" })?.value)
+
+                let payload = RecordListResult(
+                    items: [
+                        ["id": .number(1), "name": .string("Azure Interior"), "email": .string("azure@example.com"), "country_id": .relation(id: 233, label: "United States")],
+                        ["id": .number(2), "name": .string("Deco Addict"), "email": .string("deco@example.com"), "country_id": .relation(id: 124, label: "Canada")],
+                        ["id": .number(3), "name": .string("Northwind"), "email": .string("northwind@example.com"), "country_id": .relation(id: 233, label: "United States")],
+                    ],
+                    limit: 30,
+                    offset: 0,
+                    total: 3
+                )
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
+
+        await viewModel.load(using: appState)
+        await viewModel.applyGroupBy(named: "group_country", using: appState)
+
+        #expect(requestedFields == ["id,display_name,name,email", "id,display_name,name,email,country_id"])
+        #expect(viewModel.activeGroupBy?.fieldName == "country_id")
+        #expect(viewModel.displaySections.map(\.title) == ["Canada", "United States"])
+        #expect(viewModel.displaySections.first?.rows.map(\.summary.title) == ["Deco Addict"])
+        #expect(viewModel.displaySections.last?.rows.map(\.summary.title) == ["Azure Interior", "Northwind"])
+    }
+
     private func makeRestoredAppState() async throws -> AppState {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ListViewModelTestURLProtocol.self]

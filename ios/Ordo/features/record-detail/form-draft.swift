@@ -1,6 +1,67 @@
 import Foundation
 import Observation
 
+enum TemporalFieldSupport {
+    static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    static let dateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+
+    static let shortDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+
+    static func date(from value: JSONValue?, includeTime: Bool) -> Date? {
+        guard case .string(let rawString)? = value else { return nil }
+        let trimmed = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if includeTime {
+            return parseDateTime(trimmed)
+        }
+
+        return dateFormatter.date(from: trimmed)
+    }
+
+    static func string(from date: Date, includeTime: Bool) -> String {
+        includeTime ? dateTimeFormatter.string(from: date) : dateFormatter.string(from: date)
+    }
+
+    static func parseDateTime(_ value: String) -> Date? {
+        if let date = dateTimeFormatter.date(from: value) {
+            return date
+        }
+
+        if let date = shortDateTimeFormatter.date(from: value) {
+            return date
+        }
+
+        if let date = ISO8601DateFormatter().date(from: value) {
+            return date
+        }
+
+        return nil
+    }
+}
+
 @MainActor
 @Observable
 final class FormDraft {
@@ -535,56 +596,13 @@ final class FormDraft {
 
         switch type {
         case .date:
-            guard let date = Self.dateFormatter.date(from: trimmed) else { return nil }
-            return .string(Self.dateFormatter.string(from: date))
+            guard let date = TemporalFieldSupport.date(from: .string(trimmed), includeTime: false) else { return nil }
+            return .string(TemporalFieldSupport.string(from: date, includeTime: false))
         case .datetime:
-            guard let date = Self.parseDateTime(trimmed) else { return nil }
-            return .string(Self.dateTimeFormatter.string(from: date))
+            guard let date = TemporalFieldSupport.date(from: .string(trimmed), includeTime: true) else { return nil }
+            return .string(TemporalFieldSupport.string(from: date, includeTime: true))
         default:
             return nil
         }
-    }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    private static let dateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter
-    }()
-
-    private static let shortDateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }()
-
-    private static func parseDateTime(_ value: String) -> Date? {
-        if let date = dateTimeFormatter.date(from: value) {
-            return date
-        }
-
-        if let date = shortDateTimeFormatter.date(from: value) {
-            return date
-        }
-
-        if let date = ISO8601DateFormatter().date(from: value) {
-            return date
-        }
-
-        return nil
     }
 }

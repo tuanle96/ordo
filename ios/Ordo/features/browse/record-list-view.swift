@@ -97,6 +97,7 @@ struct RecordListView: View {
             Menu {
                 layoutPicker
                 sortPicker
+                groupByPicker
             } label: {
                 Label("Browse Options", systemImage: browseOptionsIcon)
             }
@@ -138,6 +139,25 @@ struct RecordListView: View {
         )) {
             ForEach(RecordListViewModel.SortOption.allCases) { option in
                 Text(option.title).tag(option)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var groupByPicker: some View {
+        if !viewModel.availableGroupBys.isEmpty {
+            Picker("Group By", selection: Binding(
+                get: { viewModel.activeGroupByName ?? "" },
+                set: { newValue in
+                    Task {
+                        await viewModel.applyGroupBy(named: newValue.isEmpty ? nil : newValue, using: appState)
+                    }
+                }
+            )) {
+                Text("None").tag("")
+                ForEach(viewModel.availableGroupBys) { option in
+                    Text(option.label).tag(option.name)
+                }
             }
         }
     }
@@ -243,30 +263,52 @@ struct RecordListView: View {
     }
 
     private var recordsSection: some View {
-        Section(recordsSectionTitle) {
-            if viewModel.viewMode == .table {
-                TableHeaderRow(columns: viewModel.tableColumns)
-            }
+        Group {
+            if viewModel.isGroupingActive {
+                ForEach(viewModel.displaySections) { section in
+                    Section(section.title) {
+                        if viewModel.viewMode == .table {
+                            TableHeaderRow(columns: viewModel.tableColumns)
+                        }
 
-            ForEach(viewModel.displayRows) { row in
-                NavigationLink {
-                    RecordDetailView(descriptor: viewModel.descriptor, recordID: row.id)
-                } label: {
-                    rowView(row: row)
+                        ForEach(section.rows) { row in
+                            recordRow(row)
+                        }
+                    }
                 }
-                .accessibilityIdentifier("record-row-\(row.id)")
-                .task {
-                    await viewModel.loadMoreIfNeeded(currentID: row.id, using: appState)
+            } else {
+                Section(recordsSectionTitle) {
+                    if viewModel.viewMode == .table {
+                        TableHeaderRow(columns: viewModel.tableColumns)
+                    }
+
+                    ForEach(viewModel.displayRows) { row in
+                        recordRow(row)
+                    }
                 }
             }
 
             if viewModel.isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
                 }
             }
+        }
+    }
+
+    private func recordRow(_ row: RecordListViewModel.DisplayRow) -> some View {
+        NavigationLink {
+            RecordDetailView(descriptor: viewModel.descriptor, recordID: row.id)
+        } label: {
+            rowView(row: row)
+        }
+        .accessibilityIdentifier("record-row-\(row.id)")
+        .task {
+            await viewModel.loadMoreIfNeeded(currentID: row.id, using: appState)
         }
     }
 

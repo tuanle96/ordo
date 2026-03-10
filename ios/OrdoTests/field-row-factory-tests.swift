@@ -275,6 +275,21 @@ struct FieldRowFactoryTests {
         #expect(model?.style == .standard)
     }
 
+    @Test
+    func temporalFieldSupportNormalizesDateAndDateTimeStrings() {
+        #expect(TemporalFieldSupport.date(from: .string("2026-03-10"), includeTime: false) != nil)
+        #expect(TemporalFieldSupport.date(from: .string("2026-03-10 14:30"), includeTime: true) != nil)
+        #expect(TemporalFieldSupport.date(from: .string("2026-03-10T14:30:00Z"), includeTime: true) != nil)
+        #expect(TemporalFieldSupport.date(from: .string("weird server value"), includeTime: true) == nil)
+    }
+
+    @Test
+    func monetaryFieldSupportUsesCurrencySymbolWhenCodeIsKnown() {
+        #expect(MonetaryFieldSupport.prefix(for: .relation(id: 1, label: "USD")) == "$")
+        #expect(MonetaryFieldSupport.prefix(for: .string("EUR")) == "€")
+        #expect(MonetaryFieldSupport.prefix(for: .string("Credits")) == "Credits")
+    }
+
     private static var sampleImageBase64: String {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2))
         let image = renderer.image { context in
