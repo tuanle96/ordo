@@ -429,6 +429,10 @@ export class OdooRpcService {
             );
         }
 
+        if (this.isExplicitlyUnavailableModelError(errorName, normalizedMessage, normalizedDebug)) {
+            return new NotFoundException('The requested Odoo model is not available on this server or database.');
+        }
+
         if (errorName.includes('accesserror') || normalizedMessage.includes('accesserror')) {
             return new ForbiddenException('You do not have permission to access this record or perform this action.');
         }
@@ -492,6 +496,29 @@ export class OdooRpcService {
             || normalizedDebug.includes('relation "ir_module_module" does not exist')
             || normalizedDebug.includes('tried to poll an undefined table on database')
         );
+    }
+
+    private isExplicitlyUnavailableModelError(
+        errorName: string,
+        normalizedMessage: string,
+        normalizedDebug: string,
+    ): boolean {
+        if (!errorName.includes('keyerror')) {
+            return false;
+        }
+
+        return this.extractUnavailableModelName(normalizedMessage, normalizedDebug) !== undefined;
+    }
+
+    private extractUnavailableModelName(
+        normalizedMessage: string,
+        normalizedDebug: string,
+    ): string | undefined {
+        const modelLikePattern = /\b[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\b/g;
+
+        return normalizedMessage.match(modelLikePattern)?.[0]
+            ?? normalizedDebug.match(modelLikePattern)?.[0]
+            ?? undefined;
     }
 
     private extractSessionCookie(response: Response): string | null {

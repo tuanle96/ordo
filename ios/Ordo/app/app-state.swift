@@ -16,6 +16,7 @@ final class AppState {
     private(set) var installedModules: [InstalledModuleInfo] = []
     private(set) var browseMenuTree: [BrowseMenuNode] = []
     private(set) var hasLoadedBrowseDiscovery = false
+    private(set) var browseDiscoveryErrorMessage: String?
     private(set) var pendingMutationCount = 0
     var statusMessage: String?
 
@@ -58,13 +59,13 @@ final class AppState {
     var browseRoots: [BrowseMenuNode] {
         hasLoadedBrowseDiscovery
             ? browseMenuTree
-            : ModelRegistry.fallbackBrowseMenuTree
+            : []
     }
 
     var availableModels: [ModelDescriptor] {
         hasLoadedBrowseDiscovery
             ? ModelRegistry.flatten(from: browseMenuTree)
-            : ModelRegistry.supported
+            : []
     }
 
     func modelDescriptor(for model: String, fallbackTitle: String? = nil) -> ModelDescriptor {
@@ -220,6 +221,7 @@ final class AppState {
         installedModules = []
         browseMenuTree = []
         hasLoadedBrowseDiscovery = false
+        browseDiscoveryErrorMessage = nil
         pendingMutationCount = 0
         phase = .login
         statusMessage = nil
@@ -352,11 +354,12 @@ final class AppState {
             installedModules = response.modules
             browseMenuTree = response.browseMenuTree
             hasLoadedBrowseDiscovery = true
+            browseDiscoveryErrorMessage = nil
         } catch {
-            // Graceful degradation: keep the static registry path when discovery fails.
             installedModules = []
             browseMenuTree = []
             hasLoadedBrowseDiscovery = false
+            browseDiscoveryErrorMessage = "Browse discovery could not be loaded right now. Try again in a moment."
         }
     }
 

@@ -233,8 +233,19 @@ The discovery slice removes the last major static browse bottleneck without inve
 - **iOS now stores the tree and flattens it only for metadata lookup**: `AppState.browseRoots` renders the menu tree directly, while `AppState.availableModels` flattens it through `ModelRegistry` so known models still get curated titles/icons and unknown models still get generic descriptors
 - **Leaf titles win when a wrapper app and descendant leaf share the same unknown model**: iOS flattens children before parents and dedupes by model, which preserves the more specific leaf title for descriptor fallback while keeping wrapper apps available for navigation
 - **Static metadata is now fallback/override, not the gatekeeper**: browse/home/settings/recent-item UI still use `ModelDescriptor` for titles, icons, fallback list fields, and summary extraction, but discovery no longer depends on a hardcoded local allowlist
-- **Failure handling remains conservative**: if discovery fails, iOS falls back to the existing static registry path instead of blocking browse entirely or pretending discovery is guaranteed
+- **Failure handling is now honest**: if discovery fails, iOS leaves browse empty, records the discovery failure message in `AppState`, and lets Browse/Home show an explicit unavailable state instead of silently resurrecting a static catalog
 - **Successful empty discovery is treated honestly**: if the backend successfully returns an empty `browseMenuTree`, iOS shows no browse entries instead of silently re-expanding the static registry and pretending discovery found something it did not
+
+## Honest discovery capability gating (2026-03-10)
+
+The capability-gating slice ensures discovered browse models are provably accessible on the current server without making false promises to the mobile client.
+
+- **Lightweight model availability probing** — `ModuleService` now probes each unique discovered model through the adapter before returning `/modules/installed`, then prunes only the browse-tree nodes proven unavailable while preserving surviving descendants and app fallback models
+- **Recognized missing-model normalization** — when Odoo responds with `KeyError: <model-name>` signatures, `OdooRpcService` now maps those proven missing-model cases to `NotFoundException` with a stable client-safe message instead of generic `502 Bad Gateway`
+- **Public HTTP surfaces stay unchanged except for honesty** — schema/list/detail routes still use the same controllers and envelope pattern; they now surface the stable 404 unavailable-model response automatically because they already flow through the adapter/RPC exception path
+- **iOS browse state is now discovery-first** — `AppState` no longer falls back to `ModelRegistry.fallbackBrowseMenuTree` or `ModelRegistry.supported` when discovery fails; it clears browse state, records a discovery error message, and leaves Browse/Home to render explicit unavailable or empty states
+- **False-negative risk is managed** — only models with recognized unavailable signatures are pruned; transient probe failures or unknown upstream errors keep the model visible and are logged as probe warnings instead of being treated as proof of unavailability
+- **`ModelRegistry` remains decorator, not gatekeeper** — discovered or directly referenced models still receive curated titles/icons from `ModelRegistry` overrides and generic fallback descriptors, but the registry no longer silently resurrects browse entries that backend discovery did not confirm
 
 ## iOS read-only relation drilldown scope (2026-03-10)
 

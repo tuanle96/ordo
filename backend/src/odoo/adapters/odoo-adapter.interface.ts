@@ -19,6 +19,7 @@ import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
 export interface OdooAdapter {
     readonly version: string;
+    isModelAvailable(session: OdooSessionContext, model: string): Promise<boolean>;
     getFormSchema(session: OdooSessionContext, model: string): Promise<MobileFormSchema>;
     getListSchema(session: OdooSessionContext, model: string): Promise<MobileListSchema>;
     getDefaultValues(

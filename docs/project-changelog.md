@@ -1,5 +1,35 @@
 # Project Changelog
 
+## 2026-03-10 (Honest Discovery Capability Gating)
+
+### Added
+
+- **Backend capability gating for `/modules/installed` discovery** — the endpoint now prunes models the current Odoo server cannot actually expose instead of blindly returning every menu-derived browse target
+- **Structured unavailable-model signature detection** — `OdooRpcService` now recognizes `KeyError: model.name` signatures as proven missing-model failures instead of treating them as generic upstream noise
+- **Honest 404 responses for unavailable models** — direct `/schema/:model/list` and `/records/:model` requests now surface a stable 404 envelope for proven missing-model cases instead of generic 502s
+- **iOS honest browse-discovery failure state** — browse discovery no longer resurrects statically registered models through `ModelRegistry` when discovery fails; Browse/Home now show an explicit unavailable message and an empty catalog
+- **Focused regression coverage** across backend discovery pruning, missing-model normalization, public HTTP envelope behavior, iOS fallback removal, and live smoke against servers lacking CRM/Sales modules
+
+### Changed
+
+- `ModuleService.getInstalledModules()` now runs a lightweight per-model availability probe and removes only models proven unavailable, while preserving dynamic menu/action-backed discovery for everything else
+- `OdooRpcService` now maps recognized missing-model `KeyError` payloads to a stable 404 message and keeps logging the upstream signature for debugging
+- iOS `AppState` now treats discovery failure honestly: `browseRoots` and `availableModels` stay empty until real discovery succeeds, while `ModelRegistry` remains available only for descriptor decoration/fallback titles
+- Browse/Home empty states now distinguish between an actually empty catalog and a discovery failure instead of implying that static fallback data is browse truth
+
+### Verified
+
+- `cd backend && npm run lint && npm run build && npm run test` — backend changes pass all regression tests and lint validation (`16 suites`, `87 tests`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/AppStateModelDiscoveryTests -only-testing:OrdoTests/RecordListViewModelTests -only-testing:OrdoTests/SchemaModelsTests test` — targeted iOS discovery and adjacent browse/schema regressions pass (`20 tests`, `** TEST SUCCEEDED **`)
+- **Live smoke on odoo17 lacking CRM/Sales**: `GET /api/v1/mobile/modules/installed` no longer advertises `crm.lead` or `sale.order`; direct `GET /api/v1/mobile/schema/crm.lead/list` and `GET /api/v1/mobile/records/crm.lead` return 404 with the stable unavailable-model message instead of generic 502s
+
+### Notes
+
+- Scope stays narrow: this slice gates discovery and normalizes missing-model failures; it does not widen the generic form/list/detail engines
+- `ModelRegistry` still decorates discovered models with titles/icons and supplies fallback titles for direct-entry descriptors, but it is no longer the browse fallback gatekeeper
+- Capability checking happens during discovery response assembly and prunes only models proven unavailable; transient probe failures keep the model visible and stay logged for investigation
+- Backend-down or transient RPC failures are preserved as upstream errors; only proven model-unavailability is normalized to 404
+
 ## 2026-03-10 (iOS Read-Only Relation Drilldown Slice)
 
 ### Added

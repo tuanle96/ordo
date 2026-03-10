@@ -75,7 +75,7 @@ struct AppStateModelDiscoveryTests {
     }
 
     @Test
-    func restoreSessionFallsBackToStaticRegistryWhenDiscoveryFails() async throws {
+    func restoreSessionKeepsBrowseCatalogEmptyWhenDiscoveryFails() async throws {
         let backendURL = URL(string: "http://127.0.0.1:35120")!
         let session = StoredSession(
             backendBaseURL: backendURL,
@@ -114,7 +114,11 @@ struct AppStateModelDiscoveryTests {
 
         await appState.restoreSession()
 
-        #expect(appState.availableModels.map(\.model) == ModelRegistry.supported.map(\.model))
+        #expect(!appState.hasLoadedBrowseDiscovery)
+        #expect(appState.browseRoots.isEmpty)
+        #expect(appState.availableModels.isEmpty)
+        #expect(appState.browseDiscoveryErrorMessage == "Browse discovery could not be loaded right now. Try again in a moment.")
+        #expect(appState.modelDescriptor(for: "crm.lead").title == "Leads")
     }
 
     @Test
@@ -162,6 +166,7 @@ struct AppStateModelDiscoveryTests {
 
         #expect(appState.hasLoadedBrowseDiscovery)
         #expect(appState.availableModels.isEmpty)
+        #expect(appState.browseDiscoveryErrorMessage == nil)
         #expect(appState.modelDescriptor(for: "project.task", fallbackTitle: "Tasks").title == "Tasks")
     }
 

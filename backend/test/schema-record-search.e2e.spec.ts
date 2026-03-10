@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import request from 'supertest';
 
 import { RecordService } from '@app/modules/record/record.service';
@@ -96,6 +97,39 @@ describe('Schema, record, and search endpoints', () => {
             columns: [{ name: 'name', type: 'char', label: 'Name' }],
             search: { fields: [], filters: [], groupBy: [] },
         });
+    });
+
+    it('returns honest 404 envelopes when a discovered model is unavailable', async () => {
+        schemaServiceMock.getListSchema.mockRejectedValueOnce(
+            new NotFoundException('The requested Odoo model is not available on this server or database.'),
+        );
+        recordServiceMock.listRecords.mockRejectedValueOnce(
+            new NotFoundException('The requested Odoo model is not available on this server or database.'),
+        );
+
+        const schemaResponse = await request(protectedApp.getHttpServer())
+            .get('/api/v1/mobile/schema/crm.lead/list')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(404);
+
+        expect(schemaResponse.body.errors).toEqual([
+            expect.objectContaining({
+                code: '404',
+                message: 'The requested Odoo model is not available on this server or database.',
+            }),
+        ]);
+
+        const recordsResponse = await request(protectedApp.getHttpServer())
+            .get('/api/v1/mobile/records/crm.lead?fields=id,name&limit=5')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(404);
+
+        expect(recordsResponse.body.errors).toEqual([
+            expect.objectContaining({
+                code: '404',
+                message: 'The requested Odoo model is not available on this server or database.',
+            }),
+        ]);
     });
 
     it('returns records envelope for list and detail endpoints', async () => {

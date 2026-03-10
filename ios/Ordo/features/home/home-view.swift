@@ -49,8 +49,11 @@ struct HomeView: View {
 
                     if appState.browseRoots.isEmpty {
                         OrdoEmptyStateCard(
-                            title: "No browseable models yet",
-                            message: "This account does not currently expose any browseable Odoo menus. Check menu and action access for the signed-in user.",
+                            title: appState.browseDiscoveryErrorMessage == nil
+                                ? "No browseable models yet"
+                                : "Browse is unavailable right now",
+                            message: appState.browseDiscoveryErrorMessage
+                                ?? "This account does not currently expose any browseable Odoo menus. Check menu and action access for the signed-in user.",
                             systemImage: "square.grid.2x2",
                             accessibilityPrefix: "home-empty-browse-catalog"
                         )

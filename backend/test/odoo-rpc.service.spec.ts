@@ -179,6 +179,25 @@ describe('OdooRpcService', () => {
         );
     });
 
+    it('maps missing model KeyError upstream failures to not found responses', () => {
+        const configService = {
+            get: jest.fn().mockReturnValue(15000),
+        } as unknown as ConfigService;
+        const service = new OdooRpcService(configService);
+
+        const error = (service as any).mapOdooError({
+            message: 'Odoo Server Error',
+            data: {
+                name: 'builtins.KeyError',
+                message: 'crm.lead',
+                debug: 'Traceback...\nKeyError: \'crm.lead\'\n',
+            },
+        });
+
+        expect(error).toBeInstanceOf(NotFoundException);
+        expect(error.message).toBe('The requested Odoo model is not available on this server or database.');
+    });
+
     it('logs structured context for call_kw JSON-RPC failures while preserving the outward exception', async () => {
         const configService = {
             get: jest.fn().mockReturnValue(15000),
@@ -209,7 +228,7 @@ describe('OdooRpcService', () => {
             model: 'crm.lead',
             method: 'fields_get',
             kwargs: { attributes: ['string'] },
-        })).rejects.toThrow(BadGatewayException);
+        })).rejects.toThrow(NotFoundException);
 
         expect(fetchSpy).toHaveBeenCalledTimes(1);
         expect(loggerErrorSpy).toHaveBeenCalledWith(expect.objectContaining({

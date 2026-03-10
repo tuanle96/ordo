@@ -36,6 +36,27 @@ export class OdooV17Adapter implements OdooAdapter {
         private readonly listSchemaBuilder: MobileListSchemaBuilderService,
     ) { }
 
+    async isModelAvailable(session: OdooSessionContext, model: string): Promise<boolean> {
+        try {
+            await this.odooRpcService.callKwWithSession<Record<string, OdooFieldMeta>>({
+                session,
+                model,
+                method: 'fields_get',
+                kwargs: {
+                    attributes: ['string'],
+                },
+            });
+
+            return true;
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                return false;
+            }
+
+            throw error;
+        }
+    }
+
     async getFormSchema(session: OdooSessionContext, model: string): Promise<MobileFormSchema> {
         const fieldsMeta = await this.odooRpcService.callKwWithSession<Record<string, OdooFieldMeta>>({
             session,

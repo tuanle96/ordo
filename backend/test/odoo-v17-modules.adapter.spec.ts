@@ -1,3 +1,5 @@
+import { NotFoundException } from '@nestjs/common';
+
 import { OdooV17Adapter } from '@app/odoo/adapters/odoo-v17.adapter';
 
 describe('OdooV17Adapter getInstalledModules', () => {
@@ -41,6 +43,32 @@ describe('OdooV17Adapter getInstalledModules', () => {
         await expect(adapter.getInstalledModules(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
         )).resolves.toEqual([]);
+    });
+});
+
+describe('OdooV17Adapter isModelAvailable', () => {
+    it('returns false when the model is explicitly unavailable', async () => {
+        const odooRpcService = {
+            callKwWithSession: jest.fn().mockRejectedValue(new NotFoundException('missing model')),
+        };
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+
+        await expect(adapter.isModelAvailable(
+            { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
+            'crm.lead',
+        )).resolves.toBe(false);
+    });
+
+    it('rethrows unexpected probe failures', async () => {
+        const odooRpcService = {
+            callKwWithSession: jest.fn().mockRejectedValue(new Error('timeout')),
+        };
+        const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
+
+        await expect(adapter.isModelAvailable(
+            { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
+            'crm.lead',
+        )).rejects.toThrow('timeout');
     });
 });
 

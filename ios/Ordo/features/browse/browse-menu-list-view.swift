@@ -127,6 +127,8 @@ struct BrowseMenuRowLink: View {
 }
 
 struct BrowseMenuListView: View {
+    @Environment(AppState.self) private var appState
+
     let title: String
     let nodes: [BrowseMenuNode]
 
@@ -135,8 +137,13 @@ struct BrowseMenuListView: View {
             VStack(spacing: OrdoSpacing.lg) {
                 if nodes.isEmpty {
                     OrdoEmptyStateCard(
-                        title: "No browseable menus found",
-                        message: "The signed-in user does not currently have any browseable Odoo menu/action entries exposed to the mobile app.",
+                        title: title == "Browse" && appState.browseDiscoveryErrorMessage != nil
+                            ? "Browse is unavailable right now"
+                            : "No browseable menus found",
+                        message: title == "Browse"
+                            ? appState.browseDiscoveryErrorMessage
+                                ?? "The signed-in user does not currently have any browseable Odoo menu/action entries exposed to the mobile app."
+                            : "The signed-in user does not currently have any browseable Odoo menu/action entries exposed to the mobile app.",
                         systemImage: "tray",
                         accessibilityPrefix: "browse-empty-catalog"
                     )
