@@ -3,124 +3,74 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
+  <a href="https://opensource.org/licenses/AGPL-3.0"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" /></a>
+  <img alt="Odoo versions" src="https://img.shields.io/badge/Odoo-17%20%7C%2018%20%7C%2019-714B67" />
+  <img alt="iOS" src="https://img.shields.io/badge/iOS-17%2B-black" />
+  <img alt="Backend" src="https://img.shields.io/badge/backend-NestJS%2011-E0234E" />
+</p>
+
+<p align="center">
+  <strong>The Odoo Community mobile experience, reimagined.</strong>
+</p>
+
+<p align="center">
+  Native iOS. Schema-driven UI. One clean API across Odoo 17, 18, and 19.
+</p>
+
+<p align="center">
+  <a href="#highlights">Highlights</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#getting-started">Getting Started</a> •
-  <a href="#project-structure">Project Structure</a> •
-  <a href="#roadmap">Roadmap</a> •
-  <a href="#contributing">Contributing</a> •
-  <a href="#license">License</a>
+  <a href="#quick-start">Quick start</a> •
+  <a href="#roadmap">Roadmap</a>
 </p>
 
 ---
 
-## Overview
+## Highlights
 
-Odoo Community has no official mobile app. **Ordo** fills this gap with a schema-driven, offline-capable native iOS client that connects to any Odoo server (v17–v19) through a lightweight NestJS middleware.
+- **Native iOS**, built for touch-first Odoo workflows
+- **Schema-driven forms and lists**, powered by real Odoo metadata
+- **One normalized backend contract** across Odoo 17, 18, and 19
+- **Already shipped:** auth, browse, detail, edit, actions, chatter, offline-resilient cache
 
-The middleware handles version differences, authentication, and schema introspection — so the mobile app receives a **consistent API** regardless of the Odoo version running on the server.
-
-### Key Differentiators
-
-- 🔌 **Multi-tenant** — One backend serves N Odoo servers. Users can connect to any Odoo instance.
-- 🧩 **Schema-driven forms** — Middleware introspects Odoo's `ir.model.fields` + `ir.ui.view` XML and generates mobile-optimized JSON schemas.
-- 🔄 **Version adapters** — Abstracts Odoo API differences (v17/v18/v19) behind a unified interface.
-- 🌐 **Dynamic i18n** — App language follows the user's Odoo `context.lang` setting.
-- 📶 **Offline-capable** — File-based cache with graceful degradation when network is unavailable.
-
----
-
-## Features
-
-### ✅ Implemented
-
-| Area                     | Backend                                                                                                                                                                                                                                                                                                                                                                                               | iOS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Authentication**       | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, JWT with session bridge plus Redis-backed session-handle revocation                                                                                                                                                                                                                                                    | Login screen, Keychain persistence, session restore, and explicit Settings sign-out that logs out remotely before clearing local state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Version Detection**    | Auto-detect Odoo 17/18/19 via `/web/webclient/version_info`                                                                                                                                                                                                                                                                                                                                           | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **Schema Introspection** | `GET /schema/:model` — XML arch → mobile JSON schema                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **Record Browsing**      | `GET /records/:model`, `GET /records/:model/:id`                                                                                                                                                                                                                                                                                                                                                      | Paginated list with table/grid view modes, sortable columns, pull-to-refresh, and persisted multi-condition browse filters powered by existing `domain` queries for `res.partner`, `crm.lead`, and narrow `sale.order`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Search**               | `GET /search/:model` (name_search)                                                                                                                                                                                                                                                                                                                                                                    | Debounced search with 300ms delay, plus relation search for supported `many2one` editors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **Record Write**         | `POST /records/:model` (create), `PATCH /records/:model/:id` (update), `DELETE /records/:model/:id` (delete), `POST /records/:model/:id/actions/:name` (action), `GET /records/:model/defaults` (create defaults hydration)                                                                                                                                                                           | New-record flow now preloads narrow server defaults before editing, plus edit mode for `char`, `text`, `integer`, `float`, `date`, `datetime`, `boolean`, `selection`, `many2one`, `many2many` tags, `priority`, `image` (read preview + choose/replace/clear + local export), generic small-file `binary`/document upload with honest filename persistence when schema exposes a companion field plus local preview/export from already-loaded payloads, `signature` capture (draw/replace/clear) with bounded read preview and PNG/base64 save reuse, and the current generic field-matrix additions; read-mode workflow action buttons with confirm/loading UX; save/discard UX; dirty tracking; required-field + format validation; refresh-aware auth retry across `res.partner` with fixture-backed coverage for `crm.lead` and narrow `sale.order` *(deterministic full create-flow/action UI stabilization is still a follow-up hardening gap)* |
-| **Chatter**              | `GET /records/:model/:id/chatter` (paginated thread read), `POST /records/:model/:id/chatter/note` (post internal note), `GET /records/:model/:id/chatter/details` (followers + activities + activity types), `POST/DELETE /records/:model/:id/chatter/follow`, `POST /records/:model/:id/chatter/activities` (schedule new activity), `POST /records/:model/:id/chatter/activities/:activityId/done` | Lazy-loaded chatter section below record form with thread display, author info, timestamps, send-note UX, follower state, follower list, activity scheduling, and activity completion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Offline Cache**        | —                                                                                                                                                                                                                                                                                                                                                                                                     | File-based cache with actor isolation, stale-data banners, plus a narrow persisted pending-mutation queue with replay after authenticated restore/sign-in                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **Health Check**         | `GET /health` (unprefixed)                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-
-### 🚧 Planned
-
-Nested `one2many` editors, kanban/grouping views, richer follower management / chatter attachments / broader mail parity, deeper field type coverage, richer attachment-platform flows beyond the current inline preview/export MVP, background retry/conflict handling for queued offline writes, biometric auth, push notifications, WebSocket real-time updates, barcode scanner, multi-server switcher, and more. See [Roadmap](#roadmap).
-
----
+Ordo is production-minded, but still evolving. Full offline sync, richer attachments, and broader workflow polish are next.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────┐
-│          iOS App (Swift / SwiftUI)           │
-│  AppState · APIClient · Keychain · Cache    │
-└──────────────────┬──────────────────────────┘
-                   │ HTTPS (REST + JWT)
-┌──────────────────┴──────────────────────────┐
-│     NestJS Middleware (TypeScript)           │
-│  Auth · Schema Builder · Record Service     │
-│  Version Adapters (v17/v18/v19)             │
-│  Session Store · Transform Interceptor      │
-└────────┬───────────────┬───────────┬────────┘
-         │               │           │ JSON-RPC
-    ┌────┴────┐    ┌─────┴────┐  ┌───┴──────┐
-    │ Odoo 17 │    │ Odoo 18  │  │ Odoo 19  │
-    └─────────┘    └──────────┘  └──────────┘
+```text
+iOS App (SwiftUI)
+    ↓ HTTPS / JWT
+NestJS Middleware
+    ↓ JSON-RPC
+Odoo 17 / 18 / 19
 ```
 
-### Tech Stack
+### Stack
 
-| Layer            | Technology                                                                                                                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS UI           | SwiftUI (iOS 17+)                                                                                                                            |
-| iOS Architecture | MVVM + `@Observable` with `@MainActor` isolation for app state and stores, `@State` root ownership in `OrdoApp`, typed environment injection |
-| iOS Networking   | URLSession + async/await + Codable                                                                                                           |
-| iOS Storage      | Keychain Services + file-based cache                                                                                                         |
-| Backend          | NestJS 11 + TypeScript 5.x                                                                                                                   |
-| Runtime          | Node.js 22 LTS                                                                                                                               |
-| Auth             | `@nestjs/jwt` + `@nestjs/passport`                                                                                                           |
-| Redis Store      | `ioredis` (sessions + schema cache)                                                                                                          |
-| Odoo RPC         | Custom JSON-RPC client (fetch-based)                                                                                                         |
-| Validation       | `class-validator` + `class-transformer`                                                                                                      |
-| Shared Types     | TypeScript package (`@ordo/shared`)                                                                                                          |
-| Tests            | Jest + Supertest (E2E + unit)                                                                                                                |
+- **iOS:** SwiftUI, `@Observable`, async/await, Keychain, file cache
+- **Backend:** NestJS 11, TypeScript 5, Redis, `class-validator`
+- **Contracts:** `@ordo/shared`
+- **Testing:** Jest, Supertest, Xcode / `xcodebuild`
 
----
+## Quick start
 
-## Getting Started
+### Requirements
 
-### Prerequisites
+- Node.js 22 LTS
+- npm 10+
+- Xcode 15+
+- Docker *(optional, for local Odoo validation)*
 
-| Tool    | Version                              |
-| ------- | ------------------------------------ |
-| Node.js | 22 LTS                               |
-| npm     | 10+                                  |
-| Xcode   | 15+ (for iOS)                        |
-| Docker  | Optional — for local Odoo validation |
-
-### Installation
+### Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/tuanle96/ordo.git
 cd ordo
-
-# Install all dependencies (backend + shared)
 npm install
-```
-
-### Environment Setup
-
-```bash
-# Copy the example env file
 cp backend/.env.example backend/.env
 ```
 
-Edit `backend/.env` with your values:
+Set the required backend values in `backend/.env`:
 
 ```env
 JWT_ACCESS_SECRET=your-access-secret
@@ -132,25 +82,19 @@ ODOO_REQUEST_TIMEOUT_MS=15000
 ODOO_SESSION_TTL_SECONDS=1800
 ```
 
-### Running
-
-#### Backend
+### Run
 
 ```bash
-# Development mode (with hot reload)
 npm run dev:backend
-
-# Production build
-npm run build
 ```
 
-The API will be available at `http://localhost:3000/api/v1/mobile`.
+API base URL:
 
-#### iOS
+```text
+http://localhost:3000/api/v1/mobile
+```
 
-Open `ios/Ordo.xcodeproj` in Xcode, select a simulator, and hit **Run** (⌘R).
-
-Or build from command line:
+Run the iOS app from `ios/Ordo.xcodeproj`, or build with:
 
 ```bash
 xcodebuild -project ios/Ordo.xcodeproj \
@@ -159,244 +103,36 @@ xcodebuild -project ios/Ordo.xcodeproj \
   build
 ```
 
-#### Local Odoo Stack (Optional)
+Optional local Odoo stack:
 
 ```bash
 cd odoo-instances
 docker compose up -d --build
 ```
 
-This spins up Odoo 17, 18, and 19 instances for local validation.
-
-### Running Tests
-
-```bash
-# Backend tests (Jest)
-npm test
-
-# With coverage
-npm run test:coverage
-```
-
-### Health Check
-
-```bash
-curl http://localhost:3000/health
-```
-
----
-
-## Project Structure
-
-```
-Ordo/
-├── backend/                  ← NestJS middleware
-│   ├── src/
-│   │   ├── modules/
-│   │   │   ├── auth/         ← Login, JWT, guards
-│   │   │   ├── health/       ← Health check endpoint
-│   │   │   ├── record/       ← CRUD + search endpoints
-│   │   │   └── schema/       ← Schema introspection endpoint
-│   │   ├── odoo/
-│   │   │   ├── adapters/     ← Version-specific adapters (v17/v18/v19)
-│   │   │   ├── rpc/          ← JSON-RPC client
-│   │   │   ├── schema/       ← XML arch → mobile JSON builder
-│   │   │   └── session/      ← Upstream session store
-│   │   ├── common/           ← Guards, interceptors, pipes, DTOs
-│   │   ├── app.module.ts
-│   │   └── main.ts
-│   └── test/                 ← E2E + unit tests
-│
-├── ios/                      ← SwiftUI native app
-│   └── Ordo/
-│       ├── app/              ← AppState, config, tab view
-│       ├── features/
-│       │   ├── auth/         ← Login view
-│       │   ├── browse/       ← Record list, model registry
-│       │   ├── record-detail/← Record detail view
-│       │   ├── settings/     ← Settings screen
-│       │   └── home/         ← Home / dashboard placeholder
-│       ├── networking/       ← API client
-│       ├── persistence/      ← Keychain + file cache
-│       └── shared/models/    ← Swift Codable models
-│
-├── shared/                   ← TypeScript type contracts
-│   └── src/
-│       ├── auth.types.ts
-│       ├── schema.types.ts
-│       ├── record.types.ts
-│       └── api.types.ts
-│
-├── docs/                     ← Engineering documentation
-├── plans/                    ← Implementation plans & reports
-├── odoo-instances/           ← Docker Compose for local Odoo
-└── prd.md                    ← Product Requirements Document
-```
-
----
-
-## API Reference
-
-All endpoints are prefixed with `/api/v1/mobile` (configurable via `API_PREFIX` env var).
-
-| Method   | Endpoint                                                  | Auth   | Description                                                                                           |
-| -------- | --------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
-| `GET`    | `/health`                                                 | No     | Health check (unprefixed)                                                                             |
-| `POST`   | `/auth/login`                                             | No     | Authenticate via Odoo, returns JWT                                                                    |
-| `POST`   | `/auth/refresh`                                           | No     | Exchange refresh token for a fresh access token                                                       |
-| `POST`   | `/auth/logout`                                            | Bearer | Revoke the current Redis-backed Odoo session bridge and best-effort destroy the upstream Odoo session |
-| `GET`    | `/auth/me`                                                | Bearer | Get current user principal                                                                            |
-| `GET`    | `/schema/:model`                                          | Bearer | Get mobile form schema for model                                                                      |
-| `GET`    | `/records/:model`                                         | Bearer | List records with pagination                                                                          |
-| `GET`    | `/records/:model/:id`                                     | Bearer | Get single record by ID                                                                               |
-| `POST`   | `/records/:model`                                         | Bearer | Create a record and read it back canonically                                                          |
-| `PATCH`  | `/records/:model/:id`                                     | Bearer | Update a record and read it back canonically                                                          |
-| `DELETE` | `/records/:model/:id`                                     | Bearer | Delete a record                                                                                       |
-| `POST`   | `/records/:model/:id/actions/:name`                       | Bearer | Execute a record-level action                                                                         |
-| `GET`    | `/records/:model/:id/chatter`                             | Bearer | Read paginated chatter thread                                                                         |
-| `POST`   | `/records/:model/:id/chatter/note`                        | Bearer | Post an internal chatter note                                                                         |
-| `GET`    | `/records/:model/:id/chatter/details`                     | Bearer | Read chatter followers, active activities, and available activity types                               |
-| `POST`   | `/records/:model/:id/chatter/follow`                      | Bearer | Follow the record as the current user                                                                 |
-| `DELETE` | `/records/:model/:id/chatter/follow`                      | Bearer | Unfollow the record as the current user                                                               |
-| `POST`   | `/records/:model/:id/chatter/activities`                  | Bearer | Schedule a new activity assigned to the current user                                                  |
-| `POST`   | `/records/:model/:id/chatter/activities/:activityId/done` | Bearer | Mark an activity done with optional feedback                                                          |
-| `GET`    | `/search/:model`                                          | Bearer | Name search (autocomplete)                                                                            |
-
-### Response Envelope
-
-All responses follow a consistent envelope:
-
-```json
-{
-  "success": true,
-  "data": { ... },
-  "meta": { "total": 100, "offset": 0, "limit": 40 },
-  "errors": []
-}
-```
-
----
-
-## Odoo Compatibility
-
-| Feature                            |  v17  |  v18  |  v19  |
-| ---------------------------------- | :---: | :---: | :---: |
-| JSON-RPC (`/jsonrpc`)              |   ✅   |   ✅   |   ✅   |
-| `fields_get` introspection         |   ✅   |   ✅   |   ✅   |
-| `get_view(view_type='form')`       |   ✅   |   ✅   |   ✅   |
-| `search_read`                      |   ✅   |   ✅   |   ✅   |
-| `name_search`                      |   ✅   |   ✅   |   ✅   |
-| Session-based authentication       |   ✅   |   ✅   |   ✅   |
-| `groups_id` / `group_ids` fallback |   ✅   |   ✅   |   ✅   |
-
-The **Version Adapter** pattern normalizes API differences. Adding support for a new Odoo version requires a single adapter file.
-
----
-
 ## Roadmap
 
-### Completed
+Next major areas:
 
-- [x] **Handoff 1 — Foundation** — Monorepo setup, shared contracts, NestJS bootstrap, health check
-- [x] **Handoff 2 — Auth & RPC** — Auth module, JWT, version detection, JSON-RPC client, live Odoo 17/18/19 validation
-- [x] **Handoff 3 — Schema & Records** — Session bridge, schema/records/search endpoints, live validation
-- [x] **Handoff 4 — Hardening** — Backend test suite, regression tests, docs cleanup
-- [x] **Handoff 5 — iOS MVP** — SwiftUI app shell, login, session restore, API client, offline cache, res.partner browsing
+- wider iOS observation migration
+- barcode + inventory workflows
+- richer attachment/media flows
+- deeper offline sync
+- notifications, realtime, biometrics, multi-server support
 
-### Phase 1 — Core Forms *(Complete through Phase 04)*
+For full details:
 
-- [x] Token refresh backend (`POST /auth/refresh`)
-- [x] Dynamic form foundation — render forms from schema JSON
-- [x] Backend record create / edit / delete endpoints
-- [x] Backend workflow action endpoints
-- [x] iOS auto-refresh
-- [x] iOS form save/write integration
-- [x] `many2one` editor flow
-- [x] Additional models: `crm.lead`, `sale.order`
-
-### Phase 1.5 — Hardening & Docs *(Complete)*
-
-- [x] Full regression confirmation across backend + iOS write flows
-- [x] Broaden iOS test coverage around save failures and relation edge cases
-- [x] Final docs cleanup for the completed write slice
-
-### Phase 2 — Production Hardening *(In Progress)*
-
-- [x] Redis session store (replace in-memory `Map`)
-- [x] Schema caching with Redis (1h TTL)
-- [x] Rate limiting on auth endpoints
-- [x] CORS configuration
-- [x] Structured logging (Pino)
-- [x] Explicit logout backend + iOS settings integration (`POST /auth/logout`)
-- [x] iOS test hardening (unit-green milestone established the baseline later used to close the recent-items relaunch seam in Phase 06A/06B)
-- [x] Phase 06A — isolate recent-items relaunch determinism before any observation refactor
-- [x] Phase 06B — run a narrow `RecentItemsStore` `@Observable` pilot
-- [ ] Phase 07 — widen `@Observable` migration to `AppState`, feature view models, and `FormDraft` only after the pilot is green
-
-### Phase 3 — Inventory & Offline
-
-- [ ] Barcode scanner (AVFoundation)
-- [ ] Inventory transfer workflows
-- [ ] Offline sync engine with conflict resolution
-- [ ] SwiftData / Core Data local store
-- [ ] Broader attachment/media follow-up (large-file fetch/export, attachment-platform APIs, chatter attachments, and richer offline-safe media flows)
-
-### Phase 4 — Notifications & Polish
-
-- [ ] Push notifications (APNs)
-- [ ] WebSocket real-time updates (Socket.IO)
-- [ ] Biometric authentication (Face ID / Touch ID)
-- [ ] Multi-server support + server switcher
-- [ ] Dark mode polish
-- [ ] App Store submission
-
-### Phase 5 — AI & Advanced *(Future)*
-
-- [ ] AI assistant for smart data entry
-- [ ] Camera OCR for documents
-- [ ] Voice input for notes and search
-- [ ] iPad-optimized layouts
-- [ ] Swagger / OpenAPI documentation
-- [ ] Android app (Kotlin / KMP)
-
----
-
-## Documentation
-
-| Document                                                     | Description                      |
-| ------------------------------------------------------------ | -------------------------------- |
-| [`prd.md`](prd.md)                                           | Product Requirements Document    |
-| [`docs/system-architecture.md`](docs/system-architecture.md) | System architecture overview     |
-| [`docs/code-standards.md`](docs/code-standards.md)           | Coding standards and conventions |
-| [`docs/codebase-summary.md`](docs/codebase-summary.md)       | Codebase summary and module map  |
-| [`docs/project-roadmap.md`](docs/project-roadmap.md)         | Handoff status tracker           |
-| [`docs/project-changelog.md`](docs/project-changelog.md)     | Change log                       |
-| [`docs/deployment-guide.md`](docs/deployment-guide.md)       | Deployment instructions          |
-
----
+- [`docs/project-roadmap.md`](docs/project-roadmap.md)
+- [`docs/project-changelog.md`](docs/project-changelog.md)
+- [`docs/system-architecture.md`](docs/system-architecture.md)
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
-
----
+PRs are welcome. Keep changes focused, run relevant validation, and use [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## License
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see the [LICENSE](LICENSE) file for details.
-
-**What this means:**
-
-- ✅ You can **use, modify, and distribute** this software freely
-- ✅ You can use it for **commercial purposes** (hosting, consulting, support)
-- ⚠️ If you modify and deploy it as a **network service**, you **must** release your source code under AGPL-3.0
-- ⚠️ Derivative works must also be licensed under AGPL-3.0
+Licensed under **AGPL-3.0**. If you modify and deploy Ordo as a network service, you must release the corresponding source code under AGPL-3.0.
 
 ---
 
