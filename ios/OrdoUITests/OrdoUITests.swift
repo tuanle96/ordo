@@ -371,6 +371,20 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testEmptyDiscoveredBrowseCatalogShowsHelpfulEmptyStates() throws {
+        let app = makeApp(resetStorage: true, emptyBrowseCatalog: true)
+        app.launch()
+
+        signIn(app)
+        XCTAssertTrue(app.staticTexts["home-empty-browse-catalog-title"].waitForExistence(timeout: standardTimeout))
+        XCTAssertFalse(app.buttons["browse-model-res-partner"].exists)
+
+        tapBrowseTab(app)
+        XCTAssertTrue(app.staticTexts["browse-empty-catalog-title"].waitForExistence(timeout: standardTimeout))
+        XCTAssertFalse(app.buttons["browse-model-res-partner"].exists)
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             let app = makeApp(resetStorage: true)
@@ -378,12 +392,13 @@ final class OrdoUITests: XCTestCase {
         }
     }
 
-    private func makeApp(resetStorage: Bool, failSave: Bool = false) -> XCUIApplication {
+    private func makeApp(resetStorage: Bool, failSave: Bool = false, emptyBrowseCatalog: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launchEnvironment["ORDO_UI_TEST_MODE"] = "smoke"
         app.launchEnvironment["ORDO_UI_TEST_RESET_STORAGE"] = resetStorage ? "1" : "0"
         app.launchEnvironment["ORDO_UI_TEST_FAIL_SAVE"] = failSave ? "1" : "0"
+        app.launchEnvironment["ORDO_UI_TEST_EMPTY_BROWSE_CATALOG"] = emptyBrowseCatalog ? "1" : "0"
         app.launchEnvironment["ORDO_UI_TEST_STORAGE_NAMESPACE"] = storageNamespace
         return app
     }

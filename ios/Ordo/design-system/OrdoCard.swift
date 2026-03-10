@@ -17,6 +17,52 @@ struct OrdoCard<Content: View>: View {
     }
 }
 
+struct OrdoEmptyStateCard: View {
+    let title: String
+    let message: String
+    let systemImage: String
+    var accessibilityPrefix: String? = nil
+
+    var body: some View {
+        OrdoCard {
+            HStack {
+                Spacer(minLength: 0)
+
+                VStack(spacing: OrdoSpacing.md) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(OrdoColors.accent)
+
+                    VStack(spacing: OrdoSpacing.xs) {
+                        Text(title)
+                            .font(OrdoTypography.headline)
+                            .foregroundStyle(OrdoColors.textPrimary)
+                            .accessibilityIdentifier(accessibilityIdentifier(suffix: "title"))
+
+                        Text(message)
+                            .font(OrdoTypography.subheadline)
+                            .foregroundStyle(OrdoColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .accessibilityIdentifier(accessibilityIdentifier(suffix: "message"))
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, OrdoSpacing.lg)
+        }
+        .accessibilityIdentifier(accessibilityIdentifier(suffix: "card"))
+    }
+
+    private func accessibilityIdentifier(suffix: String) -> String {
+        guard let accessibilityPrefix, !accessibilityPrefix.isEmpty else {
+            return ""
+        }
+
+        return "\(accessibilityPrefix)-\(suffix)"
+    }
+}
+
 #Preview {
     VStack(spacing: 16) {
         OrdoCard {
@@ -38,6 +84,13 @@ struct OrdoCard<Content: View>: View {
                 Spacer()
             }
         }
+
+        OrdoEmptyStateCard(
+            title: "Nothing here yet",
+            message: "This card can explain why a section is currently empty.",
+            systemImage: "tray",
+            accessibilityPrefix: "preview-empty-state"
+        )
     }
     .padding()
     .background(OrdoColors.surfaceGrouped)

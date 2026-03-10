@@ -16,6 +16,7 @@
 - iOS `AppState.availableModels` now prefers dynamically discovered browse models and merges them with `ModelRegistry` static overrides instead of filtering a hardcoded local registry by installed module names
 - `ModelRegistry` now acts as **curated metadata + generic fallback synthesis** for discovered models, rather than as the hard browse gatekeeper
 - Home/settings/recent-item labeling paths now resolve model descriptors through the dynamic app-state lookup so newly discovered models can surface with sane fallback titles/icons
+- Home and Browse now show explicit empty-state guidance when browse discovery succeeds with an empty catalog, instead of rendering silent blank cards
 
 ### Verified
 
@@ -26,7 +27,7 @@
 
 - This slice deliberately widens **discovery**, not the generic form/list engine itself; unknown models can now surface through the existing browse/list/detail runtime when Odoo exposes a browseable menu/action path
 - `ModelRegistry` still matters for polished titles, icons, and row-summary fallbacks, but it is no longer the primary browse allowlist
-- A targeted UI smoke rerun in this session was blocked by simulator test-runner launch failure (`OrdoUITests.xctrunner`), not by an app assertion regression in the shipped discovery path
+- The targeted Home/Browse empty-catalog UI regression was added in `OrdoUITests`, but this session did not record a clean green rerun after the final patch because `OrdoUITests.xctrunner` hit simulator launch-denial instability
 
 ## 2026-03-10 (Backend Path Alias Import Migration)
 

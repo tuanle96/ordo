@@ -188,9 +188,12 @@ private final class UITestURLProtocol: URLProtocol {
         }
 
         if path.hasSuffix("/modules/installed") {
+            let browseModels = ProcessInfo.processInfo.environment["ORDO_UI_TEST_EMPTY_BROWSE_CATALOG"] == "1"
+                ? []
+                : UITestFixtures.browseModels
             return (200, try encoder.encode(UITestEnvelope(data: InstalledModulesResponse(
                 modules: UITestFixtures.installedModules,
-                browseModels: UITestFixtures.browseModels
+                browseModels: browseModels
             ), meta: nil)))
         }
 

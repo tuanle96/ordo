@@ -47,34 +47,43 @@ struct HomeView: View {
                         .fontWeight(.semibold)
                         .padding(.horizontal, OrdoSpacing.xs)
 
-                    OrdoCard {
-                        VStack(spacing: 0) {
-                            ForEach(Array(appState.availableModels.enumerated()), id: \.element.id) { index, descriptor in
-                                NavigationLink {
-                                    RecordListView(descriptor: descriptor)
-                                } label: {
-                                    HStack(spacing: OrdoSpacing.md) {
-                                        Image(systemName: descriptor.systemImage)
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                            .frame(width: 32, height: 32)
-                                            .background(OrdoColors.accent, in: RoundedRectangle(cornerRadius: OrdoRadius.sm, style: .continuous))
+                    if appState.availableModels.isEmpty {
+                        OrdoEmptyStateCard(
+                            title: "No browseable models yet",
+                            message: "This account does not currently expose any browseable Odoo menus. Check menu and action access for the signed-in user.",
+                            systemImage: "square.grid.2x2",
+                            accessibilityPrefix: "home-empty-browse-catalog"
+                        )
+                    } else {
+                        OrdoCard {
+                            VStack(spacing: 0) {
+                                ForEach(Array(appState.availableModels.enumerated()), id: \.element.id) { index, descriptor in
+                                    NavigationLink {
+                                        RecordListView(descriptor: descriptor)
+                                    } label: {
+                                        HStack(spacing: OrdoSpacing.md) {
+                                            Image(systemName: descriptor.systemImage)
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                                .frame(width: 32, height: 32)
+                                                .background(OrdoColors.accent, in: RoundedRectangle(cornerRadius: OrdoRadius.sm, style: .continuous))
 
-                                        Text(descriptor.title)
-                                            .font(OrdoTypography.headline)
-                                            .foregroundStyle(OrdoColors.textPrimary)
+                                            Text(descriptor.title)
+                                                .font(OrdoTypography.headline)
+                                                .foregroundStyle(OrdoColors.textPrimary)
 
-                                        Spacer()
+                                            Spacer()
 
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(OrdoColors.textTertiary)
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(OrdoColors.textTertiary)
+                                        }
+                                        .padding(.vertical, OrdoSpacing.md)
                                     }
-                                    .padding(.vertical, OrdoSpacing.md)
-                                }
 
-                                if index < appState.availableModels.count - 1 {
-                                    Divider()
+                                    if index < appState.availableModels.count - 1 {
+                                        Divider()
+                                    }
                                 }
                             }
                         }
