@@ -4,6 +4,15 @@ odoo-instances/
 plans/
 .claude/
 
+# Internal / sensitive docs
+CLAUDE.md
+prd.md
+codebase-evaluation.md.resolved
+.github/prompts/
+
+# Xcode user data
+**/xcuserdata/
+
 # macOS
 .DS_Store
 
