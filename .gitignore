@@ -2,6 +2,7 @@ odoo-src
 summary
 odoo-instances/
 plans/
+.claude/
 
 # macOS
 .DS_Store
