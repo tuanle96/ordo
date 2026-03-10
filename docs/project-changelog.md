@@ -1,5 +1,24 @@
 # Project Changelog
 
+## 2026-03-10 (Backend Path Alias Import Migration)
+
+### Changed
+
+- Backend source and test files now use `@app/*` and `@test/*` path aliases instead of relative import paths throughout `backend/src` and `backend/test`
+- `backend/tsconfig.json` now defines backend-local alias mappings for `@app/*` and `@test/*`
+- `backend/jest.config.ts` now mirrors those aliases through `moduleNameMapper` so Jest resolves imports the same way as TypeScript
+- `backend/package.json` now runs `tsc-alias` after `nest build` so emitted `dist/` JavaScript stays Node-runtime safe without unresolved alias specifiers
+
+### Verified
+
+- `npm run build --workspace backend` — passes after alias rewrite integration
+- `npm run test --workspace backend` — passes (`15 suites`, `75 tests`)
+- `npm run lint --workspace backend` — passes
+
+### Notes
+
+- This is an internal backend maintainability refactor only; it does not change the public API contract, backend routes, or iOS transport behavior
+
 ## 2026-03-10 (Contributor Guide — Add Odoo Community Module Support)
 
 ### Added

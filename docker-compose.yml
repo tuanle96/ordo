@@ -8,8 +8,8 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
       target: dev
     container_name: ordo-backend
     depends_on:
@@ -18,10 +18,9 @@ services:
       - "38424:38424"
     volumes:
       # Hot-reload: mount source code into container
-      - ./backend/src:/app/backend/src
+      - ./backend/src:/app/src
       # Preserve node_modules installed inside container
       - /app/node_modules
-      - /app/backend/node_modules
     env_file:
       - .env
     environment:

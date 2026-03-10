@@ -49,7 +49,6 @@ Odoo 17 / 18 / 19
 
 - **iOS:** SwiftUI, `@Observable`, async/await, Keychain, file cache
 - **Backend:** NestJS 11, TypeScript 5, Redis, `class-validator`
-- **Contracts:** `@ordo/shared`
 - **Testing:** Jest, Supertest, Xcode / `xcodebuild`
 
 ## Quick start
@@ -65,12 +64,12 @@ Odoo 17 / 18 / 19
 
 ```bash
 git clone https://github.com/tuanle96/ordo.git
-cd ordo
+cd ordo/backend
 npm install
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
-Set the required backend values in `backend/.env`:
+Set the required values in `.env`:
 
 ```env
 JWT_ACCESS_SECRET=your-access-secret
@@ -84,14 +83,26 @@ ODOO_SESSION_TTL_SECONDS=1800
 
 ### Run
 
+**Option A — Docker Compose (recommended):**
+
 ```bash
-npm run dev:backend
+cd ..  # from repo root
+docker compose up --build
+```
+
+This starts both the backend and Redis automatically.
+
+**Option B — Local Node.js:**
+
+```bash
+# Start Redis first (or use an existing instance)
+npm run start:dev
 ```
 
 API base URL:
 
 ```text
-http://localhost:3000/api/v1/mobile
+http://localhost:38424/api/v1/mobile
 ```
 
 Run the iOS app from `ios/Ordo.xcodeproj`, or build with:
