@@ -11,7 +11,7 @@
 - **Monetary edit-prefix helper** that resolves common 3-letter currency codes like `USD` and `EUR` into symbols before falling back to the raw label
 - **Narrow nested `many2one` editor support inside generic `one2many`** using the existing authenticated relation search/select/clear path rather than widening backend or shared contracts
 - **Scoped pending-sync queue management UI** in Settings, showing queued mutation details, retry counts, and last-error hints for retryable offline writes
-- **Focused regression coverage** for schema retry after transient failure, group-by field requests plus grouped section building, ISO datetime normalization, temporal helper parsing, and monetary prefix lookup
+- **Focused regression coverage** for schema retry after transient failure, group-by field requests plus grouped section building, ISO datetime normalization, temporal helper parsing, monetary prefix lookup, create-mode modifier validation, readonly `one2many` line modifiers, and `onchange` merge opt-out behavior
 
 ### Changed
 
@@ -24,6 +24,7 @@
 - `One2ManyFieldEditorSupport` now treats nested `many2one` as part of the shipped generic line-editor matrix, and `One2ManyFieldEditor` presents a narrow picker sheet for relation search/select/clear within line editing
 - `FormDraft` line-level validation and mutation normalization now keep the nested `many2one` `one2many` path on the same generic core engine instead of treating relation lines as unsupported holes
 - Create-mode record writes are now regression-locked to send only values changed from hydrated server defaults, avoiding unnecessary default re-posts during `POST /records/:model`
+- Create-mode hardening is now regression-locked for modifier-aware required validation before `POST /records/:model`, and `FormDraft` has explicit tests covering readonly `one2many` line subfields plus `mergeReturnedValue: false` `onchange` fields
 - `AppState` now exposes scoped pending-mutation inspection plus manual retry/remove/clear operations, and Settings uses that narrow surface to manage the offline queue without inventing new sync contracts
 - `FileMutationQueueStore` now supports scoped queue clearing in addition to load/enqueue/update/remove, keeping the new queue-management UX on the existing file-backed store
 
@@ -31,6 +32,7 @@
 
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/RecordListViewModelTests test` — focused regression slice passes (`57 tests`, `** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoTests/RecordDetailViewModelTests test` — focused nested `many2one` `one2many` editor + validation regressions pass (`78 tests`, `** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FormDraftTests -only-testing:OrdoTests/RecordDetailViewModelTests test` — focused FormDraft edge-case + create-mode modifier hardening regressions pass (`64 tests`, `** TEST SUCCEEDED **`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/MutationQueueStoreTests -only-testing:OrdoTests/AppStateMutationReplayTests test` — focused queue inspection/manual retry/clear regressions pass (`6 tests`, `** TEST SUCCEEDED **`)
 - Independent code review verdict: **SHIP** with no blocking issues found
 

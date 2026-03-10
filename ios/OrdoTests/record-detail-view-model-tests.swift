@@ -201,6 +201,59 @@ struct RecordDetailViewModelTests {
     }
 
     @Test
+    func createFlowValidatesModifierFieldsBeforePost() async throws {
+        var createRequestCount = 0
+
+        DetailViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.contains("/schema/res.partner") {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: partnerSchemaWithCreateModifiers)))
+            }
+
+            if path.hasSuffix("/records/res.partner/defaults") && request.httpMethod == "GET" {
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: detailCreateModifierDefaultsRecord)))
+            }
+
+            if path.hasSuffix("/records/res.partner") && request.httpMethod == "POST" {
+                createRequestCount += 1
+                return (200, try JSONEncoder().encode(DetailEnvelope(data: RecordMutationResult(id: 99, record: detailCreatedPartnerRecord))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = RecordDetailViewModel(descriptor: try #require(ModelRegistry.supported.first), recordID: nil)
+        await viewModel.load(using: appState)
+
+        let draft = FormDraft(record: try #require(viewModel.record))
+
+        let hiddenSave = await viewModel.save(draft: draft, using: appState)
+        #expect(hiddenSave == true)
+        #expect(createRequestCount == 0)
+
+        draft.setValue(.string("open"), for: "state")
+
+        let visibleSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(visibleSave == false)
+        #expect(createRequestCount == 0)
+        #expect(viewModel.validationErrors["internal_note"] == "Internal Note is required.")
+
+        draft.setValue(.string("Ready for review"), for: "internal_note")
+
+        let completedSave = await viewModel.save(draft: draft, using: appState)
+
+        #expect(completedSave == true)
+        #expect(createRequestCount == 1)
+    }
+
+    @Test
     func deleteRecordCallsBackendAndClearsFailureState() async throws {
         var deleteRequestCount = 0
 
@@ -971,6 +1024,19 @@ private let partnerSchemaWithDefaults = MobileFormSchema(
     hasChatter: false
 )
 
+private let partnerSchemaWithCreateModifiers = MobileFormSchema(
+    model: "res.partner",
+    title: "Customer",
+    header: FormHeader(statusbar: nil, actions: []),
+    sections: [FormSection(label: "Contact", fields: [
+        FieldSchema(name: "name", type: .char, label: "Name", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "state", type: .selection, label: "State", required: true, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: [["draft", "Draft"], ["open", "Open"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        FieldSchema(name: "internal_note", type: .text, label: "Internal Note", required: true, readonly: nil, invisible: nil, modifiers: .init(invisible: .init(type: "condition", condition: .init(field: "state", op: "==", value: .string("draft"), values: nil), rules: nil, constant: nil), readonly: nil, required: nil), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+    ])],
+    tabs: [],
+    hasChatter: false
+)
+
 private let partnerSchemaWithOnchange = MobileFormSchema(
     model: "res.partner",
     title: "Customer",
@@ -1123,6 +1189,12 @@ private let detailCreateDefaultsRecord: RecordData = [
     "name": .string("Draft Customer"),
     "country_id": .number(21),
     "priority": .string("2"),
+]
+
+private let detailCreateModifierDefaultsRecord: RecordData = [
+    "name": .string("Draft Customer"),
+    "state": .string("draft"),
+    "internal_note": .null,
 ]
 
 private let saleOrderSchemaWithAction = MobileFormSchema(

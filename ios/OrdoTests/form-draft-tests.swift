@@ -653,6 +653,33 @@ struct FormDraftTests {
     }
 
     @Test
+    func one2manyRequiredSubfieldSkipsReadonlyModifierLine() {
+        let draft = FormDraft(record: [:])
+        let fields = [
+            FieldSchema(name: "order_line", type: .one2many, label: "Order Lines", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "sale.order.line", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: [
+                FieldSchema(name: "state", type: .selection, label: "State", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: [["locked", "Locked"], ["draft", "Draft"]], currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+                FieldSchema(name: "name", type: .char, label: "Description", required: true, readonly: nil, invisible: nil, modifiers: .init(invisible: nil, readonly: .init(type: "condition", condition: .init(field: "state", op: "==", value: .string("locked"), values: nil), rules: nil, constant: nil), required: nil), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+            ], searchable: nil, widget: nil),
+        ]
+
+        draft.setValue(.array([
+            .object([
+                "state": .string("locked"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == nil)
+
+        draft.setValue(.array([
+            .object([
+                "state": .string("draft"),
+            ]),
+        ]), for: "order_line")
+
+        #expect(draft.validationErrors(for: fields)["order_line"] == "Order Lines line 1: Description is required.")
+    }
+
+    @Test
     func one2manyMany2OneSubfieldNormalizesWithinCommands() {
         let baseline: RecordData = [:]
         let draft = FormDraft(record: baseline)
@@ -971,5 +998,26 @@ struct FormDraftTests {
             .relation(id: 11, label: "Wholesale"),
         ]))
         #expect(mergedFields == ["category_id", "country_id"])
+    }
+
+    @Test
+    func mergeOnchangeValuesSkipsFieldWhenMergeReturnedValueDisabled() {
+        let draft = FormDraft(record: [
+            "nickname": .string("Local Nick"),
+        ])
+        let fieldsByName = [
+            "nickname": FieldSchema(name: "nickname", type: .char, label: "Nickname", required: nil, readonly: nil, invisible: nil, modifiers: nil, onchange: OnchangeFieldMeta(trigger: "name", source: "view", dependencies: nil, mergeReturnedValue: false), domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil),
+        ]
+
+        let mergedFields = draft.mergeOnchangeValues(
+            [
+                "nickname": .string("Server Nick"),
+            ],
+            fieldsByName: fieldsByName,
+            protectingEditsAfter: [:]
+        )
+
+        #expect(draft.value(for: "nickname", fallback: nil) == .string("Local Nick"))
+        #expect(mergedFields.isEmpty)
     }
 }
