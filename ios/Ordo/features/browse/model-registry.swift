@@ -88,16 +88,35 @@ enum ModelRegistry {
         ),
     ]
 
-    static func merged(with browseModels: [BrowseModelInfo]) -> [ModelDescriptor] {
+    static let fallbackBrowseMenuTree: [BrowseMenuNode] = supported.map { descriptor in
+        BrowseMenuNode(
+            id: stableMenuID(for: descriptor.model),
+            name: descriptor.title,
+            kind: .app,
+            model: descriptor.model,
+            children: []
+        )
+    }
+
+    static func flatten(from browseMenuTree: [BrowseMenuNode]) -> [ModelDescriptor] {
         var seenModels = Set<String>()
 
-        return browseModels.compactMap { browseModel in
-            guard seenModels.insert(browseModel.model).inserted else {
-                return nil
-            }
+        func traverse(nodes: [BrowseMenuNode]) -> [ModelDescriptor] {
+            nodes.flatMap { node in
+                var descriptors: [ModelDescriptor] = []
 
-            return descriptor(for: browseModel.model, browseTitle: browseModel.title)
+                if !node.children.isEmpty {
+                    descriptors.append(contentsOf: traverse(nodes: node.children))
+                }
+
+                if let model = node.model, seenModels.insert(model).inserted {
+                    descriptors.append(descriptor(for: model, browseTitle: node.name))
+                }
+                return descriptors
+            }
         }
+
+        return traverse(nodes: browseMenuTree)
     }
 
     static func descriptor(for model: String, browseTitle: String? = nil) -> ModelDescriptor {
@@ -161,6 +180,12 @@ enum ModelRegistry {
         }
 
         return "square.grid.2x2"
+    }
+
+    private static func stableMenuID(for model: String) -> Int {
+        model.unicodeScalars.reduce(0) { partial, scalar in
+            (partial &* 31) &+ Int(scalar.value)
+        }
     }
 }
 

@@ -13,7 +13,7 @@ import type {
     RecordListResult,
 } from '@app/shared';
 
-import type { BrowseModelInfo, InstalledModuleInfo } from '@app/modules/module/module.types';
+import type { BrowseMenuNode, InstalledModuleInfo } from '@app/modules/module/module.types';
 
 import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
@@ -120,7 +120,7 @@ export interface OdooAdapter {
     getInstalledModules(
         session: OdooSessionContext,
     ): Promise<InstalledModuleInfo[]>;
-    getBrowseModels(
+    getBrowseMenuTree(
         session: OdooSessionContext,
-    ): Promise<BrowseModelInfo[]>;
+    ): Promise<BrowseMenuNode[]>;
 }

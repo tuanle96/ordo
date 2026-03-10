@@ -1,27 +1,29 @@
 # Project Changelog
 
-## 2026-03-10 (Dynamic Module Discovery & Browse Unblocking)
+## 2026-03-10 (Browse Menu Tree Discovery & Dynamic Browse Unblocking)
 
 ### Added
 
 - **Dynamic backend module discovery** for `GET /api/v1/mobile/modules/installed`, which now returns all installed Odoo application modules instead of a hardcoded curated whitelist
-- **Menu/action-backed browse-model discovery** on the backend, so the same endpoint now also returns `browseModels` derived from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
-- **Focused regression coverage** for backend module service composition, dynamic installed-module queries, browse-model extraction, and iOS app-state discovery merge/fallback behavior
+- **Menu/action-backed browse menu tree discovery** on the backend, so the same endpoint now also returns `browseMenuTree` derived from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
+- **Focused regression coverage** for backend module service composition, tree assembly/pruning, and iOS app-state discovery tree restore/merge/fallback behavior
 
 ### Changed
 
-- `backend/src/modules/module/module.service.ts` no longer gates discovery through `KNOWN_MODULES`; it now combines `adapter.getInstalledModules(...)` with `adapter.getBrowseModels(...)`
+- `backend/src/modules/module/module.service.ts` no longer gates discovery through `KNOWN_MODULES`; it now combines `adapter.getInstalledModules(...)` with `adapter.getBrowseMenuTree(...)`
 - `OdooAdapter` / `OdooV17Adapter` now treat module discovery as a real adapter capability instead of a caller-supplied whitelist lookup
-- `OdooV17Adapter.getBrowseModels(...)` now derives browseable models from active menus and window actions, ignores non-browse targets like `target='new'`, and keeps the payload deduped by `res_model`
-- iOS `AppState.availableModels` now prefers dynamically discovered browse models and merges them with `ModelRegistry` static overrides instead of filtering a hardcoded local registry by installed module names
+- `OdooV17Adapter.getBrowseMenuTree(...)` now derives an app/category/leaf tree from active menus and window actions, ignores non-browse targets like `target='new'`, prunes empty branches, and carries a top-level app fallback `model` from the first browseable descendant when needed
+- iOS `AppState` now stores `browseMenuTree` roots for nested Browse/Home navigation, while `AppState.availableModels` flattens that tree through `ModelRegistry` static overrides instead of filtering a hardcoded local registry by installed module names
 - `ModelRegistry` now acts as **curated metadata + generic fallback synthesis** for discovered models, rather than as the hard browse gatekeeper
 - Home/settings/recent-item labeling paths now resolve model descriptors through the dynamic app-state lookup so newly discovered models can surface with sane fallback titles/icons
-- Home and Browse now show explicit empty-state guidance when browse discovery succeeds with an empty catalog, instead of rendering silent blank cards
+- Home and Browse now render top-level apps/categories from the discovery tree, open `RecordListView` only from model-bearing nodes, and show explicit empty-state guidance when browse discovery succeeds with an empty catalog
+- Unknown models shared by both app wrappers and descendant leaves now prefer the deeper leaf title during iOS descriptor flattening, preventing generic list titles like `Accounting` from masking a more specific leaf like `Invoices`
 
 ### Verified
 
 - `cd backend && npm run build && npm run test && npm run lint` — backend validation passes after the discovery refactor (`16 suites`, `78 tests`)
 - `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/AppStateModelDiscoveryTests test` — focused iOS discovery merge/fallback regressions pass (`** TEST SUCCEEDED **`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' build` — broader iOS project build passes after the tree-render + flattening fix (`** BUILD SUCCEEDED **`)
 
 ### Notes
 

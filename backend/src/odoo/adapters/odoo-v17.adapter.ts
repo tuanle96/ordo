@@ -17,7 +17,7 @@ import type {
     RecordListResult,
 } from '@app/shared';
 
-import type { BrowseModelInfo, InstalledModuleInfo } from '@app/modules/module/module.types';
+import type { BrowseMenuNode, InstalledModuleInfo } from '@app/modules/module/module.types';
 
 import { OdooAdapter } from '@app/odoo/adapters/odoo-adapter.interface';
 import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
@@ -583,19 +583,16 @@ export class OdooV17Adapter implements OdooAdapter {
         }));
     }
 
-    async getBrowseModels(
+    async getBrowseMenuTree(
         session: OdooSessionContext,
-    ): Promise<BrowseModelInfo[]> {
+    ): Promise<BrowseMenuNode[]> {
         const menuRecords = await this.odooRpcService.callKwWithSession<Array<OdooMenuRecord>>({
             session,
             model: 'ir.ui.menu',
             method: 'search_read',
             kwargs: {
-                domain: [
-                    ['action', '!=', false],
-                    ['active', '=', true],
-                ],
-                fields: ['name', 'action'],
+                domain: [['active', '=', true]],
+                fields: ['id', 'name', 'parent_id', 'action'],
                 order: 'sequence asc, id asc',
             },
         });
@@ -619,31 +616,106 @@ export class OdooV17Adapter implements OdooAdapter {
         });
 
         const actionsByID = new Map(actions.map((action) => [action.id, action]));
-        const browseModelsByModel = new Map<string, BrowseModelInfo>();
+
+        return this.buildBrowseMenuTree(menuRecords, actionsByID);
+    }
+
+    private buildBrowseMenuTree(
+        menuRecords: OdooMenuRecord[],
+        actionsByID: Map<number, OdooWindowActionRecord>,
+    ): BrowseMenuNode[] {
+        const menuRecordsByID = new Map(menuRecords.map((menuRecord) => [menuRecord.id, menuRecord]));
+        const childMenuIDsByParentID = new Map<number | undefined, number[]>();
 
         for (const menuRecord of menuRecords) {
-            const actionID = this.parseWindowActionID(menuRecord.action);
-            if (!actionID) {
-                continue;
-            }
-
-            const action = actionsByID.get(actionID);
-            if (!action || !this.isBrowseableWindowAction(action)) {
-                continue;
-            }
-
-            const model = action.res_model.trim();
-            if (browseModelsByModel.has(model)) {
-                continue;
-            }
-
-            browseModelsByModel.set(model, {
-                model,
-                title: this.normalizeBrowseTitle(menuRecord.name ?? action.name ?? model),
-            });
+            const parentID = this.extractParentMenuID(menuRecord.parent_id);
+            const existingChildren = childMenuIDsByParentID.get(parentID) ?? [];
+            existingChildren.push(menuRecord.id);
+            childMenuIDsByParentID.set(parentID, existingChildren);
         }
 
-        return Array.from(browseModelsByModel.values());
+        const rootMenuIDs = menuRecords
+            .filter((menuRecord) => {
+                const parentID = this.extractParentMenuID(menuRecord.parent_id);
+                return parentID === undefined || !menuRecordsByID.has(parentID);
+            })
+            .map((menuRecord) => menuRecord.id);
+
+        return rootMenuIDs
+            .map((menuID) => this.buildBrowseMenuNode(menuID, true, menuRecordsByID, childMenuIDsByParentID, actionsByID))
+            .filter((menuNode): menuNode is BrowseMenuNode => menuNode !== undefined);
+    }
+
+    private buildBrowseMenuNode(
+        menuID: number,
+        isRoot: boolean,
+        menuRecordsByID: Map<number, OdooMenuRecord>,
+        childMenuIDsByParentID: Map<number | undefined, number[]>,
+        actionsByID: Map<number, OdooWindowActionRecord>,
+    ): BrowseMenuNode | undefined {
+        const menuRecord = menuRecordsByID.get(menuID);
+        if (!menuRecord) {
+            return undefined;
+        }
+
+        const children = (childMenuIDsByParentID.get(menuID) ?? [])
+            .map((childMenuID) => this.buildBrowseMenuNode(childMenuID, false, menuRecordsByID, childMenuIDsByParentID, actionsByID))
+            .filter((menuNode): menuNode is BrowseMenuNode => menuNode !== undefined);
+
+        const model = this.resolveBrowseableModel(menuRecord.action, actionsByID);
+        if (!model && children.length === 0) {
+            return undefined;
+        }
+
+        const resolvedModel = model ?? (isRoot ? this.findFirstBrowseableModel(children) : undefined);
+
+        return {
+            id: menuRecord.id,
+            name: this.normalizeBrowseTitle(menuRecord.name ?? resolvedModel ?? `Menu ${menuRecord.id}`),
+            kind: isRoot ? 'app' : children.length === 0 ? 'leaf' : 'category',
+            model: resolvedModel,
+            children,
+        };
+    }
+
+    private findFirstBrowseableModel(children: BrowseMenuNode[]): string | undefined {
+        for (const child of children) {
+            if (child.model) {
+                return child.model;
+            }
+
+            const descendantModel = this.findFirstBrowseableModel(child.children);
+            if (descendantModel) {
+                return descendantModel;
+            }
+        }
+
+        return undefined;
+    }
+
+    private resolveBrowseableModel(
+        action: OdooMenuActionReference,
+        actionsByID: Map<number, OdooWindowActionRecord>,
+    ): string | undefined {
+        const actionID = this.parseWindowActionID(action);
+        if (!actionID) {
+            return undefined;
+        }
+
+        const actionRecord = actionsByID.get(actionID);
+        if (!actionRecord || !this.isBrowseableWindowAction(actionRecord)) {
+            return undefined;
+        }
+
+        return actionRecord.res_model.trim();
+    }
+
+    private extractParentMenuID(parent: OdooMenuParentReference): number | undefined {
+        if (Array.isArray(parent) && typeof parent[0] === 'number') {
+            return parent[0];
+        }
+
+        return undefined;
     }
 
     private parseWindowActionID(action: OdooMenuActionReference): number | undefined {
@@ -920,9 +992,13 @@ interface OdooActivityTypeRecord {
 type OdooMenuActionReference = string | [string, number] | false | null | undefined;
 
 interface OdooMenuRecord {
+    id: number;
     name?: string;
+    parent_id?: OdooMenuParentReference;
     action?: OdooMenuActionReference;
 }
+
+type OdooMenuParentReference = [number, string] | false | null | undefined;
 
 interface OdooWindowActionRecord {
     id: number;

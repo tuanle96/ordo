@@ -20,19 +20,31 @@ export class ModuleService {
         const session = await this.sessionStore.getOrThrow(currentUser.sessionHandle);
         const adapter = this.adapterFactory.getAdapter(currentUser.version);
 
-        const [modules, browseModels] = await Promise.all([
+        const [modules, browseMenuTree] = await Promise.all([
             adapter.getInstalledModules(session),
-            adapter.getBrowseModels(session),
+            adapter.getBrowseMenuTree(session),
         ]);
+
+        const browseModels = this.collectBrowseModels(browseMenuTree);
 
         this.logger.log({
             event: 'installed_modules_fetched',
             moduleCount: modules.length,
+            browseMenuRootCount: browseMenuTree.length,
             browseModelCount: browseModels.length,
             moduleNames: modules.map((module) => module.name),
-            browseModelNames: browseModels.map((browseModel) => browseModel.model),
+            browseModelNames: browseModels,
         });
 
-        return { modules, browseModels };
+        return { modules, browseMenuTree };
+    }
+
+    private collectBrowseModels(browseMenuTree: InstalledModulesResponse['browseMenuTree']): string[] {
+        const occurrences = browseMenuTree.flatMap((node) => {
+            const descendants = this.collectBrowseModels(node.children);
+            return node.model ? [node.model, ...descendants] : descendants;
+        });
+
+        return Array.from(new Set(occurrences));
     }
 }

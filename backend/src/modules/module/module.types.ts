@@ -3,12 +3,17 @@ export interface InstalledModuleInfo {
     displayName: string;
 }
 
-export interface BrowseModelInfo {
-    model: string;
-    title: string;
+export type BrowseMenuNodeKind = 'app' | 'category' | 'leaf';
+
+export interface BrowseMenuNode {
+    id: number;
+    name: string;
+    kind: BrowseMenuNodeKind;
+    model?: string;
+    children: BrowseMenuNode[];
 }
 
 export interface InstalledModulesResponse {
     modules: InstalledModuleInfo[];
-    browseModels: BrowseModelInfo[];
+    browseMenuTree: BrowseMenuNode[];
 }

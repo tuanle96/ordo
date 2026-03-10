@@ -109,7 +109,7 @@ Ordo now auto-discovers the mobile browse catalog through:
 That endpoint now returns:
 
 1. installed Odoo application modules
-2. `browseModels` discovered from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
+2. `browseMenuTree` discovered from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
 
 In other words, the backend no longer needs a hardcoded module whitelist just to surface a new model.
 
@@ -123,7 +123,7 @@ Examples of real reasons discovery may not surface a model:
 - the action only opens modal/wizard targets (`target='new'`)
 - the action is not browse-oriented (`tree`, `list`, `kanban`)
 
-Also note the current boundary: discovery is **menu/action-backed but coarse**. The payload preserves the discovered `model` plus a human title, but it does not preserve action-specific `domain` or `context` when multiple menus point at the same model.
+Also note the current boundary: discovery is **menu/action-backed but coarse**. The payload preserves app/category/leaf hierarchy plus the discovered `model`, but it does not preserve action-specific `domain` or `context` when multiple menus point at the same model.
 
 ### iOS: register browse metadata
 

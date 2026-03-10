@@ -47,7 +47,7 @@ struct HomeView: View {
                         .fontWeight(.semibold)
                         .padding(.horizontal, OrdoSpacing.xs)
 
-                    if appState.availableModels.isEmpty {
+                    if appState.browseRoots.isEmpty {
                         OrdoEmptyStateCard(
                             title: "No browseable models yet",
                             message: "This account does not currently expose any browseable Odoo menus. Check menu and action access for the signed-in user.",
@@ -57,31 +57,10 @@ struct HomeView: View {
                     } else {
                         OrdoCard {
                             VStack(spacing: 0) {
-                                ForEach(Array(appState.availableModels.enumerated()), id: \.element.id) { index, descriptor in
-                                    NavigationLink {
-                                        RecordListView(descriptor: descriptor)
-                                    } label: {
-                                        HStack(spacing: OrdoSpacing.md) {
-                                            Image(systemName: descriptor.systemImage)
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundStyle(.white)
-                                                .frame(width: 32, height: 32)
-                                                .background(OrdoColors.accent, in: RoundedRectangle(cornerRadius: OrdoRadius.sm, style: .continuous))
+                                ForEach(Array(appState.browseRoots.enumerated()), id: \.element.id) { index, node in
+                                    BrowseMenuRowLink(node: node, compact: true)
 
-                                            Text(descriptor.title)
-                                                .font(OrdoTypography.headline)
-                                                .foregroundStyle(OrdoColors.textPrimary)
-
-                                            Spacer()
-
-                                            Image(systemName: "chevron.right")
-                                                .font(.system(size: 13, weight: .semibold))
-                                                .foregroundStyle(OrdoColors.textTertiary)
-                                        }
-                                        .padding(.vertical, OrdoSpacing.md)
-                                    }
-
-                                    if index < appState.availableModels.count - 1 {
+                                    if index < appState.browseRoots.count - 1 {
                                         Divider()
                                     }
                                 }

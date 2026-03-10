@@ -188,12 +188,12 @@ private final class UITestURLProtocol: URLProtocol {
         }
 
         if path.hasSuffix("/modules/installed") {
-            let browseModels = ProcessInfo.processInfo.environment["ORDO_UI_TEST_EMPTY_BROWSE_CATALOG"] == "1"
+            let browseMenuTree = ProcessInfo.processInfo.environment["ORDO_UI_TEST_EMPTY_BROWSE_CATALOG"] == "1"
                 ? []
-                : UITestFixtures.browseModels
+                : UITestFixtures.browseMenuTree
             return (200, try encoder.encode(UITestEnvelope(data: InstalledModulesResponse(
                 modules: UITestFixtures.installedModules,
-                browseModels: browseModels
+                browseMenuTree: browseMenuTree
             ), meta: nil)))
         }
 
@@ -298,10 +298,42 @@ private enum UITestFixtures {
         InstalledModuleInfo(name: "sale", displayName: "Sales"),
     ]
 
-    static let browseModels = [
-        BrowseModelInfo(model: "res.partner", title: "Contacts"),
-        BrowseModelInfo(model: "crm.lead", title: "Leads"),
-        BrowseModelInfo(model: "sale.order", title: "Sales Orders"),
+    static let browseMenuTree = [
+        BrowseMenuNode(
+            id: 10,
+            name: "Contacts",
+            kind: .app,
+            model: "res.partner",
+            children: [
+                BrowseMenuNode(id: 11, name: "Contacts", kind: .leaf, model: "res.partner", children: []),
+            ]
+        ),
+        BrowseMenuNode(
+            id: 20,
+            name: "CRM",
+            kind: .app,
+            model: "crm.lead",
+            children: [
+                BrowseMenuNode(
+                    id: 21,
+                    name: "Sales",
+                    kind: .category,
+                    model: nil,
+                    children: [
+                        BrowseMenuNode(id: 22, name: "Leads", kind: .leaf, model: "crm.lead", children: []),
+                    ]
+                ),
+            ]
+        ),
+        BrowseMenuNode(
+            id: 30,
+            name: "Sales",
+            kind: .app,
+            model: "sale.order",
+            children: [
+                BrowseMenuNode(id: 31, name: "Sales Orders", kind: .leaf, model: "sale.order", children: []),
+            ]
+        ),
     ]
 
     static let partnerSearchResults = [

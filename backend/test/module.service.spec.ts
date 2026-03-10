@@ -3,14 +3,22 @@ import type { TokenPayload } from '@app/shared';
 import { ModuleService } from '@app/modules/module/module.service';
 
 describe('ModuleService', () => {
-    it('combines installed modules and browse models from adapter discovery', async () => {
+    it('combines installed modules and browse menu tree from adapter discovery', async () => {
         const session = { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' };
         const adapter = {
             getInstalledModules: jest.fn().mockResolvedValue([
                 { name: 'crm', displayName: 'CRM' },
             ]),
-            getBrowseModels: jest.fn().mockResolvedValue([
-                { model: 'crm.lead', title: 'Leads' },
+            getBrowseMenuTree: jest.fn().mockResolvedValue([
+                {
+                    id: 10,
+                    name: 'CRM',
+                    kind: 'app',
+                    model: 'crm.lead',
+                    children: [
+                        { id: 11, name: 'Leads', kind: 'leaf', model: 'crm.lead', children: [] },
+                    ],
+                },
             ]),
         };
         const adapterFactory = {
@@ -26,12 +34,22 @@ describe('ModuleService', () => {
             version: '17',
         } as TokenPayload)).resolves.toEqual({
             modules: [{ name: 'crm', displayName: 'CRM' }],
-            browseModels: [{ model: 'crm.lead', title: 'Leads' }],
+            browseMenuTree: [
+                {
+                    id: 10,
+                    name: 'CRM',
+                    kind: 'app',
+                    model: 'crm.lead',
+                    children: [
+                        { id: 11, name: 'Leads', kind: 'leaf', model: 'crm.lead', children: [] },
+                    ],
+                },
+            ],
         });
 
         expect(sessionStore.getOrThrow).toHaveBeenCalledWith('session-handle');
         expect(adapterFactory.getAdapter).toHaveBeenCalledWith('17');
         expect(adapter.getInstalledModules).toHaveBeenCalledWith(session);
-        expect(adapter.getBrowseModels).toHaveBeenCalledWith(session);
+        expect(adapter.getBrowseMenuTree).toHaveBeenCalledWith(session);
     });
 });

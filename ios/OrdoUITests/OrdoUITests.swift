@@ -33,10 +33,10 @@ final class OrdoUITests: XCTestCase {
         assertHomeScreen(app)
 
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-crm-lead"].waitForExistence(timeout: standardTimeout))
-        XCTAssertTrue(app.buttons["browse-model-sale-order"].exists)
+        XCTAssertTrue(app.buttons["browse-app-crm-lead"].waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(app.buttons["browse-app-sale-order"].exists)
 
-        app.buttons["browse-model-res-partner"].tap()
+        app.buttons["browse-app-res-partner"].tap()
         XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: standardTimeout))
 
         openFirstRecordDetail(app)
@@ -46,8 +46,12 @@ final class OrdoUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: standardTimeout))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.buttons["browse-model-crm-lead"].waitForExistence(timeout: standardTimeout))
+        XCTAssertTrue(app.buttons["browse-app-crm-lead"].waitForExistence(timeout: standardTimeout))
 
+        app.buttons["browse-app-crm-lead"].tap()
+        XCTAssertTrue(app.buttons["browse-menu-21"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-menu-21"].tap()
+        XCTAssertTrue(app.buttons["browse-model-crm-lead"].waitForExistence(timeout: standardTimeout))
         app.buttons["browse-model-crm-lead"].tap()
         XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: standardTimeout))
         openFirstRecordDetail(app)
@@ -55,11 +59,11 @@ final class OrdoUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["field-value-stage_id"].waitForExistence(timeout: standardTimeout))
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: standardTimeout))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.buttons["browse-model-sale-order"].waitForExistence(timeout: standardTimeout))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["browse-app-sale-order"].waitForExistence(timeout: standardTimeout))
 
-        app.buttons["browse-model-sale-order"].tap()
+        app.buttons["browse-app-sale-order"].tap()
         XCTAssertTrue(app.buttons["record-row-1"].waitForExistence(timeout: standardTimeout))
         openFirstRecordDetail(app)
         XCTAssertTrue(app.staticTexts["record-detail-title"].waitForExistence(timeout: standardTimeout))
@@ -91,8 +95,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -109,8 +113,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -135,8 +139,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -162,8 +166,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -198,8 +202,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -238,8 +242,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -278,8 +282,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(app.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(app)
 
         openEditMode(app)
@@ -307,8 +311,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-sale-order"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-sale-order"].tap()
+        XCTAssertTrue(app.buttons["browse-app-sale-order"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-sale-order"].tap()
         openFirstRecordDetail(app)
 
         let actionButton = app.buttons["detail-action-action_confirm"]
@@ -332,8 +336,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         tapBrowseTab(app)
-        XCTAssertTrue(app.buttons["browse-model-sale-order"].waitForExistence(timeout: standardTimeout))
-        app.buttons["browse-model-sale-order"].tap()
+        XCTAssertTrue(app.buttons["browse-app-sale-order"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-sale-order"].tap()
         openFirstRecordDetail(app)
 
         let targetChip = app.buttons["record-detail-status-chip-sale"]
@@ -356,8 +360,8 @@ final class OrdoUITests: XCTestCase {
 
         signIn(firstLaunch)
         tapBrowseTab(firstLaunch)
-        XCTAssertTrue(firstLaunch.buttons["browse-model-res-partner"].waitForExistence(timeout: standardTimeout))
-        firstLaunch.buttons["browse-model-res-partner"].tap()
+        XCTAssertTrue(firstLaunch.buttons["browse-app-res-partner"].waitForExistence(timeout: standardTimeout))
+        firstLaunch.buttons["browse-app-res-partner"].tap()
         openFirstRecordDetail(firstLaunch)
         XCTAssertTrue(firstLaunch.staticTexts["record-detail-title"].waitForExistence(timeout: standardTimeout))
 
@@ -377,11 +381,11 @@ final class OrdoUITests: XCTestCase {
 
         signIn(app)
         XCTAssertTrue(app.staticTexts["home-empty-browse-catalog-title"].waitForExistence(timeout: standardTimeout))
-        XCTAssertFalse(app.buttons["browse-model-res-partner"].exists)
+        XCTAssertFalse(app.buttons["browse-app-res-partner"].exists)
 
         tapBrowseTab(app)
         XCTAssertTrue(app.staticTexts["browse-empty-catalog-title"].waitForExistence(timeout: standardTimeout))
-        XCTAssertFalse(app.buttons["browse-model-res-partner"].exists)
+        XCTAssertFalse(app.buttons["browse-app-res-partner"].exists)
     }
 
     @MainActor

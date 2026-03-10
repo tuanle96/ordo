@@ -14,7 +14,7 @@ final class AppState {
     private(set) var session: StoredSession?
     private(set) var currentPrincipal: AuthenticatedPrincipal?
     private(set) var installedModules: [InstalledModuleInfo] = []
-    private(set) var browseModels: [BrowseModelInfo] = []
+    private(set) var browseMenuTree: [BrowseMenuNode] = []
     private(set) var hasLoadedBrowseDiscovery = false
     private(set) var pendingMutationCount = 0
     var statusMessage: String?
@@ -55,9 +55,15 @@ final class AppState {
         currentPrincipal?.version
     }
 
+    var browseRoots: [BrowseMenuNode] {
+        hasLoadedBrowseDiscovery
+            ? browseMenuTree
+            : ModelRegistry.fallbackBrowseMenuTree
+    }
+
     var availableModels: [ModelDescriptor] {
         hasLoadedBrowseDiscovery
-            ? ModelRegistry.merged(with: browseModels)
+            ? ModelRegistry.flatten(from: browseMenuTree)
             : ModelRegistry.supported
     }
 
@@ -212,7 +218,7 @@ final class AppState {
         session = nil
         currentPrincipal = nil
         installedModules = []
-        browseModels = []
+        browseMenuTree = []
         hasLoadedBrowseDiscovery = false
         pendingMutationCount = 0
         phase = .login
@@ -344,12 +350,12 @@ final class AppState {
                 try await self.apiClient.installedModules(token: token)
             }
             installedModules = response.modules
-            browseModels = response.browseModels
+            browseMenuTree = response.browseMenuTree
             hasLoadedBrowseDiscovery = true
         } catch {
             // Graceful degradation: keep the static registry path when discovery fails.
             installedModules = []
-            browseModels = []
+            browseMenuTree = []
             hasLoadedBrowseDiscovery = false
         }
     }

@@ -44,31 +44,56 @@ describe('OdooV17Adapter getInstalledModules', () => {
     });
 });
 
-describe('OdooV17Adapter getBrowseModels', () => {
-    it('returns unique browseable models discovered from active menu-backed window actions', async () => {
+describe('OdooV17Adapter getBrowseMenuTree', () => {
+    it('returns a pruned browse menu tree with app fallback model resolution', async () => {
         const odooRpcService = {
             callKwWithSession: jest.fn()
                 .mockResolvedValueOnce([
-                    { name: 'Contacts', action: 'ir.actions.act_window,11' },
-                    { name: 'Leads', action: 'ir.actions.act_window,12' },
-                    { name: 'Duplicate Leads', action: 'ir.actions.act_window,13' },
-                    { name: 'Popup Wizard', action: 'ir.actions.act_window,14' },
-                    { name: 'Server Action', action: 'ir.actions.server,15' },
+                    { id: 10, name: 'Contacts', parent_id: false, action: false },
+                    { id: 11, name: 'Contacts', parent_id: [10, 'Contacts'], action: 'ir.actions.act_window,21' },
+                    { id: 20, name: 'CRM', parent_id: false, action: false },
+                    { id: 21, name: 'Sales', parent_id: [20, 'CRM'], action: false },
+                    { id: 22, name: 'Leads', parent_id: [21, 'Sales'], action: 'ir.actions.act_window,22' },
+                    { id: 23, name: 'Popup Wizard', parent_id: [21, 'Sales'], action: 'ir.actions.act_window,23' },
+                    { id: 24, name: 'Server Action', parent_id: [20, 'CRM'], action: 'ir.actions.server,24' },
+                    { id: 30, name: 'Empty App', parent_id: false, action: false },
                 ])
                 .mockResolvedValueOnce([
-                    { id: 11, name: 'Contacts', res_model: 'res.partner', view_mode: 'tree,form', target: 'current' },
-                    { id: 12, name: 'Leads', res_model: 'crm.lead', view_mode: 'kanban,form', target: 'current' },
-                    { id: 13, name: 'Lead Form', res_model: 'crm.lead', view_mode: 'tree,form', target: 'current' },
-                    { id: 14, name: 'Wizard', res_model: 'crm.merge.opportunity', view_mode: 'form', target: 'new' },
+                    { id: 21, name: 'Contacts', res_model: 'res.partner', view_mode: 'tree,form', target: 'current' },
+                    { id: 22, name: 'Leads', res_model: 'crm.lead', view_mode: 'kanban,form', target: 'current' },
+                    { id: 23, name: 'Wizard', res_model: 'crm.merge.opportunity', view_mode: 'form', target: 'new' },
                 ]),
         };
         const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
 
-        await expect(adapter.getBrowseModels(
+        await expect(adapter.getBrowseMenuTree(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
         )).resolves.toEqual([
-            { model: 'res.partner', title: 'Contacts' },
-            { model: 'crm.lead', title: 'Leads' },
+            {
+                id: 10,
+                name: 'Contacts',
+                kind: 'app',
+                model: 'res.partner',
+                children: [
+                    { id: 11, name: 'Contacts', kind: 'leaf', model: 'res.partner', children: [] },
+                ],
+            },
+            {
+                id: 20,
+                name: 'CRM',
+                kind: 'app',
+                model: 'crm.lead',
+                children: [
+                    {
+                        id: 21,
+                        name: 'Sales',
+                        kind: 'category',
+                        children: [
+                            { id: 22, name: 'Leads', kind: 'leaf', model: 'crm.lead', children: [] },
+                        ],
+                    },
+                ],
+            },
         ]);
 
         expect(odooRpcService.callKwWithSession).toHaveBeenNthCalledWith(1, {
@@ -76,11 +101,8 @@ describe('OdooV17Adapter getBrowseModels', () => {
             model: 'ir.ui.menu',
             method: 'search_read',
             kwargs: {
-                domain: [
-                    ['action', '!=', false],
-                    ['active', '=', true],
-                ],
-                fields: ['name', 'action'],
+                domain: [['active', '=', true]],
+                fields: ['id', 'name', 'parent_id', 'action'],
                 order: 'sequence asc, id asc',
             },
         });
@@ -88,7 +110,7 @@ describe('OdooV17Adapter getBrowseModels', () => {
             session: { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' },
             model: 'ir.actions.act_window',
             method: 'read',
-            args: [[11, 12, 13, 14]],
+            args: [[21, 22, 23]],
             kwargs: {
                 fields: ['id', 'name', 'res_model', 'view_mode', 'target'],
             },
@@ -101,7 +123,7 @@ describe('OdooV17Adapter getBrowseModels', () => {
         };
         const adapter = new OdooV17Adapter(odooRpcService as never, {} as never, {} as never);
 
-        await expect(adapter.getBrowseModels(
+        await expect(adapter.getBrowseMenuTree(
             { cookieHeader: 'session_id=abc123', odooUrl: 'http://example.com' } as never,
         )).resolves.toEqual([]);
     });

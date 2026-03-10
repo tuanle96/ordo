@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct AppStateModelDiscoveryTests {
     @Test
-    func restoreSessionBuildsAvailableModelsFromDiscoveredBrowseModels() async throws {
+    func restoreSessionBuildsAvailableModelsFromDiscoveredBrowseMenuTree() async throws {
         let backendURL = URL(string: "http://127.0.0.1:35120")!
         let session = StoredSession(
             backendBaseURL: backendURL,
@@ -32,9 +32,25 @@ struct AppStateModelDiscoveryTests {
             if path.hasSuffix("/modules/installed") {
                 return (200, try JSONEncoder().encode(AppStateModelDiscoveryEnvelope(data: InstalledModulesResponse(
                     modules: [InstalledModuleInfo(name: "account", displayName: "Accounting")],
-                    browseModels: [
-                        BrowseModelInfo(model: "res.partner", title: "Contacts"),
-                        BrowseModelInfo(model: "account.move", title: "Invoices"),
+                    browseMenuTree: [
+                        BrowseMenuNode(
+                            id: 10,
+                            name: "Contacts",
+                            kind: .app,
+                            model: "res.partner",
+                            children: [
+                                BrowseMenuNode(id: 11, name: "Contacts", kind: .leaf, model: "res.partner", children: []),
+                            ]
+                        ),
+                        BrowseMenuNode(
+                            id: 20,
+                            name: "Accounting",
+                            kind: .app,
+                            model: "account.move",
+                            children: [
+                                BrowseMenuNode(id: 21, name: "Invoices", kind: .leaf, model: "account.move", children: []),
+                            ]
+                        ),
                     ]
                 ))))
             }
@@ -51,6 +67,7 @@ struct AppStateModelDiscoveryTests {
 
         await appState.restoreSession()
 
+        #expect(appState.browseRoots.map(\.name) == ["Contacts", "Accounting"])
         #expect(appState.availableModels.map(\.model) == ["res.partner", "account.move"])
         #expect(appState.modelDescriptor(for: "res.partner").title == "Customers")
         #expect(appState.modelDescriptor(for: "account.move").title == "Invoices")
@@ -127,7 +144,7 @@ struct AppStateModelDiscoveryTests {
             if path.hasSuffix("/modules/installed") {
                 return (200, try JSONEncoder().encode(AppStateModelDiscoveryEnvelope(data: InstalledModulesResponse(
                     modules: [InstalledModuleInfo(name: "project", displayName: "Project")],
-                    browseModels: []
+                    browseMenuTree: []
                 ))))
             }
 
@@ -146,6 +163,71 @@ struct AppStateModelDiscoveryTests {
         #expect(appState.hasLoadedBrowseDiscovery)
         #expect(appState.availableModels.isEmpty)
         #expect(appState.modelDescriptor(for: "project.task", fallbackTitle: "Tasks").title == "Tasks")
+    }
+
+    @Test
+    func restoreSessionPrefersLeafTitleWhenAppAndLeafShareUnknownModel() async throws {
+        let backendURL = URL(string: "http://127.0.0.1:35120")!
+        let session = StoredSession(
+            backendBaseURL: backendURL,
+            odooURL: "http://127.0.0.1:38950",
+            database: "odoo17",
+            login: "admin",
+            accessToken: "access-token",
+            refreshToken: "refresh-token",
+            expiresAt: Date().addingTimeInterval(3600),
+            user: StoredSession.preview.user
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AppStateModelDiscoveryURLProtocol.self]
+
+        AppStateModelDiscoveryURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(AppStateModelDiscoveryEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/modules/installed") {
+                return (200, try JSONEncoder().encode(AppStateModelDiscoveryEnvelope(data: InstalledModulesResponse(
+                    modules: [InstalledModuleInfo(name: "crm", displayName: "CRM")],
+                    browseMenuTree: [
+                        BrowseMenuNode(
+                            id: 10,
+                            name: "CRM",
+                            kind: .app,
+                            model: "x_pipeline.record",
+                            children: [
+                                BrowseMenuNode(
+                                    id: 11,
+                                    name: "Sales",
+                                    kind: .category,
+                                    model: nil,
+                                    children: [
+                                        BrowseMenuNode(id: 12, name: "Pipeline", kind: .leaf, model: "x_pipeline.record", children: []),
+                                    ]
+                                ),
+                            ]
+                        ),
+                    ]
+                ))))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = AppState(
+            config: .preview,
+            sessionStore: AppStateModelDiscoverySessionStore(session: session),
+            apiClient: APIClient(baseURL: backendURL, session: URLSession(configuration: configuration)),
+            cacheStore: FileCacheStore(baseDirectoryURL: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
+        )
+
+        await appState.restoreSession()
+
+        #expect(appState.availableModels.map(\ .model) == ["x_pipeline.record"])
+        #expect(appState.modelDescriptor(for: "x_pipeline.record").title == "Pipeline")
     }
 }
 
