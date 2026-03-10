@@ -2,46 +2,76 @@
 
 ## Current status
 
-Production deployment remains out of scope. Local development for backend and iOS is fully functional.
+Local development is fully supported. Production deployment guidance is still intentionally lightweight and should be treated as operational follow-up work, not as a finished platform-ops playbook.
 
-## Backend local development
+## Local backend runtime
 
-After `npm install` and `npm run dev:backend`, the following endpoints are available:
+From the repo root, the verified local backend paths are:
 
-- `GET /health` — health check
-- `POST /auth/login` — Odoo authentication (requires reachable upstream)
-- `GET /auth/me` — protected current-user endpoint (requires Bearer token)
-- `GET /schema/:model` — schema parser
-- `GET /records/:model` — record list
-- `GET /records/:model/:id` — record detail
-- `GET /search/:model` — relation search
+- `docker compose up --build` — starts backend + Redis
+- `npm run start:dev --workspace backend` — runs the backend locally if Redis is already available
 
-See `.env` for required runtime variables (JWT secrets, request timeouts, API prefix, Odoo upstream URLs).
+The backend now depends on Redis for shipped behavior, not future behavior:
 
-## iOS local development
+- Redis-backed upstream Odoo session persistence
+- Redis-backed schema caching
 
-From `ios/`:
+Current mobile API surface includes:
+
+- `GET /health`
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `GET /schema/:model`
+- `GET /schema/:model/list`
+- `GET /records/:model`
+- `GET /records/:model/:id`
+- `GET /records/:model/defaults`
+- `POST /records/:model`
+- `PATCH /records/:model/:id`
+- `DELETE /records/:model/:id`
+- `POST /records/:model/:id/actions/:actionName`
+- `POST /records/:model/onchange`
+- `GET /search/:model`
+
+See `.env.example` and `README.md` for required runtime variables such as JWT secrets, Redis URL, request timeout, and Odoo upstream configuration.
+
+## Local iOS runtime
+
+Run the iOS app from `ios/Ordo.xcodeproj`, or validate the build with:
 
 ```bash
-xcodebuild -project Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build
+xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'generic/platform=iOS Simulator' build
 ```
 
-The app expects `backend/` running on `http://localhost:3000` by default; override via app settings or `app-config.swift`.
+The default backend base URL is configured in `ios/Ordo/app/app-config.swift`. The README's local API example currently points to `http://localhost:38424/api/v1/mobile` when using the repo Docker setup.
 
-## Near-term expectation
+## Local Odoo validation
 
-Once iOS feature completeness is reached, deployment guidance should document:
+For live end-to-end validation against local Odoo instances:
 
-- iOS TestFlight distribution and App Store submission
-- backend container build and cloud deployment (AWS ECS, GCP Cloud Run, etc.)
-- runtime environment variables and secrets management (API keys, JWT secrets, Odoo credentials)
-- health and readiness checks for Odoo upstream connectivity
-- Redis/Bull dependency (for sync, notifications, WebSockets) if needed
-- database migrations and data freshness strategy
-- staging and production rollout strategy
+```bash
+cd odoo-instances
+docker compose up -d --build
+```
+
+This repo ships local validation support for Odoo 17, 18, and 19.
+
+## What is still not a finished deployment story
+
+The following are still legitimate deployment follow-up items:
+
+- polished TestFlight / App Store distribution guidance
+- production container/orchestrator guidance for the backend
+- secrets management and managed Redis guidance per environment
+- staging/production rollout checklists and observability dashboards
+- production-grade background sync / realtime / notification topology
+- large-file/media serving strategy beyond the current inline/local preview-export path
 
 ## Current constraints
 
-- Live multi-version Odoo upstream integration has been tested locally but requires a reachable Odoo 17/18/19 instance
+- live multi-version Odoo validation still requires reachable Odoo 17/18/19 instances
 - iOS build requires Xcode 15+ on macOS
-- Redis and WebSocket support deferred beyond current scope
+- offline support is still cache + queued mutation replay, not a full background sync engine
+- multi-company switching and backend file-proxy/download flows are still outside the current shipped scope

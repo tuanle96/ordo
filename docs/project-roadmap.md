@@ -47,3 +47,14 @@
 - Source-of-truth stack is SwiftUI + NestJS
 - Target Odoo compatibility starts with 17, 18, and 19
 - iOS implementation starts after backend MVP core stabilizes
+
+## Current documented follow-up gaps
+
+These are the remaining honest follow-up areas after the completed slices above. They should not be confused with already-shipped narrow support.
+
+- **Browse `SearchField.filterDomain` application** — backend list schema already exposes this metadata, but iOS browse filters still ignore it when building dynamic filter clauses.
+- **Relation drilldown from read-only relation labels** — many2one/many2many values render correctly but still do not navigate into related record detail.
+- **Many2one stage interaction parity** — the narrow statusbar tap path is complete for action-backed two-state selection flows, but many2one stage bars such as `crm.lead.stage_id` remain display-only.
+- **Multi-company switching** — still not implemented.
+- **Remote/large-file attachment handling** — local inline preview/export is complete for already-loaded payloads, but backend download/proxy and larger attachment flows remain deferred.
+- **Full offline sync** — queued mutation replay/management is complete, but conflict resolution, background scheduling, and broader sync parity remain deferred.

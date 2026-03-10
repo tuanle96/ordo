@@ -1,5 +1,20 @@
 # Project Changelog
 
+## 2026-03-10 (Docs Backlog Alignment to Live Codebase)
+
+### Changed
+
+- Refreshed top-level status docs so they describe the live Ordo platform as of 2026-03-10 instead of stopping around the early handoff era
+- `docs/codebase-summary.md` now reflects the shipped backend/iOS surfaces, current honest boundaries, and package ownership more accurately
+- `docs/project-overview-pdr.md` no longer claims Handoff 5 is still in progress; it now summarizes the cumulative shipped platform and the current follow-up gaps
+- `docs/deployment-guide.md` no longer says Redis support is deferred; it now reflects the shipped Redis-backed session/cache runtime and separates real local-dev facts from still-deferred production ops guidance
+- `README.md` and `docs/project-roadmap.md` now distinguish **already shipped narrow support** from **still-open follow-up work** for grouped browse, statusbar interaction, attachment handling, offline behavior, relation drilldown, and multi-company switching
+
+### Notes
+
+- This was a docs-only cleanup slice; it does not widen product scope or change runtime behavior
+- Historical changelog entries below remain chronological slice records and may describe limitations that were true in that slice even when later work partially or fully closed them
+
 ## 2026-03-10 (Browse Menu Tree Discovery & Dynamic Browse Unblocking)
 
 ### Added

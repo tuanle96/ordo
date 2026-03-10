@@ -11,35 +11,47 @@ Ordo is a mobile-first client for Odoo Community focused on fast operational wor
 - Shared contracts: TypeScript package in `shared/`
 - Reference Odoo versions: 17, 18, 19
 
-## Current delivery strategy
+## Current delivered platform
 
-The repository is executing a backend-first rollout with incremental handoffs.
+The backend-first rollout is no longer at the "early handoff" stage. The current shipped platform now includes:
 
-Handoff 1 (complete):
-- repository foundation docs
-- Node workspace setup
-- shared contracts
-- NestJS bootstrap
+- Odoo auth, refresh, logout, and Redis-backed upstream session persistence
+- schema-driven form and list contracts, including `GET /schema/:model/list`
+- record browse/detail/search plus create/update/delete/action mutation routes
+- backend onchange transport and menu/action-backed dynamic browse discovery
+- native iOS browse/detail/edit/create/delete flows
+- chatter thread read/post and narrow follower/activity workflows
+- local cache plus file-backed offline mutation queue management UX
+- inline local preview/export for already-loaded image, binary, and signature payloads
 
-Handoff 2 (complete and live-validated):
-- Auth module with Odoo login and token issuance
-- JSON-RPC transport for version-aware Odoo integration
-- First protected endpoint (`GET /auth/me`)
+## Current product boundaries
 
-Handoff 3 (complete and live-validated):
-- Schema parsing via `GET /schema/:model`
-- Record reads via `GET /records/:model`, `GET /records/:model/:id`, and `GET /search/:model`
-- Opaque upstream Odoo session bridge for protected reads
+The platform is usable and broadly shipped, but several areas remain intentionally narrow or deferred:
 
-Handoff 4 (complete):
-- Comprehensive backend automated test coverage and hardening
-- Docs and status alignment with backend implementations
+- browse grouping is client-side only on top of flat list payloads
+- statusbar interaction is shipped only for narrow action-backed two-state selection flows; many2one stage flows such as `crm.lead.stage_id` remain read-only
+- attachment preview/export is local-only for bytes already returned in record detail; there is no backend file proxy or large-file download path yet
+- offline support covers cache plus queued update/delete/action replay, not full sync/conflict/background behavior
+- dynamic list schema already carries `SearchField.filterDomain`, but iOS does not yet apply that metadata when building browse filters
+- read-only relation labels still do not drill into related record detail
+- multi-company switching is still not implemented
 
-Handoff 5 (in progress):
-- iOS SwiftUI native client with file-based offline cache and pagination
-- Feature set: login, session restore, schema/record browsing, detail view, search, reload-cache management
-- Unit test coverage for cache store (FileCacheStore) and pagination logic
+## Delivery history summary
+
+The incremental handoff history remains useful for chronology, but these are the current high-level milestones rather than active work-in-progress labels:
+
+- Foundation, auth, schema, and record surfaces are complete
+- Native iOS browse/detail/edit foundations are complete
+- production-hardening foundations such as Redis sessions/cache, auth perimeter hardening, and structured logging are complete
+- core form-engine/media/statusbar/offline queue slices are complete for their intended narrow scope
+- dynamic browse discovery now comes from backend menu/action exposure rather than a hardcoded local allowlist
+
+See these docs for the live detail level:
+
+- `docs/project-roadmap.md` — cumulative shipped status by phase
+- `docs/project-changelog.md` — chronological slice history
+- `docs/system-architecture.md` — exact current architecture and narrow boundaries
 
 ## Explicit correction
 
-Any stale references to Flutter or FastAPI in older planning text are superseded by the architecture and tech-stack decisions in `prd.md`.
+Any stale references to Flutter or FastAPI in older planning text are superseded by the architecture and tech-stack decisions in `prd.md` and the current repo docs.
