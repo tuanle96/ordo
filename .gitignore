@@ -1,4 +1,7 @@
 odoo-src
+summary
+odoo-instances/
+plans/
 
 # macOS
 .DS_Store
