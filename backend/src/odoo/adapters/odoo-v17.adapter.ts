@@ -17,7 +17,7 @@ import type {
     RecordListResult,
 } from '@app/shared';
 
-import type { InstalledModuleInfo } from '@app/modules/module/module.types';
+import type { BrowseModelInfo, InstalledModuleInfo } from '@app/modules/module/module.types';
 
 import { OdooAdapter } from '@app/odoo/adapters/odoo-adapter.interface';
 import { OdooRpcService } from '@app/odoo/rpc/odoo-rpc.service';
@@ -560,7 +560,6 @@ export class OdooV17Adapter implements OdooAdapter {
 
     async getInstalledModules(
         session: OdooSessionContext,
-        technicalNames: string[],
     ): Promise<InstalledModuleInfo[]> {
         const records = await this.odooRpcService.callKwWithSession<
             Array<{ name: string; shortdesc: string }>
@@ -570,10 +569,11 @@ export class OdooV17Adapter implements OdooAdapter {
             method: 'search_read',
             kwargs: {
                 domain: [
-                    ['name', 'in', technicalNames],
                     ['state', '=', 'installed'],
+                    ['application', '=', true],
                 ],
                 fields: ['name', 'shortdesc'],
+                order: 'shortdesc asc, name asc',
             },
         });
 
@@ -581,6 +581,112 @@ export class OdooV17Adapter implements OdooAdapter {
             name: record.name,
             displayName: record.shortdesc,
         }));
+    }
+
+    async getBrowseModels(
+        session: OdooSessionContext,
+    ): Promise<BrowseModelInfo[]> {
+        const menuRecords = await this.odooRpcService.callKwWithSession<Array<OdooMenuRecord>>({
+            session,
+            model: 'ir.ui.menu',
+            method: 'search_read',
+            kwargs: {
+                domain: [
+                    ['action', '!=', false],
+                    ['active', '=', true],
+                ],
+                fields: ['name', 'action'],
+                order: 'sequence asc, id asc',
+            },
+        });
+
+        const actionIDs = Array.from(new Set(menuRecords
+            .map((menuRecord) => this.parseWindowActionID(menuRecord.action))
+            .filter((actionID): actionID is number => actionID !== undefined)));
+
+        if (actionIDs.length === 0) {
+            return [];
+        }
+
+        const actions = await this.odooRpcService.callKwWithSession<Array<OdooWindowActionRecord>>({
+            session,
+            model: 'ir.actions.act_window',
+            method: 'read',
+            args: [actionIDs],
+            kwargs: {
+                fields: ['id', 'name', 'res_model', 'view_mode', 'target'],
+            },
+        });
+
+        const actionsByID = new Map(actions.map((action) => [action.id, action]));
+        const browseModelsByModel = new Map<string, BrowseModelInfo>();
+
+        for (const menuRecord of menuRecords) {
+            const actionID = this.parseWindowActionID(menuRecord.action);
+            if (!actionID) {
+                continue;
+            }
+
+            const action = actionsByID.get(actionID);
+            if (!action || !this.isBrowseableWindowAction(action)) {
+                continue;
+            }
+
+            const model = action.res_model.trim();
+            if (browseModelsByModel.has(model)) {
+                continue;
+            }
+
+            browseModelsByModel.set(model, {
+                model,
+                title: this.normalizeBrowseTitle(menuRecord.name ?? action.name ?? model),
+            });
+        }
+
+        return Array.from(browseModelsByModel.values());
+    }
+
+    private parseWindowActionID(action: OdooMenuActionReference): number | undefined {
+        if (typeof action === 'string') {
+            const [referenceModel, referenceID] = action.split(',');
+            return referenceModel === 'ir.actions.act_window' && /^\d+$/.test(referenceID ?? '')
+                ? Number(referenceID)
+                : undefined;
+        }
+
+        if (Array.isArray(action) && action.length >= 2) {
+            const [referenceModel, referenceID] = action;
+            return referenceModel === 'ir.actions.act_window' && typeof referenceID === 'number'
+                ? referenceID
+                : undefined;
+        }
+
+        return undefined;
+    }
+
+    private isBrowseableWindowAction(action: OdooWindowActionRecord): action is OdooWindowActionRecord & { res_model: string } {
+        if (typeof action.res_model !== 'string' || action.res_model.trim().length === 0) {
+            return false;
+        }
+
+        if (action.target === 'new') {
+            return false;
+        }
+
+        if (typeof action.view_mode !== 'string' || action.view_mode.trim().length === 0) {
+            return true;
+        }
+
+        const supportedViewModes = new Set(['tree', 'list', 'kanban']);
+        return action.view_mode
+            .split(',')
+            .map((viewMode) => viewMode.trim())
+            .some((viewMode) => supportedViewModes.has(viewMode));
+    }
+
+    private normalizeBrowseTitle(title: string): string {
+        const trimmedTitle = title.trim();
+        return trimmedTitle.length > 0 ? trimmedTitle : 'Browse Records';
     }
 
     private mapChatterMessage(message: OdooFormattedMessage): ChatterMessage {
@@ -809,4 +915,19 @@ interface OdooActivityTypeRecord {
     summary?: string | false;
     icon?: string | false;
     default_note?: string | false;
+}
+
+type OdooMenuActionReference = string | [string, number] | false | null | undefined;
+
+interface OdooMenuRecord {
+    name?: string;
+    action?: OdooMenuActionReference;
+}
+
+interface OdooWindowActionRecord {
+    id: number;
+    name?: string;
+    res_model?: string | false;
+    view_mode?: string | false;
+    target?: string | false;
 }

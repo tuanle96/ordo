@@ -41,7 +41,6 @@ Use this path when the generic engine already supports the model and the app onl
 
 Typical files:
 
-- `backend/src/modules/module/module.service.ts`
 - `ios/Ordo/features/browse/model-registry.swift`
 
 This is the common case for a basic CRUD slice.
@@ -101,29 +100,30 @@ Examples of likely module-specific UX:
 
 ## Registration-only implementation
 
-### Backend: add the module to installed-module detection
+### Backend: verify discovery already exposes the model honestly
 
-Ordo does not currently auto-discover all Odoo modules for the mobile app surface. The backend exposes a curated installed-module list through:
+Ordo now auto-discovers the mobile browse catalog through:
 
 - `GET /api/v1/mobile/modules/installed`
 
-The current whitelist lives in:
+That endpoint now returns:
 
-- `backend/src/modules/module/module.service.ts`
+1. installed Odoo application modules
+2. `browseModels` discovered from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
 
-This backend list does not directly decide which models exist on iOS by itself. The current flow is:
+In other words, the backend no longer needs a hardcoded module whitelist just to surface a new model.
 
-1. backend `KNOWN_MODULES` decides which Odoo technical modules are checked
-2. `GET /api/v1/mobile/modules/installed` reports the installed subset
-3. iOS filters registered `ModelDescriptor` values using `requiredModule`
+For a registration-only slice, first verify that the target model is already discoverable through real Odoo menus/actions. If it is not, investigate the actual Odoo/menu/action cause before adding app-side code.
 
-If the new browse model should only appear when a module is installed, add the Odoo technical module name to `KNOWN_MODULES` and set the matching `requiredModule` in the iOS descriptor.
+Examples of real reasons discovery may not surface a model:
 
-Example:
+- the module is not installed as an application module
+- the model has no active menu entry
+- the menu points to a non-window action
+- the action only opens modal/wizard targets (`target='new'`)
+- the action is not browse-oriented (`tree`, `list`, `kanban`)
 
-- add `"hr"` for HR models
-- add `"stock"` for inventory models
-- add `"project"` for project models
+Also note the current boundary: discovery is **menu/action-backed but coarse**. The payload preserves the discovered `model` plus a human title, but it does not preserve action-specific `domain` or `context` when multiple menus point at the same model.
 
 ### iOS: register browse metadata
 
@@ -141,9 +141,11 @@ Each descriptor should define:
 - row summary fields (`titleFields`, `subtitleFields`, `footnoteFields`)
 - `requiredModule`
 
-This is what makes the model appear in Home/Browse when the module is considered installed.
+This metadata now acts as a **curated override/fallback**, not the primary browse gatekeeper.
 
-`requiredModule` is a browse-surface filter, not a security boundary. The current iOS app gracefully falls back to showing all registered models if module detection fails, so contributors must still validate the real runtime behavior against an Odoo instance with the module installed.
+Known models can get better titles, icons, fallback list fields, and row-summary rules here. Unknown discovered models can still surface without a new descriptor because iOS synthesizes a generic one.
+
+`requiredModule` remains a UI hint for known descriptors, not a security boundary. Contributors should use it sparingly and only when the polished descriptor truly belongs to a specific installed module.
 
 ### Important fallback seam
 
@@ -218,14 +220,15 @@ If the change affects contributor workflow, update:
 - Treating one successful model as proof that the whole module is supported
 - Adding module-specific UI before confirming the generic engine cannot represent the workflow
 - Changing `backend/src/shared/` for convenience instead of necessity
-- Forgetting backend module gating while adding `requiredModule` on iOS
-- Relying on the current graceful-degradation path where failed module detection can temporarily expose all registered models
+- Assuming a new model needs backend whitelist code when the real issue is missing Odoo menu/action exposure
+- Using `requiredModule` as if it were the primary browse gate or a security boundary
+- Relying on static descriptor registration when the model could already surface through dynamic discovery
 - Claiming parity with unsupported Odoo widgets, wizard flows, or advanced x2many behavior
 
 ## Pull request checklist
 
 - [ ] Chosen the smallest valid layer for the change
-- [ ] Added backend module gating when the model should be module-scoped
+- [ ] Verified whether backend menu/action discovery already exposes the model honestly
 - [ ] Added or updated `ModelDescriptor` metadata when the model should be browsable
 - [ ] Kept generic fixes generic
 - [ ] Added focused regression coverage for the changed seam
@@ -234,7 +237,7 @@ If the change affects contributor workflow, update:
 
 ## Rule of thumb
 
-If you can support a new model by updating the module whitelist plus `ModelDescriptor` metadata, do that.
+If you can support a new model through existing discovery plus a small `ModelDescriptor` override, do that.
 
 If the model exposes a reusable gap in the engine, fix the engine once.
 

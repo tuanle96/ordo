@@ -1,5 +1,33 @@
 # Project Changelog
 
+## 2026-03-10 (Dynamic Module Discovery & Browse Unblocking)
+
+### Added
+
+- **Dynamic backend module discovery** for `GET /api/v1/mobile/modules/installed`, which now returns all installed Odoo application modules instead of a hardcoded curated whitelist
+- **Menu/action-backed browse-model discovery** on the backend, so the same endpoint now also returns `browseModels` derived from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
+- **Focused regression coverage** for backend module service composition, dynamic installed-module queries, browse-model extraction, and iOS app-state discovery merge/fallback behavior
+
+### Changed
+
+- `backend/src/modules/module/module.service.ts` no longer gates discovery through `KNOWN_MODULES`; it now combines `adapter.getInstalledModules(...)` with `adapter.getBrowseModels(...)`
+- `OdooAdapter` / `OdooV17Adapter` now treat module discovery as a real adapter capability instead of a caller-supplied whitelist lookup
+- `OdooV17Adapter.getBrowseModels(...)` now derives browseable models from active menus and window actions, ignores non-browse targets like `target='new'`, and keeps the payload deduped by `res_model`
+- iOS `AppState.availableModels` now prefers dynamically discovered browse models and merges them with `ModelRegistry` static overrides instead of filtering a hardcoded local registry by installed module names
+- `ModelRegistry` now acts as **curated metadata + generic fallback synthesis** for discovered models, rather than as the hard browse gatekeeper
+- Home/settings/recent-item labeling paths now resolve model descriptors through the dynamic app-state lookup so newly discovered models can surface with sane fallback titles/icons
+
+### Verified
+
+- `cd backend && npm run build && npm run test && npm run lint` — backend validation passes after the discovery refactor (`16 suites`, `78 tests`)
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/AppStateModelDiscoveryTests test` — focused iOS discovery merge/fallback regressions pass (`** TEST SUCCEEDED **`)
+
+### Notes
+
+- This slice deliberately widens **discovery**, not the generic form/list engine itself; unknown models can now surface through the existing browse/list/detail runtime when Odoo exposes a browseable menu/action path
+- `ModelRegistry` still matters for polished titles, icons, and row-summary fallbacks, but it is no longer the primary browse allowlist
+- A targeted UI smoke rerun in this session was blocked by simulator test-runner launch failure (`OrdoUITests.xctrunner`), not by an app assertion regression in the shipped discovery path
+
 ## 2026-03-10 (Backend Path Alias Import Migration)
 
 ### Changed
@@ -34,7 +62,7 @@
 
 ### Notes
 
-- The guide documents the current real seams contributors must check, including backend module gating in `backend/src/modules/module/module.service.ts`, iOS browse registration in `ios/Ordo/features/browse/model-registry.swift`, and browse-filter fallback behavior in `ios/Ordo/features/browse/filter-models.swift`
+- The guide documents the contributor seams around module discovery, iOS browse metadata overrides, and browse-filter fallback behavior so new module onboarding does not stay tribal knowledge
 
 ## 2026-03-10 (iOS Core-Engine Polish Slice)
 

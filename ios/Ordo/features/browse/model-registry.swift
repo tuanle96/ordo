@@ -88,11 +88,85 @@ enum ModelRegistry {
         ),
     ]
 
-    static func available(installedModules: Set<String>) -> [ModelDescriptor] {
-        supported.filter { descriptor in
-            guard let required = descriptor.requiredModule else { return true }
-            return installedModules.contains(required)
+    static func merged(with browseModels: [BrowseModelInfo]) -> [ModelDescriptor] {
+        var seenModels = Set<String>()
+
+        return browseModels.compactMap { browseModel in
+            guard seenModels.insert(browseModel.model).inserted else {
+                return nil
+            }
+
+            return descriptor(for: browseModel.model, browseTitle: browseModel.title)
         }
+    }
+
+    static func descriptor(for model: String, browseTitle: String? = nil) -> ModelDescriptor {
+        supported.first(where: { $0.model == model })
+            ?? genericDescriptor(model: model, title: browseTitle)
+    }
+
+    private static func genericDescriptor(model: String, title: String?) -> ModelDescriptor {
+        ModelDescriptor(
+            model: model,
+            title: normalizedTitle(title, fallbackModel: model),
+            subtitle: humanizedModelName(model),
+            systemImage: genericSystemImage(for: model, title: title),
+            listFields: nil,
+            titleFields: ["display_name", "name"],
+            subtitleFields: ["partner_name", "email", "phone", "partner_id", "state"],
+            footnoteFields: ["user_id", "company_id", "amount_total", "date_deadline"],
+            requiredModule: nil
+        )
+    }
+
+    private static func normalizedTitle(_ title: String?, fallbackModel: String) -> String {
+        guard let trimmedTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedTitle.isEmpty else {
+            return humanizedModelName(fallbackModel)
+        }
+
+        return trimmedTitle
+    }
+
+    private static func humanizedModelName(_ model: String) -> String {
+        model
+            .split(separator: ".")
+            .flatMap { $0.split(separator: "_") }
+            .map { token in
+                let lowercased = token.lowercased()
+                guard let first = lowercased.first else { return "" }
+                return String(first).uppercased() + lowercased.dropFirst()
+            }
+            .joined(separator: " ")
+    }
+
+    private static func genericSystemImage(for model: String, title: String?) -> String {
+        let haystack = [model, title ?? ""]
+            .joined(separator: " ")
+            .lowercased()
+
+        if haystack.contains("account") || haystack.contains("invoice") || haystack.contains("bill") {
+            return "doc.text"
+        }
+
+        if haystack.contains("stock") || haystack.contains("inventory") || haystack.contains("warehouse") {
+            return "shippingbox"
+        }
+
+        if haystack.contains("project") || haystack.contains("task") {
+            return "checklist"
+        }
+
+        if haystack.contains("hr") || haystack.contains("employee") || haystack.contains("recruit") {
+            return "person.3"
+        }
+
+        return "square.grid.2x2"
+    }
+}
+
+extension ModelDescriptor {
+    static func generic(model: String, browseTitle: String? = nil) -> ModelDescriptor {
+        ModelRegistry.descriptor(for: model, browseTitle: browseTitle)
     }
 }
 

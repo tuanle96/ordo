@@ -13,7 +13,7 @@ import type {
     RecordListResult,
 } from '@app/shared';
 
-import type { InstalledModuleInfo } from '@app/modules/module/module.types';
+import type { BrowseModelInfo, InstalledModuleInfo } from '@app/modules/module/module.types';
 
 import type { OdooSessionContext } from '@app/odoo/session/odoo-session.types';
 
@@ -119,6 +119,8 @@ export interface OdooAdapter {
     ): Promise<ChatterDetailsResult>;
     getInstalledModules(
         session: OdooSessionContext,
-        technicalNames: string[],
     ): Promise<InstalledModuleInfo[]>;
+    getBrowseModels(
+        session: OdooSessionContext,
+    ): Promise<BrowseModelInfo[]>;
 }

@@ -93,36 +93,36 @@ struct HomeView: View {
                         OrdoCard {
                             VStack(spacing: 0) {
                                 ForEach(Array(recentItems.items.prefix(5).enumerated()), id: \.element.id) { index, item in
-                                    if let descriptor = appState.availableModels.first(where: { $0.model == item.model }) {
-                                        NavigationLink {
-                                            RecordDetailView(descriptor: descriptor, recordID: item.recordID)
-                                        } label: {
-                                            HStack(spacing: OrdoSpacing.md) {
-                                                AvatarView(name: item.displayName, size: 36)
+                                    let descriptor = appState.modelDescriptor(for: item.model)
 
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(item.displayName)
-                                                        .font(OrdoTypography.headline)
-                                                        .foregroundStyle(OrdoColors.textPrimary)
-                                                        .lineLimit(1)
-                                                    Text(descriptor.title)
-                                                        .font(OrdoTypography.caption)
-                                                        .foregroundStyle(OrdoColors.textTertiary)
-                                                }
+                                    NavigationLink {
+                                        RecordDetailView(descriptor: descriptor, recordID: item.recordID)
+                                    } label: {
+                                        HStack(spacing: OrdoSpacing.md) {
+                                            AvatarView(name: item.displayName, size: 36)
 
-                                                Spacer()
-
-                                                Image(systemName: "chevron.right")
-                                                    .font(.system(size: 13, weight: .semibold))
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(item.displayName)
+                                                    .font(OrdoTypography.headline)
+                                                    .foregroundStyle(OrdoColors.textPrimary)
+                                                    .lineLimit(1)
+                                                Text(descriptor.title)
+                                                    .font(OrdoTypography.caption)
                                                     .foregroundStyle(OrdoColors.textTertiary)
                                             }
-                                            .padding(.vertical, OrdoSpacing.sm)
-                                        }
-                                        .accessibilityIdentifier("recent-item-\(descriptor.model)-\(item.recordID)")
 
-                                        if index < min(recentItems.items.count, 5) - 1 {
-                                            Divider()
+                                            Spacer()
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(OrdoColors.textTertiary)
                                         }
+                                        .padding(.vertical, OrdoSpacing.sm)
+                                    }
+                                    .accessibilityIdentifier("recent-item-\(descriptor.model)-\(item.recordID)")
+
+                                    if index < min(recentItems.items.count, 5) - 1 {
+                                        Divider()
                                     }
                                 }
                             }

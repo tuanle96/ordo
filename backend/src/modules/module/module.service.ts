@@ -7,8 +7,6 @@ import type { InstalledModulesResponse } from '@app/modules/module/module.types'
 import { AdapterFactoryService } from '@app/odoo/adapters/adapter-factory.service';
 import { OdooSessionStoreService } from '@app/odoo/session/odoo-session-store.service';
 
-const KNOWN_MODULES = ['contacts', 'crm', 'sale'];
-
 @Injectable()
 export class ModuleService {
     private readonly logger = new Logger(ModuleService.name);
@@ -22,14 +20,19 @@ export class ModuleService {
         const session = await this.sessionStore.getOrThrow(currentUser.sessionHandle);
         const adapter = this.adapterFactory.getAdapter(currentUser.version);
 
-        const modules = await adapter.getInstalledModules(session, KNOWN_MODULES);
+        const [modules, browseModels] = await Promise.all([
+            adapter.getInstalledModules(session),
+            adapter.getBrowseModels(session),
+        ]);
 
         this.logger.log({
             event: 'installed_modules_fetched',
-            count: modules.length,
-            names: modules.map((m) => m.name),
+            moduleCount: modules.length,
+            browseModelCount: browseModels.length,
+            moduleNames: modules.map((module) => module.name),
+            browseModelNames: browseModels.map((browseModel) => browseModel.model),
         });
 
-        return { modules };
+        return { modules, browseModels };
     }
 }

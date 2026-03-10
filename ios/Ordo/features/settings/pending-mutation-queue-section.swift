@@ -173,7 +173,7 @@ struct PendingMutationQueueSection: View {
     }
 
     private func title(for mutation: QueuedRecordMutation) -> String {
-        let modelTitle = ModelRegistry.supported.first(where: { $0.model == mutation.model })?.title ?? mutation.model
+        let modelTitle = appState.modelDescriptor(for: mutation.model).title
         return "\(kindLabel(for: mutation.kind)) · \(modelTitle)"
     }
 

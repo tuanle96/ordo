@@ -13,7 +13,9 @@ final class AppState {
     private(set) var phase: Phase = .launching
     private(set) var session: StoredSession?
     private(set) var currentPrincipal: AuthenticatedPrincipal?
-    private(set) var installedModuleNames: Set<String> = []
+    private(set) var installedModules: [InstalledModuleInfo] = []
+    private(set) var browseModels: [BrowseModelInfo] = []
+    private(set) var hasLoadedBrowseDiscovery = false
     private(set) var pendingMutationCount = 0
     var statusMessage: String?
 
@@ -54,9 +56,14 @@ final class AppState {
     }
 
     var availableModels: [ModelDescriptor] {
-        installedModuleNames.isEmpty
-            ? ModelRegistry.supported
-            : ModelRegistry.available(installedModules: installedModuleNames)
+        hasLoadedBrowseDiscovery
+            ? ModelRegistry.merged(with: browseModels)
+            : ModelRegistry.supported
+    }
+
+    func modelDescriptor(for model: String, fallbackTitle: String? = nil) -> ModelDescriptor {
+        availableModels.first(where: { $0.model == model })
+            ?? ModelRegistry.descriptor(for: model, browseTitle: fallbackTitle)
     }
 
     var cacheScope: CacheScope? {
@@ -204,7 +211,9 @@ final class AppState {
         try? sessionStore.clear()
         session = nil
         currentPrincipal = nil
-        installedModuleNames = []
+        installedModules = []
+        browseModels = []
+        hasLoadedBrowseDiscovery = false
         pendingMutationCount = 0
         phase = .login
         statusMessage = nil
@@ -334,10 +343,14 @@ final class AppState {
             let response = try await withAuthenticatedToken { [self] token in
                 try await self.apiClient.installedModules(token: token)
             }
-            installedModuleNames = Set(response.modules.map(\.name))
+            installedModules = response.modules
+            browseModels = response.browseModels
+            hasLoadedBrowseDiscovery = true
         } catch {
-            // Graceful degradation: show all models if module check fails
-            installedModuleNames = []
+            // Graceful degradation: keep the static registry path when discovery fails.
+            installedModules = []
+            browseModels = []
+            hasLoadedBrowseDiscovery = false
         }
     }
 
@@ -503,6 +516,7 @@ extension AppState {
         state.session = .preview
         state.currentPrincipal = .preview
         state.phase = .authenticated
+        state.hasLoadedBrowseDiscovery = false
         return state
     }()
 }

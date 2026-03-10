@@ -187,6 +187,13 @@ private final class UITestURLProtocol: URLProtocol {
             return (200, try encoder.encode(UITestEnvelope(data: UITestFixtures.principal, meta: nil)))
         }
 
+        if path.hasSuffix("/modules/installed") {
+            return (200, try encoder.encode(UITestEnvelope(data: InstalledModulesResponse(
+                modules: UITestFixtures.installedModules,
+                browseModels: UITestFixtures.browseModels
+            ), meta: nil)))
+        }
+
         return notFound(encoder: encoder)
     }
 
@@ -281,6 +288,18 @@ private enum UITestFixtures {
         email: "admin@example.com",
         tz: "UTC"
     )
+
+    static let installedModules = [
+        InstalledModuleInfo(name: "contacts", displayName: "Contacts"),
+        InstalledModuleInfo(name: "crm", displayName: "CRM"),
+        InstalledModuleInfo(name: "sale", displayName: "Sales"),
+    ]
+
+    static let browseModels = [
+        BrowseModelInfo(model: "res.partner", title: "Contacts"),
+        BrowseModelInfo(model: "crm.lead", title: "Leads"),
+        BrowseModelInfo(model: "sale.order", title: "Sales Orders"),
+    ]
 
     static let partnerSearchResults = [
         NameSearchResult(id: 1, name: "Azure Interior"),

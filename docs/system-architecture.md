@@ -221,6 +221,19 @@ The dynamic list slice adds a separate browse-schema transport instead of wideni
 - **Cache isolation widened deliberately**: list-page cache keys now include both the active domain and requested field set so schema-driven pages do not collide with descriptor-fallback cache entries
 - **Cache filenames are length-safe**: the iOS cache store hashes the full list-page identity into a single filename token instead of concatenating long per-part hashes, preventing simulator filesystem path-length failures on complex browse combinations
 
+## Dynamic module discovery and browse exposure (2026-03-10)
+
+The discovery slice removes the last major static browse bottleneck without inventing a new model-specific transport layer.
+
+- **Backend discovery is now additive and dynamic**: `GET /api/v1/mobile/modules/installed` returns both installed Odoo application modules and `browseModels`, where browse models are derived from active `ir.ui.menu` entries that resolve to browseable `ir.actions.act_window` records
+- **Browseability is menu/action-backed, not raw-model-backed**: the backend intentionally derives candidates from live menu/action exposure, filters out non-browse targets like modal `target='new'` actions, and dedupes the result by `res_model` so the mobile app receives a realistic browse catalog instead of every technical model in `ir.model`
+- **The modules endpoint remains discovery-focused**: it is not a permission boundary and does not claim to represent every Odoo capability; it simply advertises which installed application modules and browseable models the current authenticated user can plausibly enter through the shipped mobile browse surface
+- **iOS now merges dynamic discovery with static polish**: `AppState.availableModels` prefers the discovered browse-model list, while `ModelRegistry` supplies curated overrides for known models (`res.partner`, `crm.lead`, `sale.order`) and synthesizes generic descriptors for unknown discovered models
+- **Static metadata is now fallback/override, not the gatekeeper**: browse/home/settings/recent-item UI still use `ModelDescriptor` for titles, icons, fallback list fields, and summary extraction, but discovery no longer depends on a hardcoded local allowlist
+- **Failure handling remains conservative**: if discovery fails, iOS falls back to the existing static registry path instead of blocking browse entirely or pretending discovery is guaranteed
+- **Successful empty discovery is treated honestly**: if the backend successfully returns an empty browse catalog, iOS shows no browse models instead of silently re-expanding the static registry and pretending discovery found something it did not
+- **Current browse discovery is intentionally coarse**: the payload only carries `model` plus a title derived from the first browseable menu/action path, so action-specific domains/contexts are not preserved across multiple menus pointing at the same `res_model`
+
 ## Core-engine offline mutation queue foundation (2026-03-09)
 
 The first offline-write slice stays intentionally modest: it gives Ordo a real persisted retry foundation without claiming full sync-engine parity.
