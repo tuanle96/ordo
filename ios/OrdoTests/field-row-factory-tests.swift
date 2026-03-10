@@ -261,6 +261,40 @@ struct FieldRowFactoryTests {
 
         #expect(model?.value == "VIP, Wholesale")
         #expect(model?.style == .standard)
+        if case .chips(let destinations)? = model?.relationPresentation {
+            #expect(destinations.map(\.recordID) == [8, 11])
+            #expect(destinations.map(\.label) == ["VIP", "Wholesale"])
+        } else {
+            Issue.record("Expected many2many read-only value to expose relation chip destinations.")
+        }
+    }
+
+    @Test
+    func many2OneReadOnlyExposesRelationDestination() {
+        let field = FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.country", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let model = FieldRowFactory.model(for: field, rawValue: .relation(id: 233, label: "United States"))
+
+        if case .row(let destination)? = model?.relationPresentation {
+            #expect(destination.model == "res.country")
+            #expect(destination.recordID == 233)
+            #expect(destination.label == "United States")
+        } else {
+            Issue.record("Expected many2one read-only value to expose a relation destination.")
+        }
+    }
+
+    @Test
+    func relationReadOnlyFallbackStaysNonInteractiveWithoutComodelOrIDs() {
+        let missingComodelField = FieldSchema(name: "country_id", type: .many2one, label: "Country", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: nil, selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+        let textOnlyMany2ManyField = FieldSchema(name: "category_id", type: .many2many, label: "Tags", required: nil, readonly: nil, invisible: nil, domain: nil, comodel: "res.partner.category", selection: nil, currencyField: nil, placeholder: nil, digits: nil, subfields: nil, searchable: nil, widget: nil)
+
+        let missingComodelModel = FieldRowFactory.model(for: missingComodelField, rawValue: .relation(id: 233, label: "United States"))
+        let textOnlyMany2ManyModel = FieldRowFactory.model(for: textOnlyMany2ManyField, rawValue: .string("VIP, Wholesale"))
+
+        #expect(missingComodelModel?.relationPresentation == nil)
+        #expect(textOnlyMany2ManyModel?.relationPresentation == nil)
+        #expect(textOnlyMany2ManyModel?.value == "VIP, Wholesale")
     }
 
     @Test

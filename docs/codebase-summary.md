@@ -49,8 +49,8 @@ The product is far beyond MVP scaffolding, but a few areas are still intentional
 - statusbar interaction is only shipped for narrow two-state, action-backed selection flows; many2one stage flows such as CRM stages remain non-interactive
 - inline attachment preview/export works for already-loaded payload bytes, but there is still no backend download/proxy or large-file fetch path
 - offline support includes cache plus queued update/delete/action replay, not a full sync/conflict/background engine
-- `SearchField.filterDomain` metadata exists in list schema, but iOS does not yet apply it when building dynamic browse filters
-- relation drilldown from read-only many2one/many2many labels into related record detail is still missing
+- iOS dynamic browse filters now honor backend `SearchField.filterDomain` templates, including compound domains and quick-filter composition, but template-backed operator UX is still narrow
+- read-only relation drilldown is now shipped; many2one fields render as NavigationLink rows with chevrons, many2many fields render as tappable chip grids, both navigate to related record detail with proper descriptor lookup and fallback to plain text when comodel metadata is unavailable
 - multi-company switching is still not implemented
 
 ## Package ownership

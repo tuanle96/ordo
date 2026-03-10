@@ -354,6 +354,27 @@ final class OrdoUITests: XCTestCase {
     }
 
     @MainActor
+    func testReadOnlyRelationTapNavigatesToRelatedRecordDetail() throws {
+        let app = makeApp(resetStorage: true)
+        app.launch()
+
+        signIn(app)
+        tapBrowseTab(app)
+        XCTAssertTrue(app.buttons["browse-app-sale-order"].waitForExistence(timeout: standardTimeout))
+        app.buttons["browse-app-sale-order"].tap()
+        openFirstRecordDetail(app)
+
+        let relationLink = app.descendants(matching: .any)["field-link-partner_id"]
+        XCTAssertTrue(relationLink.waitForExistence(timeout: standardTimeout))
+        relationLink.tap()
+
+        let title = app.staticTexts["record-detail-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: standardTimeout))
+        XCTAssertEqual(title.label, "Azure Interior")
+        XCTAssertTrue(app.staticTexts["field-value-country_id"].waitForExistence(timeout: standardTimeout))
+    }
+
+    @MainActor
     func testHomeShowsRecentlyViewedRecordAfterRelaunch() throws {
         let firstLaunch = makeApp(resetStorage: true)
         firstLaunch.launch()

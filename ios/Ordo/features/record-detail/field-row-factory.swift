@@ -13,6 +13,24 @@ struct ReadOnlyFieldRowAttachment: Equatable {
     let filename: String
 }
 
+struct ReadOnlyRelationDestination: Identifiable, Equatable {
+    enum Presentation: Equatable {
+        case row
+        case chips
+    }
+
+    let model: String
+    let recordID: Int
+    let label: String
+
+    var id: String { "\(model)-\(recordID)" }
+}
+
+enum ReadOnlyRelationPresentation: Equatable {
+    case row(ReadOnlyRelationDestination)
+    case chips([ReadOnlyRelationDestination])
+}
+
 struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     enum Style: Equatable {
         case standard
@@ -33,6 +51,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
     let richText: AttributedString?
     let previewData: Data?
     let attachment: ReadOnlyFieldRowAttachment?
+    let relationPresentation: ReadOnlyRelationPresentation?
 
     init(
         id: String,
@@ -41,7 +60,8 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
         style: Style,
         richText: AttributedString? = nil,
         previewData: Data? = nil,
-        attachment: ReadOnlyFieldRowAttachment? = nil
+        attachment: ReadOnlyFieldRowAttachment? = nil,
+        relationPresentation: ReadOnlyRelationPresentation? = nil
     ) {
         self.id = id
         self.label = label
@@ -50,6 +70,7 @@ struct ReadOnlyFieldRowModel: Identifiable, Equatable {
         self.richText = richText
         self.previewData = previewData
         self.attachment = attachment
+        self.relationPresentation = relationPresentation
     }
 }
 
@@ -103,6 +124,7 @@ enum FieldRowFactory {
         }
 
         let attachment = attachment(for: field, rawValue: rawValue, record: record)
+        let relationPresentation = relationPresentation(for: field, rawValue: rawValue)
 
         return ReadOnlyFieldRowModel(
             id: field.name,
@@ -111,7 +133,8 @@ enum FieldRowFactory {
             style: style,
             richText: field.type == .html ? attributedHTMLValue(for: rawValue) : nil,
             previewData: (field.type == .image || field.type == .signature) ? attachment?.data : nil,
-            attachment: attachment
+            attachment: attachment,
+            relationPresentation: relationPresentation
         )
     }
 
@@ -295,6 +318,25 @@ enum FieldRowFactory {
         guard count > 0 else { return "—" }
 
         return count == 1 ? "1 line item" : "\(count) line items"
+    }
+
+    private static func relationPresentation(for field: FieldSchema, rawValue: JSONValue) -> ReadOnlyRelationPresentation? {
+        guard let comodel = field.comodel?.trimmingCharacters(in: .whitespacesAndNewlines), !comodel.isEmpty else {
+            return nil
+        }
+
+        switch field.type {
+        case .many2one:
+            guard let relation = rawValue.relationValue else { return nil }
+            return .row(ReadOnlyRelationDestination(model: comodel, recordID: relation.id, label: relation.label))
+        case .many2many:
+            let destinations = rawValue.relationValues.map {
+                ReadOnlyRelationDestination(model: comodel, recordID: $0.id, label: $0.label)
+            }
+            return destinations.isEmpty ? nil : .chips(destinations)
+        default:
+            return nil
+        }
     }
 
     private static func attachment(for field: FieldSchema, rawValue: JSONValue, record: RecordData?) -> ReadOnlyFieldRowAttachment? {

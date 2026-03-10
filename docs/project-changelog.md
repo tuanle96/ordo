@@ -1,5 +1,48 @@
 # Project Changelog
 
+## 2026-03-10 (iOS Read-Only Relation Drilldown Slice)
+
+### Added
+
+- **Many2one NavigationLink rows** in read-only record detail mode — tappable relation fields now navigate to related record detail with proper descriptor lookup and chevron visual affordance
+- **Many2many chip grid navigation** in read-only mode — relation fields render as a lazy grid of pill-shaped NavigationLink chips, each navigating to the related record detail
+- **Regression test coverage** for relation presentation extraction, descriptor lookup, and end-to-end sale.order → partner_id navigation flow
+
+### Changed
+
+- `ReadOnlyFieldRowModel` now carries optional `relationPresentation` metadata extracted from field comodel and rawValue relation IDs
+- `FieldRowFactory.relationPresentation(...)` inspects many2one/many2many fields and returns `.row()` or `.chips()` presentation when comodel and IDs are present, falls back to `nil` for missing comodel or string-only values
+- `read-only-field-row.swift` now renders `relationRow()` and `relationChipsRow()` views with environment-injected `AppState` for `ModelDescriptor` lookup
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/FieldRowFactoryTests -only-testing:OrdoUITests/OrdoUITests/testReadOnlyRelationTapNavigatesToRelatedRecordDetail test` — passes
+- Unit tests verify relation presentation extraction, fallback to `nil` for missing comodel/IDs, and proper many2one/many2many distinction
+- UI test verifies end-to-end sale.order → partner_id → detail navigation and related record field rendering
+
+### Notes
+
+- Scope stays narrow and honest: only many2one and many2many in read-only mode, one2many intentionally excluded (line lists not drilldown targets), edit mode still uses search/select UI
+- Fields without comodel metadata or with string-only many2many values fall back to plain text rendering instead of offering broken navigation
+- No new backend contracts needed; reuses existing `RecordDetailView`, `ModelDescriptor`, and `AppState` infrastructure
+
+## 2026-03-10 (iOS Browse SearchField.filterDomain Slice)
+
+### Changed
+
+- iOS dynamic browse filters now preserve and apply backend-provided `SearchField.filterDomain` templates from `MobileListSchema.search.fields`
+- `RecordListViewModel` now loads list schema metadata before normalizing/applying browse filters so schema-backed search fields work even when the user applies a filter before the first list load
+- Browse domain composition now preserves legacy single-clause filters while correctly flattening compound template domains alongside quick filters into Odoo-compatible request payloads
+
+### Verified
+
+- `xcodebuild -project ios/Ordo.xcodeproj -scheme Ordo -parallel-testing-enabled NO -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.3.1' -only-testing:OrdoTests/RecordListViewModelTests -only-testing:OrdoTests/SchemaModelsTests test` — passes (`16 tests`, `** TEST SUCCEEDED **`)
+
+### Notes
+
+- This slice closes the shipped/runtime gap where backend list schema already exposed `SearchField.filterDomain` but iOS ignored it when building dynamic browse filter clauses
+- Template-backed fields still use intentionally narrow operator behavior: `.contains` resolves the backend template, while other operators fall back to the existing legacy field/operator/value clause path
+
 ## 2026-03-10 (Docs Backlog Alignment to Live Codebase)
 
 ### Changed

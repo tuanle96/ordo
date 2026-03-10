@@ -33,12 +33,13 @@
 - **One normalized backend contract** across Odoo 17, 18, and 19
 - **Already shipped:** auth, browse, detail, create/edit/delete, actions, chatter, offline-resilient cache, dynamic browse discovery from backend menu trees, and inline preview/export for loaded media/documents
 
-Ordo is production-minded, but still evolving. Full offline sync, many2one stage-style status interactions, relation drilldown, multi-company switching, and richer remote attachment handling are still follow-up work.
+Ordo is production-minded, but still evolving. Full offline sync, many2one stage-style status interactions, multi-company switching, and richer remote attachment handling are still follow-up work.
 
 ### Current boundaries
 
 - Browse grouping is already shipped, but it is **client-side grouping over flat list payloads**, not backend aggregates.
 - Attachment preview/export is already shipped for **bytes already loaded in record detail**, but there is no backend download/proxy path for large files yet.
+- Read-only relation drilldown is already shipped for **many2one rows and many2many chip grids** when current payloads include usable `comodel` + relation IDs.
 - Statusbar tap-to-change is shipped only for a **narrow action-backed two-state selection flow**; many2one stage bars such as CRM stages remain read-only.
 - Offline behavior currently means **cache + queued update/delete/action replay/management**, not queued create replay or a full background sync/conflict engine.
 

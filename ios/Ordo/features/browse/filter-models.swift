@@ -50,6 +50,7 @@ struct BrowseFilterField: Identifiable, Hashable {
     let name: String
     let label: String
     let kind: BrowseFilterFieldKind
+    let filterDomainTemplate: JSONValue?
 
     var id: String { name }
 }
@@ -136,7 +137,36 @@ struct BrowseFilterCondition: Codable, Hashable, Identifiable {
 
     func domainClause(for field: BrowseFilterField) -> JSONValue? {
         guard let normalized = normalized(for: field), let value = normalized.value else { return nil }
+
+        if normalized.filterOperator == .contains,
+           let resolvedTemplateDomain = BrowseFilterDomainTemplateResolver.resolve(field.filterDomainTemplate, substituting: value) {
+            return resolvedTemplateDomain
+        }
+
         return .array([.string(field.name), .string(normalized.filterOperator.rawValue), value])
+    }
+}
+
+private enum BrowseFilterDomainTemplateResolver {
+    static func resolve(_ template: JSONValue?, substituting value: JSONValue) -> JSONValue? {
+        guard let template else { return nil }
+
+        let resolved = substituteSelf(in: template, with: value)
+        guard case .array = resolved else { return nil }
+        return resolved
+    }
+
+    private static func substituteSelf(in jsonValue: JSONValue, with value: JSONValue) -> JSONValue {
+        switch jsonValue {
+        case .string(let stringValue) where stringValue == "self":
+            return value
+        case .array(let values):
+            return .array(values.map { substituteSelf(in: $0, with: value) })
+        case .object(let object):
+            return .object(object.mapValues { substituteSelf(in: $0, with: value) })
+        default:
+            return jsonValue
+        }
     }
 }
 
@@ -161,7 +191,7 @@ struct BrowseFilterState: Codable, Hashable {
             return condition.domainClause(for: field)
         }
 
-        return clauses.isEmpty ? nil : .array(clauses)
+        return BrowseFilterDomainComposer.compose(clauses)
     }
 
     var activeCount: Int {
@@ -169,6 +199,70 @@ struct BrowseFilterState: Codable, Hashable {
     }
 
     static let empty = BrowseFilterState()
+}
+
+enum BrowseFilterDomainComposer {
+    static func compose(_ domains: [JSONValue]) -> JSONValue? {
+        guard !domains.isEmpty else { return nil }
+        guard domains.count > 1 else {
+            let domain = domains[0]
+            return isCompoundExpression(domain) ? domain : .array([domain])
+        }
+
+        let mergedComponents = domains.flatMap(domainComponents)
+        return .array(mergedComponents)
+    }
+
+    private static func domainComponents(for array: [JSONValue]) -> [JSONValue] {
+        if let first = array.first,
+           case .string(let operatorValue) = first,
+           ["|", "&", "!"].contains(operatorValue) {
+            return array
+        }
+
+        if array.allSatisfy(isClauseLike) {
+            return array.map { .array([$0]) }
+        }
+
+        return array
+    }
+
+    private static func domainComponents(_ domain: JSONValue) -> [JSONValue] {
+        guard case .array(let values) = domain else {
+            return [domain]
+        }
+
+        if isCompoundExpression(domain) {
+            return values
+        }
+
+        if isClauseLike(domain) {
+            return [domain]
+        }
+
+        return values
+    }
+
+    private static func isCompoundExpression(_ domain: JSONValue) -> Bool {
+        guard case .array(let values) = domain,
+              let first = values.first,
+              case .string(let operatorValue) = first else {
+            return false
+        }
+
+        return ["|", "&", "!"].contains(operatorValue)
+    }
+
+    private static func isClauseLike(_ domain: JSONValue) -> Bool {
+        guard case .array(let values) = domain,
+              values.count == 3,
+              case .string = values[0],
+              case .string = values[1] else {
+            return false
+        }
+
+        return true
+    }
 }
 
 enum BrowseFilterRegistry {
@@ -184,32 +278,32 @@ enum BrowseFilterRegistry {
         switch descriptor.model {
         case "res.partner":
             return [
-                BrowseFilterField(name: "name", label: "Name", kind: .text),
-                BrowseFilterField(name: "email", label: "Email", kind: .text),
-                BrowseFilterField(name: "phone", label: "Phone", kind: .text),
-                BrowseFilterField(name: "city", label: "City", kind: .text),
-                BrowseFilterField(name: "customer_rank", label: "Customer Rank", kind: .number),
-                BrowseFilterField(name: "is_company", label: "Company", kind: .boolean),
+                BrowseFilterField(name: "name", label: "Name", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "email", label: "Email", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "phone", label: "Phone", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "city", label: "City", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "customer_rank", label: "Customer Rank", kind: .number, filterDomainTemplate: nil),
+                BrowseFilterField(name: "is_company", label: "Company", kind: .boolean, filterDomainTemplate: nil),
             ]
         case "crm.lead":
             return [
-                BrowseFilterField(name: "name", label: "Opportunity", kind: .text),
-                BrowseFilterField(name: "partner_name", label: "Customer", kind: .text),
-                BrowseFilterField(name: "email_from", label: "Email", kind: .text),
-                BrowseFilterField(name: "phone", label: "Phone", kind: .text),
-                BrowseFilterField(name: "stage_id", label: "Stage", kind: .text),
-                BrowseFilterField(name: "user_id", label: "Salesperson", kind: .text),
+                BrowseFilterField(name: "name", label: "Opportunity", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "partner_name", label: "Customer", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "email_from", label: "Email", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "phone", label: "Phone", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "stage_id", label: "Stage", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "user_id", label: "Salesperson", kind: .text, filterDomainTemplate: nil),
             ]
         case "sale.order":
             return [
-                BrowseFilterField(name: "name", label: "Order", kind: .text),
-                BrowseFilterField(name: "partner_id", label: "Customer", kind: .text),
-                BrowseFilterField(name: "user_id", label: "Salesperson", kind: .text),
-                BrowseFilterField(name: "state", label: "Status", kind: .selection([["draft", "Quotation"], ["sale", "Sales Order"]])),
-                BrowseFilterField(name: "amount_total", label: "Total", kind: .number),
+                BrowseFilterField(name: "name", label: "Order", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "partner_id", label: "Customer", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "user_id", label: "Salesperson", kind: .text, filterDomainTemplate: nil),
+                BrowseFilterField(name: "state", label: "Status", kind: .selection([["draft", "Quotation"], ["sale", "Sales Order"]]), filterDomainTemplate: nil),
+                BrowseFilterField(name: "amount_total", label: "Total", kind: .number, filterDomainTemplate: nil),
             ]
         default:
-            return [BrowseFilterField(name: descriptor.primarySortField, label: descriptor.title, kind: .text)]
+            return [BrowseFilterField(name: descriptor.primarySortField, label: descriptor.title, kind: .text, filterDomainTemplate: nil)]
         }
     }
 
@@ -227,7 +321,12 @@ enum BrowseFilterRegistry {
             kind = .text
         }
 
-        return BrowseFilterField(name: searchField.name, label: searchField.label, kind: kind)
+        return BrowseFilterField(
+            name: searchField.name,
+            label: searchField.label,
+            kind: kind,
+            filterDomainTemplate: searchField.filterDomain.flatMap(JSONValue.decoded(fromJSONString:))
+        )
     }
 }
 

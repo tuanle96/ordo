@@ -32,8 +32,8 @@ The platform is usable and broadly shipped, but several areas remain intentional
 - statusbar interaction is shipped only for narrow action-backed two-state selection flows; many2one stage flows such as `crm.lead.stage_id` remain read-only
 - attachment preview/export is local-only for bytes already returned in record detail; there is no backend file proxy or large-file download path yet
 - offline support covers cache plus queued update/delete/action replay, not full sync/conflict/background behavior
-- dynamic list schema already carries `SearchField.filterDomain`, but iOS does not yet apply that metadata when building browse filters
-- read-only relation labels still do not drill into related record detail
+- dynamic list schema `SearchField.filterDomain` metadata is now applied by iOS browse filters, including compound template substitution and composition with quick filters, but template-backed operator UX remains intentionally narrow
+- read-only relation drilldown is now shipped for many2one (NavigationLink row) and many2many (chip grid), both navigate to related record detail when comodel metadata is available
 - multi-company switching is still not implemented
 
 ## Delivery history summary

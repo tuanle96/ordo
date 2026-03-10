@@ -41,6 +41,7 @@
 | Core platform — Dynamic module discovery & browse unblocking | ✅ Complete | `GET /modules/installed` now discovers installed application modules plus a menu/action-backed `browseMenuTree`, and iOS renders top-level apps/categories directly while flattening the tree through `ModelRegistry` overrides so new browseable models are no longer blocked by a hardcoded allowlist |
 | Core platform — Browse menu tree minimum slice | ✅ Complete | Flat browse discovery was replaced with a narrow app/category/leaf tree contract, top-level apps now preserve first-browseable-descendant fallback models, and iOS Browse/Home render nested menu navigation with focused AppState regressions green |
 | iOS core-engine polish | ✅ Complete | Browse lists now support persisted client-side grouping on top of existing list-schema metadata, list schema retries after transient failures, date/datetime normalization shares one temporal helper path with text fallback for weird server values, edit-mode monetary prefixes resolve common currency symbols, and narrow nested `many2one` line editing now ships inside generic `one2many`; focused iOS validation passed (`57` then `78` targeted tests) |
+| iOS read-only relation drilldown | ✅ Complete | Record detail now renders many2one fields as NavigationLink rows and many2many fields as tappable chip grids, both navigating to related record detail with proper ModelDescriptor lookup; fallback to plain text when comodel metadata or relation IDs are unavailable; read-only mode only (edit mode stays on search/select path); focused unit + end-to-end UI test coverage green |
 
 ## Scope reminders
 
@@ -52,8 +53,7 @@
 
 These are the remaining honest follow-up areas after the completed slices above. They should not be confused with already-shipped narrow support.
 
-- **Browse `SearchField.filterDomain` application** — backend list schema already exposes this metadata, but iOS browse filters still ignore it when building dynamic filter clauses.
-- **Relation drilldown from read-only relation labels** — many2one/many2many values render correctly but still do not navigate into related record detail.
+- **Browse filter UX for schema-driven search fields** — iOS now applies backend `SearchField.filterDomain` templates when building browse domains, but operator/UI parity for template-backed fields is still intentionally narrow.
 - **Many2one stage interaction parity** — the narrow statusbar tap path is complete for action-backed two-state selection flows, but many2one stage bars such as `crm.lead.stage_id` remain display-only.
 - **Multi-company switching** — still not implemented.
 - **Remote/large-file attachment handling** — local inline preview/export is complete for already-loaded payloads, but backend download/proxy and larger attachment flows remain deferred.

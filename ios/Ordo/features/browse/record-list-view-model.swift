@@ -207,6 +207,7 @@ final class RecordListViewModel {
     }
 
     func apply(filterState: BrowseFilterState, using appState: AppState) async {
+        await loadListSchemaIfNeeded(using: appState)
         let normalizedState = filterState.normalized(with: filterFields)
         guard normalizedState != self.filterState else { return }
         self.filterState = normalizedState

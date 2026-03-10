@@ -165,7 +165,13 @@ export class OdooRpcService {
             request.method,
             request.args ?? [],
             request.kwargs ?? {},
-        ]);
+        ], {
+            path: '/jsonrpc',
+            service: 'object',
+            operation: 'execute_kw',
+            model: request.model,
+            method: request.method,
+        });
     }
 
     async callKwWithSession<T>(request: OdooCallKwRequest): Promise<T> {
@@ -174,7 +180,11 @@ export class OdooRpcService {
             method: request.method,
             args: request.args ?? [],
             kwargs: request.kwargs ?? {},
-        }, request.session.cookieHeader);
+        }, request.session.cookieHeader, {
+            path: '/web/dataset/call_kw',
+            model: request.model,
+            method: request.method,
+        });
     }
 
     /**
@@ -208,6 +218,8 @@ export class OdooRpcService {
             this.logger.error({
                 event: 'odoo_upstream_http_error',
                 path: '/web/dataset/call_kw',
+                model: request.model,
+                method: request.method,
                 status: response.status,
             });
             throw new BadGatewayException(`Odoo upstream request failed with status ${response.status}`);
@@ -215,7 +227,11 @@ export class OdooRpcService {
 
         const payload = (await response.json()) as { error?: Parameters<OdooRpcService['mapOdooError']>[0] };
         if (payload.error) {
-            throw this.mapOdooError(payload.error);
+            throw this.mapOdooError(payload.error, {
+                path: '/web/dataset/call_kw',
+                model: request.model,
+                method: request.method,
+            });
         }
         // Intentionally no result check — void Odoo methods return None/null
     }
@@ -269,6 +285,11 @@ export class OdooRpcService {
                 kwargs: request.kwargs ?? {},
             },
             request.session.cookieHeader,
+            {
+                path: `/web/dataset/call_kw/${request.model}/${request.method}`,
+                model: request.model,
+                method: request.method,
+            },
         );
     }
 
@@ -277,11 +298,16 @@ export class OdooRpcService {
         service: string,
         method: string,
         args: unknown[],
+        context?: OdooRpcLogContext,
     ): Promise<T> {
         return this.postJsonRoute<T>(this.normalizeBaseUrl(odooUrl), '/jsonrpc', {
             service,
             method,
             args,
+        }, undefined, context ?? {
+            path: '/jsonrpc',
+            service,
+            operation: method,
         });
     }
 
@@ -290,8 +316,9 @@ export class OdooRpcService {
         path: string,
         params: Record<string, unknown>,
         cookieHeader?: string,
+        context?: OdooRpcLogContext,
     ): Promise<T> {
-        const { payload } = await this.postJsonRouteWithResponse<T>(baseUrl, path, params, cookieHeader);
+        const { payload } = await this.postJsonRouteWithResponse<T>(baseUrl, path, params, cookieHeader, context);
 
         return payload;
     }
@@ -301,6 +328,7 @@ export class OdooRpcService {
         path: string,
         params: Record<string, unknown>,
         cookieHeader?: string,
+        context?: OdooRpcLogContext,
     ): Promise<{ payload: T; response: Response }> {
         const response = await this.fetchWithTimeout(new URL(path, `${baseUrl}/`).toString(), {
             method: 'POST',
@@ -320,6 +348,10 @@ export class OdooRpcService {
             this.logger.error({
                 event: 'odoo_upstream_http_error',
                 path,
+                service: context?.service,
+                operation: context?.operation,
+                model: context?.model,
+                method: context?.method,
                 status: response.status,
             });
             throw new BadGatewayException(`Odoo upstream request failed with status ${response.status}`);
@@ -327,7 +359,10 @@ export class OdooRpcService {
 
         const payload = (await response.json()) as OdooJsonRpcEnvelope<T>;
         if (payload.error) {
-            throw this.mapOdooError(payload.error);
+            throw this.mapOdooError(payload.error, {
+                path,
+                ...context,
+            });
         }
 
         if (payload.result === undefined) {
@@ -360,18 +395,38 @@ export class OdooRpcService {
         }
     }
 
-    private mapOdooError(error: OdooJsonRpcError):
+    private mapOdooError(error: OdooJsonRpcError, context?: OdooRpcLogContext):
         | UnauthorizedException
         | ForbiddenException
         | NotFoundException
         | BadRequestException
+        | ServiceUnavailableException
         | BadGatewayException {
         const message = this.extractUpstreamMessage(error);
         const errorName = this.extractUpstreamErrorName(error).toLowerCase();
         const normalizedMessage = message.toLowerCase();
+        const normalizedDebug = this.extractUpstreamDebug(error).toLowerCase();
+
+        this.logger.error({
+            event: 'odoo_upstream_rpc_error',
+            path: context?.path,
+            service: context?.service,
+            operation: context?.operation,
+            model: context?.model,
+            method: context?.method,
+            upstreamErrorName: this.extractUpstreamErrorName(error),
+            upstreamMessage: message,
+            upstreamDebugSnippet: this.buildUpstreamDebugSnippet(error),
+        });
 
         if (normalizedMessage.includes('accessdenied')) {
             return new UnauthorizedException('Wrong login/password');
+        }
+
+        if (this.isUninitializedDatabaseError(errorName, normalizedMessage, normalizedDebug)) {
+            return new ServiceUnavailableException(
+                'The selected Odoo database is not initialized yet. Finish Odoo database setup, then try logging in again.',
+            );
         }
 
         if (errorName.includes('accesserror') || normalizedMessage.includes('accesserror')) {
@@ -404,6 +459,39 @@ export class OdooRpcService {
 
     private extractUpstreamErrorName(error: OdooJsonRpcError): string {
         return error.data?.name ?? error.message ?? 'Unknown Odoo upstream error';
+    }
+
+    private extractUpstreamDebug(error: OdooJsonRpcError): string {
+        return error.data?.debug ?? '';
+    }
+
+    private buildUpstreamDebugSnippet(error: OdooJsonRpcError): string | undefined {
+        const debug = this.extractUpstreamDebug(error).trim();
+        if (!debug) {
+            return undefined;
+        }
+
+        return debug
+            .replace(/session_id=[^;\s]+/gi, 'session_id=[Redacted]')
+            .replace(/("password"\s*:\s*")([^"]+)(")/gi, '$1[Redacted]$3')
+            .replace(/(password=)([^\s&]+)/gi, '$1[Redacted]')
+            .replace(/(api[_-]?key\s*[=:]\s*["']?)([^"'\s&;]+)/gi, '$1[Redacted]')
+            .replace(/((?:access|refresh|id)?[_-]?token\s*[=:]\s*["']?)([^"'\s&;]+)/gi, '$1[Redacted]')
+            .replace(/((?:client|api)?[_-]?secret\s*[=:]\s*["']?)([^"'\s&;]+)/gi, '$1[Redacted]')
+            .slice(0, 500);
+    }
+
+    private isUninitializedDatabaseError(
+        errorName: string,
+        normalizedMessage: string,
+        normalizedDebug: string,
+    ): boolean {
+        return (
+            (errorName.includes('keyerror') && normalizedMessage.includes('res.users'))
+            || normalizedDebug.includes("keyerror: 'res.users'")
+            || normalizedDebug.includes('relation "ir_module_module" does not exist')
+            || normalizedDebug.includes('tried to poll an undefined table on database')
+        );
     }
 
     private extractSessionCookie(response: Response): string | null {
@@ -469,4 +557,12 @@ interface OdooJsonRpcError {
         debug?: string;
         name?: string;
     };
+}
+
+interface OdooRpcLogContext {
+    path: string;
+    service?: string;
+    operation?: string;
+    model?: string;
+    method?: string;
 }

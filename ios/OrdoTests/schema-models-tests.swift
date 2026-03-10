@@ -137,6 +137,35 @@ struct SchemaModelsTests {
         )
     }
 
+    @Test
+    func mobileListSchemaPreservesSearchFieldFilterDomain() throws {
+        let json = """
+        {
+            "model": "res.partner",
+            "title": "Partners",
+            "columns": [
+                { "name": "name", "type": "char", "label": "Name" }
+            ],
+            "search": {
+                "fields": [
+                    {
+                        "name": "display_name",
+                        "label": "Customer",
+                        "type": "char",
+                        "filterDomain": "[\\"|\\",[\\"display_name\\",\\"ilike\\",\\"self\\"],[\\"name\\",\\"ilike\\",\\"self\\"]]"
+                    }
+                ],
+                "filters": [],
+                "groupBy": []
+            }
+        }
+        """.data(using: .utf8)!
+
+        let schema = try JSONDecoder().decode(MobileListSchema.self, from: json)
+
+        #expect(schema.search.fields.first?.filterDomain == "[\"|\",[\"display_name\",\"ilike\",\"self\"],[\"name\",\"ilike\",\"self\"]]")
+    }
+
     private func encodedJSONValue<T: Encodable>(from value: T) throws -> JSONValue {
         let data = try JSONEncoder().encode(value)
         return try JSONDecoder().decode(JSONValue.self, from: data)

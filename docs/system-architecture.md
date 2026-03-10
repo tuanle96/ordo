@@ -236,6 +236,18 @@ The discovery slice removes the last major static browse bottleneck without inve
 - **Failure handling remains conservative**: if discovery fails, iOS falls back to the existing static registry path instead of blocking browse entirely or pretending discovery is guaranteed
 - **Successful empty discovery is treated honestly**: if the backend successfully returns an empty `browseMenuTree`, iOS shows no browse entries instead of silently re-expanding the static registry and pretending discovery found something it did not
 
+## iOS read-only relation drilldown scope (2026-03-10)
+
+The relation drilldown slice closes the gap between read-only many2one/many2many labels and related record detail without expanding into edit-mode navigation:
+
+- **Many2one NavigationLink presentation** — read-only many2one fields render as tappable rows with chevron affordance when comodel metadata and relation ID are present in the current record payload, otherwise fall back to plain text
+- **Many2many chip grid presentation** — read-only many2many fields render as lazily-laid-out NavigationLink chips within a grid when comodel metadata and relation ID array are present, otherwise fall back to plain text
+- **Model descriptor lookup via environment** — navigation destinations use `@Environment(AppState.self)` to resolve `ModelDescriptor` for the related model, enabling proper title/icon/fallback rendering on the destination detail screen
+- **Fallback discipline is explicit** — missing comodel metadata, empty relation arrays, or string-only many2many values (no ID data) remain non-interactive text instead of attempting broken navigation
+- **Scope stays honest**: only read-only mode is supported; edit-mode relation fields continue using the existing search/select UI since navigation would conflict with field editing
+- **Scope excludes one2many intentionally** — one2many relations are line-item lists not navigation targets, so they remain out of scope for this drilldown architecture
+- **No new contracts required** — reuses existing `RecordDetailView`, `ModelDescriptor`, `MobileSchema` comodel metadata, and `AppState` infrastructure, keeping implementation minimal and runtime dependencies shallow
+
 ## Core-engine offline mutation queue foundation (2026-03-09)
 
 The first offline-write slice stays intentionally modest: it gives Ordo a real persisted retry foundation without claiming full sync-engine parity.
@@ -318,3 +330,13 @@ The following remain deferred beyond the current scope:
 - autosave
 - draft recovery after app relaunch
 - expanded field type editors beyond the current Phase 01 matrix and narrow `one2many` scope
+
+## iOS read-only relation drilldown slice (2026-03-10)
+
+The relation drilldown slice closes the honest many2one/many2many navigation gap without requiring new backend contracts or inventing a second relation transport:
+
+- **Read-only relation presentation metadata** carried in `ReadOnlyFieldRowModel.relationPresentation` distinguishes between many2one row-style navigation and many2many chip-grid navigation
+- **Factory-level extraction** in `FieldRowFactory.relationPresentation(...)` inspects field comodel and rawValue relation IDs, returns `.row()` for single many2one relations and `.chips()` for many2many relation arrays, and falls back to `nil` when comodel is missing or empty
+- **NavigationLink-based UI** in `read-only-field-row.swift` renders many2one as a single tappable row with chevron icon, many2many as a lazy grid of pill-shaped chips, both navigate to `RecordDetailView` with proper `ModelDescriptor` lookup through environment-injected `AppState`
+- **Scope stays narrow and honest**: only many2one and many2many are supported, only in read-only mode (edit mode still uses search/select), one2many is intentionally excluded (line item lists not drilldown targets), fields without comodel metadata fall back to plain text rendering
+- **Safe fallback behavior**: missing comodel, string-only many2many values, or empty relation arrays all return `nil` presentation and render as standard text instead of crashing or offering broken navigation

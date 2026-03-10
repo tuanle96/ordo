@@ -244,6 +244,133 @@ struct RecordListViewModelTests {
     }
 
     @Test
+    func schemaFilterDomainReplacesSelfPlaceholderInRequestDomain() async throws {
+        var requestedDomains: [String?] = []
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchemaWithFilterDomain)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let domain = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "domain" })?.value
+                requestedDomains.append(domain)
+                let payload = RecordListResult(items: [["id": .number(11), "name": .string("Azure Interior")]], limit: 30, offset: 0, total: 1)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
+
+        await viewModel.apply(
+            filterState: BrowseFilterState(conditions: [
+                BrowseFilterCondition(fieldName: "display_name", filterOperator: .contains, value: .string("azure")),
+            ]),
+            using: appState
+        )
+
+        #expect(requestedDomains == ["[\"|\",[\"display_name\",\"ilike\",\"azure\"],[\"name\",\"ilike\",\"azure\"]]"])
+
+        let filteredCache = await appState.cacheStore.loadListPage(
+            for: "res.partner",
+            limit: 30,
+            offset: 0,
+            order: nil,
+            domainKey: "[\"|\",[\"display_name\",\"ilike\",\"azure\"],[\"name\",\"ilike\",\"azure\"]]",
+            fieldKey: "id,display_name,name,email",
+            scope: try #require(appState.cacheScope)
+        )
+        #expect(filteredCache?.value.items.count == 1)
+    }
+
+    @Test
+    func schemaFilterDomainCombinesWithQuickFilter() async throws {
+        var requestedDomains: [String?] = []
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchemaWithFilterDomain)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let domain = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "domain" })?.value
+                requestedDomains.append(domain)
+                let payload = RecordListResult(items: [["id": .number(12), "name": .string("Azure Interior")]], limit: 30, offset: 0, total: 1)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
+
+        await viewModel.load(using: appState)
+        await viewModel.applyQuickFilter(named: "companies", using: appState)
+        await viewModel.apply(
+            filterState: BrowseFilterState(conditions: [
+                BrowseFilterCondition(fieldName: "display_name", filterOperator: .contains, value: .string("azure")),
+            ]),
+            using: appState
+        )
+
+        #expect(requestedDomains.last == "[[\"is_company\",\"=\",true],\"|\",[\"display_name\",\"ilike\",\"azure\"],[\"name\",\"ilike\",\"azure\"]]")
+    }
+
+    @Test
+    func schemaFieldWithoutFilterDomainKeepsLegacyClauseBehavior() async throws {
+        var requestedDomains: [String?] = []
+
+        ListViewModelTestURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+
+            if path.hasSuffix("/auth/me") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: AuthenticatedPrincipal.preview)))
+            }
+
+            if path.hasSuffix("/schema/res.partner/list") {
+                return (200, try JSONEncoder().encode(TestEnvelope(data: sampleListSchemaWithFilterDomain)))
+            }
+
+            if path.contains("/records/res.partner") {
+                let domain = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "domain" })?.value
+                requestedDomains.append(domain)
+                let payload = RecordListResult(items: [["id": .number(13), "name": .string("Azure Interior")]], limit: 30, offset: 0, total: 1)
+                return (200, try JSONEncoder().encode(TestEnvelope(data: payload)))
+            }
+
+            throw URLError(.unsupportedURL)
+        }
+
+        let appState = try await makeRestoredAppState()
+        let viewModel = try makeViewModel(userDefaults: makeIsolatedUserDefaults())
+
+        await viewModel.apply(
+            filterState: BrowseFilterState(conditions: [
+                BrowseFilterCondition(fieldName: "email", filterOperator: .contains, value: .string("azure")),
+            ]),
+            using: appState
+        )
+
+        #expect(requestedDomains == ["[[\"email\",\"ilike\",\"azure\"]]"])
+    }
+
+    @Test
     func retriesListSchemaAfterTransientFailure() async throws {
         var schemaRequestCount = 0
 
@@ -422,5 +549,25 @@ private let sampleListSchema = MobileListSchema(
         groupBy: [
             SearchGroupBy(name: "group_country", label: "Country", fieldName: "country_id"),
         ]
+    )
+)
+
+private let sampleListSchemaWithFilterDomain = MobileListSchema(
+    model: "res.partner",
+    title: "Customers",
+    columns: [
+        ListColumn(name: "name", type: .char, label: "Name", comodel: nil, selection: nil, widget: nil, optional: nil, columnInvisible: nil),
+        ListColumn(name: "email", type: .char, label: "Email", comodel: nil, selection: nil, widget: nil, optional: .show, columnInvisible: nil),
+    ],
+    defaultOrder: "name asc",
+    search: .init(
+        fields: [
+            SearchField(name: "display_name", label: "Customer", type: .char, filterDomain: "[\"|\",[\"display_name\",\"ilike\",\"self\"],[\"name\",\"ilike\",\"self\"]]", selection: nil),
+            SearchField(name: "email", label: "Email", type: .char, filterDomain: nil, selection: nil),
+        ],
+        filters: [
+            SearchFilter(name: "companies", label: "Companies", domain: "[[\"is_company\",\"=\",true]]"),
+        ],
+        groupBy: []
     )
 )

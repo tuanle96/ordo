@@ -3,6 +3,8 @@ import QuickLook
 import UIKit
 
 struct ReadOnlyFieldRow: View {
+    @Environment(AppState.self) private var appState
+
     let model: ReadOnlyFieldRowModel
 
     @State private var previewFile: TemporaryAttachmentFile?
@@ -14,6 +16,10 @@ struct ReadOnlyFieldRow: View {
             case .standard:
                 if model.attachment?.kind == .document {
                     attachmentValueRow(multiline: false)
+                } else if case .row(let destination)? = model.relationPresentation {
+                    relationRow(destination: destination)
+                } else if case .chips(let destinations)? = model.relationPresentation {
+                    relationChipsRow(destinations: destinations)
                 } else {
                     row(multiline: false)
                 }
@@ -74,6 +80,10 @@ struct ReadOnlyFieldRow: View {
         }
     }
 
+    private func descriptor(for destination: ReadOnlyRelationDestination) -> ModelDescriptor {
+        appState.modelDescriptor(for: destination.model)
+    }
+
     @ViewBuilder
     private func row(multiline: Bool) -> some View {
         LabeledContent(model.label) {
@@ -87,6 +97,63 @@ struct ReadOnlyFieldRow: View {
                     .multilineTextAlignment(.trailing)
                     .lineLimit(multiline ? nil : 1)
                     .accessibilityIdentifier("field-value-\(model.id)")
+            }
+        }
+        .accessibilityIdentifier("field-row-\(model.id)")
+    }
+
+    private func relationRow(destination: ReadOnlyRelationDestination) -> some View {
+        NavigationLink {
+            RecordDetailView(
+                descriptor: descriptor(for: destination),
+                recordID: destination.recordID
+            )
+        } label: {
+            LabeledContent(model.label) {
+                HStack(spacing: 6) {
+                    Text(model.value)
+                        .multilineTextAlignment(.trailing)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("field-value-\(model.id)")
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("field-link-\(model.id)")
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func relationChipsRow(destinations: [ReadOnlyRelationDestination]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.label)
+                .font(.subheadline.weight(.medium))
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(destinations) { destination in
+                    NavigationLink {
+                        RecordDetailView(
+                            descriptor: descriptor(for: destination),
+                            recordID: destination.recordID
+                        )
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(destination.label)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("field-relation-\(model.id)-\(destination.recordID)")
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .accessibilityIdentifier("field-row-\(model.id)")
@@ -276,4 +343,5 @@ private struct QuickLookPreviewSheet: UIViewControllerRepresentable {
         ReadOnlyFieldRow(model: ReadOnlyFieldRowModel(id: "comment", label: "Notes", value: "Preferred customer", style: .multiline))
         ReadOnlyFieldRow(model: ReadOnlyFieldRowModel(id: "state", label: "Status", value: "Active", style: .status))
     }
+    .environment(AppState.preview)
 }
